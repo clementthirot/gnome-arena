@@ -1,0 +1,29 @@
+[
+  {
+    "id": "rock_fall", "label": "Chute de roche !", "weight": 3, "from": 10, "target": "densest",
+    "telegraph": 1.2, "telegraphRadius": 13, "visual": "rock",
+    "effects": [ { "type": "damage", "amount": 30, "radius": 13, "knockback": 120, "friendlyFire": true, "visual": "dust" } ]
+  },
+  {
+    "id": "fireball", "label": "Boule de feu !", "weight": 2, "from": 20, "target": "random_unit",
+    "telegraph": 0.5, "telegraphRadius": 18, "visual": "fireball",
+    "effects": [
+      { "type": "projectile", "speed": 130, "arc": 30, "visual": "fireball", "effects": [
+        { "type": "damage", "amount": 18, "radius": 18, "knockback": 150, "friendlyFire": true, "visual": "explosion" }
+      ] }
+    ]
+  },
+  {
+    "id": "lightning", "label": "Éclair !", "weight": 2, "from": 30, "target": "hero",
+    "telegraph": 0.9, "telegraphRadius": 8, "visual": "lightning",
+    "effects": [
+      { "type": "damage", "amount": 24, "radius": 6, "knockback": 60, "friendlyFire": true, "visual": "lightning" },
+      { "type": "ricochet", "bounces": 3, "range": 35, "amount": 14, "falloff": 0.8, "friendlyFire": true, "visual": "lightning" }
+    ]
+  },
+  {
+    "id": "mud", "label": "Flaque de boue", "weight": 1, "from": 15, "target": "random_point",
+    "telegraph": 0.3, "telegraphRadius": 22, "visual": "mud",
+    "effects": [ { "type": "slow", "factor": 0.45, "duration": 4, "radius": 22, "friendlyFire": true, "visual": "mud" } ]
+  }
+]

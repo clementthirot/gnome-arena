@@ -1,0 +1,278 @@
+{
+  "$comment": "Clé visuelle -> asset. Passer aux vrais sprites = remplacer une entrée placeholder par une entrée spritesheet. Tailles en px monde (x4 à l'écran).",
+  "defaults": {
+    "bricks": {
+      "attack": "lunge",
+      "shoot": "recoil",
+      "hurt": "flash",
+      "death": "topple",
+      "impact": "explode",
+      "panic": "exclaim"
+    }
+  },
+  "assets": {
+    "gnome_melee": {
+      "type": "placeholder",
+      "body": "gnome",
+      "size": 12,
+      "color": "#5b8def",
+      "accent": "#d83b3b",
+      "mark": "none"
+    },
+    "gnome_archer": {
+      "type": "placeholder",
+      "body": "gnome",
+      "size": 12,
+      "color": "#5b8def",
+      "accent": "#3f9e4a",
+      "mark": "bow"
+    },
+    "gnome_charger": {
+      "type": "placeholder",
+      "body": "gnome",
+      "size": 14,
+      "color": "#3d6cc4",
+      "accent": "#d83b3b",
+      "mark": "helmet"
+    },
+    "goblin_melee": {
+      "type": "placeholder",
+      "body": "goblin",
+      "size": 12,
+      "color": "#7cc243",
+      "accent": "#7a4a26",
+      "mark": "none"
+    },
+    "goblin_archer": {
+      "type": "placeholder",
+      "body": "goblin",
+      "size": 12,
+      "color": "#7cc243",
+      "accent": "#7a4a26",
+      "mark": "bow"
+    },
+    "goblin_charger": {
+      "type": "placeholder",
+      "body": "goblin",
+      "size": 14,
+      "color": "#5a9a2c",
+      "accent": "#7a4a26",
+      "mark": "helmet"
+    },
+    "hero_bob": {
+      "type": "placeholder",
+      "body": "gnome",
+      "size": 22,
+      "color": "#6fa0ff",
+      "accent": "#e8b830",
+      "mark": "helmet",
+      "outline": "#fff4c2"
+    },
+    "hero_kevin": {
+      "type": "placeholder",
+      "body": "gnome",
+      "size": 20,
+      "color": "#6fa0ff",
+      "accent": "#8a4fd8",
+      "mark": "bow",
+      "outline": "#fff4c2"
+    },
+    "hero_gertrude": {
+      "type": "placeholder",
+      "body": "gnome",
+      "size": 20,
+      "color": "#6fa0ff",
+      "accent": "#ff7a3a",
+      "mark": "none",
+      "outline": "#fff4c2"
+    },
+    "hero_grok": {
+      "type": "placeholder",
+      "body": "goblin",
+      "size": 22,
+      "color": "#8fd456",
+      "accent": "#5a3010",
+      "mark": "helmet",
+      "outline": "#fff4c2"
+    },
+    "hero_snik": {
+      "type": "placeholder",
+      "body": "goblin",
+      "size": 20,
+      "color": "#8fd456",
+      "accent": "#40285a",
+      "mark": "bow",
+      "outline": "#fff4c2"
+    },
+    "hero_morva": {
+      "type": "placeholder",
+      "body": "goblin",
+      "size": 20,
+      "color": "#8fd456",
+      "accent": "#a02020",
+      "mark": "none",
+      "outline": "#fff4c2"
+    }
+  },
+  "accessories": {
+    "acc_goggles": {
+      "type": "placeholder",
+      "kind": "goggles",
+      "color": "#ff3040",
+      "accent": "#2a2a2a",
+      "anchor": [
+        0.18,
+        -0.22
+      ]
+    },
+    "acc_sword": {
+      "type": "placeholder",
+      "kind": "sword",
+      "color": "#d8f0ff",
+      "accent": "#8a5a2b",
+      "anchor": [
+        0.48,
+        0
+      ]
+    },
+    "acc_grenades": {
+      "type": "placeholder",
+      "kind": "grenades",
+      "color": "#4a5a3a",
+      "accent": "#8a5a2b",
+      "anchor": [
+        0,
+        0.22
+      ]
+    },
+    "acc_glue": {
+      "type": "placeholder",
+      "kind": "jar",
+      "color": "#b8f050",
+      "accent": "#8a8a8a",
+      "anchor": [
+        -0.42,
+        0.1
+      ]
+    },
+    "acc_chicken": {
+      "type": "placeholder",
+      "kind": "chicken",
+      "color": "#ffffff",
+      "accent": "#ff8a00",
+      "anchor": [
+        -0.4,
+        -0.15
+      ]
+    },
+    "acc_pot": {
+      "type": "placeholder",
+      "kind": "pot",
+      "color": "#7a7a86",
+      "accent": "#4a4a52",
+      "anchor": [
+        0,
+        -0.5
+      ]
+    }
+  },
+  "effects": {
+    "arrow": {
+      "kind": "arrow",
+      "color": "#f4f0e0",
+      "accent": "#2a1a0a",
+      "size": 1
+    },
+    "laser": {
+      "kind": "line",
+      "color": "#ff3040",
+      "accent": "#ffd0d8",
+      "size": 1.5,
+      "duration": 0.15
+    },
+    "grenade": {
+      "kind": "ball",
+      "color": "#3a4a2a",
+      "accent": "#ffcc33",
+      "size": 3
+    },
+    "glue_ball": {
+      "kind": "ball",
+      "color": "#b8f050",
+      "accent": "#ffffff",
+      "size": 3
+    },
+    "chicken": {
+      "kind": "ball",
+      "color": "#ffffff",
+      "accent": "#ff8a00",
+      "size": 4
+    },
+    "fireball": {
+      "kind": "ball",
+      "color": "#ff6a1a",
+      "accent": "#ffe14a",
+      "size": 6
+    },
+    "rock": {
+      "kind": "ball",
+      "color": "#7b6a58",
+      "accent": "#a89880",
+      "size": 8
+    },
+    "spark": {
+      "kind": "spark",
+      "color": "#fff4a0",
+      "accent": "#ff3040",
+      "size": 1
+    },
+    "slash": {
+      "kind": "ring",
+      "color": "#c8e8ff",
+      "accent": "#ffffff",
+      "size": 1,
+      "duration": 0.25
+    },
+    "explosion": {
+      "kind": "ring",
+      "color": "#ffb347",
+      "accent": "#fff2b0",
+      "size": 2,
+      "duration": 0.4
+    },
+    "dust": {
+      "kind": "ring",
+      "color": "#c8a46c",
+      "accent": "#e0c590",
+      "size": 2,
+      "duration": 0.45
+    },
+    "lightning": {
+      "kind": "bolt",
+      "color": "#fff7a8",
+      "accent": "#9fd8ff",
+      "size": 2,
+      "duration": 0.25
+    },
+    "glue": {
+      "kind": "puddle",
+      "color": "#b8f050",
+      "accent": "#ffffff",
+      "size": 1,
+      "duration": 3.5
+    },
+    "mud": {
+      "kind": "puddle",
+      "color": "#6b4a2a",
+      "accent": "#8a6a40",
+      "size": 1,
+      "duration": 4
+    },
+    "feathers": {
+      "kind": "spark",
+      "color": "#ffffff",
+      "accent": "#ff8a00",
+      "size": 1
+    }
+  }
+}

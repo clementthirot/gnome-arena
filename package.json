@@ -1,0 +1,28 @@
+{
+  "name": "gnome-arena",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Gnomes vs Gobelins — arène feuilleton (lot 1 : POC mêlée)",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "bench": "tsx scripts/bench.ts",
+    "episode": "tsx scripts/episode.ts"
+  },
+  "dependencies": {
+    "@fontsource/press-start-2p": "^5.2.5",
+    "phaser": "3.90.0",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "bob", "name": "Bob", "label": "le vaillant", "base": "gnome_charger", "visual": "hero_bob",
+    "personality": "valiant", "stats": { "hp": 3.2, "damage": 1.6, "speed": 1.05, "size": 1.7, "mass": 2.2 }
+  },
+  {
+    "id": "kevin", "name": "Kevin", "label": "le prudent", "base": "gnome_archer", "visual": "hero_kevin",
+    "personality": "cautious", "stats": { "hp": 2.8, "damage": 1.8, "speed": 1.05, "size": 1.6, "mass": 1.6 }
+  },
+  {
+    "id": "gertrude", "name": "Gertrude", "label": "la téméraire", "base": "gnome_melee", "visual": "hero_gertrude",
+    "personality": "reckless", "stats": { "hp": 3, "damage": 1.7, "speed": 1.1, "size": 1.6, "mass": 1.8 }
+  },
+  {
+    "id": "grok", "name": "Grok", "label": "la brute", "base": "goblin_charger", "visual": "hero_grok",
+    "personality": "reckless", "stats": { "hp": 3.2, "damage": 1.6, "speed": 1.05, "size": 1.75, "mass": 2.3 }
+  },
+  {
+    "id": "snik", "name": "Snik", "label": "le fourbe", "base": "goblin_archer", "visual": "hero_snik",
+    "personality": "sneaky", "stats": { "hp": 2.8, "damage": 1.8, "speed": 1.1, "size": 1.6, "mass": 1.5 }
+  },
+  {
+    "id": "morva", "name": "Morva", "label": "la vaillante", "base": "goblin_melee", "visual": "hero_morva",
+    "personality": "valiant", "stats": { "hp": 3, "damage": 1.7, "speed": 1.05, "size": 1.6, "mass": 1.8 }
+  }
+]

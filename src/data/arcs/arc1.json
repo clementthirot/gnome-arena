@@ -1,0 +1,7 @@
+{
+  "id": "arc1",
+  "title": "Arc 1 — La Grande Mêlée",
+  "heroes": ["bob", "kevin", "gertrude", "grok", "snik", "morva"],
+  "status": "open",
+  "episodes": []
+}

@@ -1,0 +1,35 @@
+{
+  "tickRate": 30,
+  "arena": {
+    "width": 270,
+    "height": 480,
+    "field": { "x": 18, "y": 70, "width": 234, "height": 350 }
+  },
+  "armies": {
+    "gnomes": { "gnome_melee": 24, "gnome_archer": 14, "gnome_charger": 9 },
+    "goblins": { "goblin_melee": 24, "goblin_archer": 14, "goblin_charger": 9 }
+  },
+  "rules": {
+    "maxAttackersPerTarget": 3,
+    "targetRandomness": 0.6,
+    "retargetInterval": [2, 5],
+    "damageScale": 0.22,
+    "knockbackDecay": 0.02,
+    "separationStrength": 40,
+    "wander": 6,
+    "moraleRegen": 0.04,
+    "moraleLossOnHit": 0.9,
+    "moraleLossOnAllyDeath": 0.12,
+    "allyDeathRadius": 30,
+    "underdog": { "threshold": 0.05, "fullAt": 0.3, "maxBonus": 1, "heroFactor": 2 },
+    "panicDuration": [1.5, 3.5]
+  },
+  "events": { "perMinute": 3, "endRamp": 4, "firstAt": 12 },
+  "ending": {
+    "shrinkStart": 45,
+    "shrinkEnd": 75,
+    "minScale": 0.25,
+    "zoneDamage": 0.08,
+    "hardCap": 80
+  }
+}

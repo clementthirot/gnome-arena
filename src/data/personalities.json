@@ -1,0 +1,8 @@
+[
+  { "id": "steady", "label": "Ordinaire", "distanceFactor": 1, "recklessChance": 0.03, "panicThreshold": 0.25, "panicChance": 0.25, "fickleness": 0.3 },
+  { "id": "coward", "label": "Peureux", "distanceFactor": 1.5, "recklessChance": 0.02, "panicThreshold": 0.45, "panicChance": 0.45, "fickleness": 0.45, "speedFactor": 1.05 },
+  { "id": "reckless", "label": "Téméraire", "distanceFactor": 0.6, "recklessChance": 0.2, "panicThreshold": 0.1, "panicChance": 0.1, "fickleness": 0.2, "speedFactor": 1.1 },
+  { "id": "valiant", "label": "Vaillant", "distanceFactor": 0.7, "recklessChance": 0.15, "panicThreshold": 0.08, "panicChance": 0.05, "fickleness": 0.15, "speedFactor": 1.05 },
+  { "id": "cautious", "label": "Prudent", "distanceFactor": 1.4, "recklessChance": 0.04, "panicThreshold": 0.35, "panicChance": 0.3, "fickleness": 0.25 },
+  { "id": "sneaky", "label": "Fourbe", "distanceFactor": 1.2, "recklessChance": 0.06, "panicThreshold": 0.3, "panicChance": 0.35, "fickleness": 0.6, "speedFactor": 1.1 }
+]

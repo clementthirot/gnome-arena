@@ -1,0 +1,178 @@
+[
+  {
+    "id": "laser_goggles",
+    "label": "Lunettes laser",
+    "short": "laser",
+    "visual": "acc_goggles",
+    "special": {
+      "maxRange": 110,
+      "cooldown": 6,
+      "misfire": {
+        "chance": 0.12,
+        "mode": "random"
+      },
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 520,
+          "visual": "laser",
+          "effects": [
+            {
+              "type": "damage",
+              "power": 1,
+              "knockback": 50,
+              "visual": "spark"
+            },
+            {
+              "type": "ricochet",
+              "bounces": 2,
+              "range": 45,
+              "power": 0.6,
+              "falloff": 0.7,
+              "friendlyFire": true,
+              "visual": "laser"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "magic_sword",
+    "label": "Épée magique",
+    "short": "épée",
+    "visual": "acc_sword",
+    "stats": {
+      "damage": 1.05
+    },
+    "special": {
+      "maxRange": 5,
+      "cooldown": 7,
+      "effects": [
+        {
+          "type": "damage",
+          "power": 1,
+          "radius": 10,
+          "knockback": 130,
+          "visual": "slash"
+        }
+      ]
+    }
+  },
+  {
+    "id": "grenades",
+    "label": "Grenades",
+    "short": "grenades",
+    "visual": "acc_grenades",
+    "special": {
+      "minRange": 20,
+      "maxRange": 95,
+      "cooldown": 5,
+      "misfire": {
+        "chance": 0.08,
+        "mode": "self"
+      },
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 85,
+          "arc": 24,
+          "spread": 10,
+          "visual": "grenade",
+          "effects": [
+            {
+              "type": "damage",
+              "power": 4,
+              "radius": 18,
+              "knockback": 150,
+              "friendlyFire": true,
+              "visual": "explosion"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "glue_bomb",
+    "label": "Bombe à glu",
+    "short": "glu",
+    "visual": "acc_glue",
+    "special": {
+      "minRange": 15,
+      "maxRange": 85,
+      "cooldown": 8,
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 95,
+          "arc": 18,
+          "spread": 6,
+          "visual": "glue_ball",
+          "effects": [
+            {
+              "type": "slow",
+              "factor": 0.6,
+              "duration": 2.5,
+              "radius": 16,
+              "visual": "glue"
+            },
+            {
+              "type": "damage",
+              "power": 1,
+              "radius": 16
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "chicken_launcher",
+    "label": "Lance-poulet",
+    "short": "poulet",
+    "visual": "acc_chicken",
+    "special": {
+      "minRange": 10,
+      "maxRange": 80,
+      "cooldown": 4,
+      "misfire": {
+        "chance": 0.15,
+        "mode": "ally"
+      },
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 110,
+          "arc": 14,
+          "spread": 8,
+          "visual": "chicken",
+          "effects": [
+            {
+              "type": "knockback",
+              "force": 230,
+              "radius": 16
+            },
+            {
+              "type": "damage",
+              "power": 1.5,
+              "radius": 8,
+              "visual": "feathers"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "iron_pot",
+    "label": "Casserole en fonte",
+    "short": "casserole",
+    "visual": "acc_pot",
+    "stats": {
+      "hp": 1.45,
+      "mass": 1.4,
+      "speed": 0.95
+    }
+  }
+]
