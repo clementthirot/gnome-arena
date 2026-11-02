@@ -3,7 +3,7 @@
 import type Phaser from 'phaser';
 import type { Staging } from './manifest';
 
-type Moment = 'heroDeath' | 'heroDuel' | 'heroCharge' | 'misfire' | 'lastStand';
+type Moment = 'heroDeath' | 'heroDuel' | 'heroCharge' | 'misfire' | 'lastStand' | 'bigImpact';
 
 interface Shot {
   /** Position écran suivie (appelée à chaque image : la cible bouge). */
@@ -13,7 +13,7 @@ interface Shot {
   priority: number;
 }
 
-const PRIORITY: Record<Moment, number> = { misfire: 1, heroCharge: 1, heroDuel: 2, heroDeath: 3, lastStand: 4 };
+const PRIORITY: Record<Moment, number> = { misfire: 1, heroCharge: 1, bigImpact: 2, heroDuel: 2, heroDeath: 3, lastStand: 4 };
 
 export class Director {
   private shot: Shot | null = null;

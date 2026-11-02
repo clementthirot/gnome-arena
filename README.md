@@ -82,8 +82,10 @@ commande donne le même combat dans Chrome, Firefox ou Safari.
 - **Un incident d'arène** : `src/data/events.json` — poids, moment d'apparition, cible (`densest`, `hero`, `random_unit`, `random_point`), télégraphe, effets.
 - **Un rendu d'effet** : `manifest.effects` (trait, boule, anneau, flaque, éclair, étincelles).
 
-Effets disponibles : `damage` (ponctuel ou de zone, tir allié possible), `projectile` (contient d'autres effets à l'impact),
-`ricochet` (rebonds en chaîne), `knockback`, `slow`. Une boule de feu = un `projectile` qui déclenche un `damage` de zone.
+Effets disponibles : `damage` (ponctuel ou de zone, tir allié possible), `projectile` (contient d'autres effets à l'impact,
+peut tomber du ciel avec `fromSky`), `ricochet` (rebonds en chaîne), `beam` (rayon qui traverse l'arène et rebondit sur les murs),
+`launch` (projette dans les airs), `spawn` (renforts qui sautent dans l'arène), `knockback`, `slow`.
+Les effets de zone peuvent se centrer sur le lanceur (`"at": "self"`, le tourbillon de l'épée) et un rayon peut se charger avant de frapper (`delay`). Une boule de feu = un `projectile` qui déclenche un `damage` de zone.
 
 ## Mécaniques
 
@@ -94,11 +96,16 @@ Effets disponibles : `damage` (ponctuel ou de zone, tir allié possible), `proje
 - **Personnalités** : tendances probabilistes ; les héros gardent la leur d'un combat à l'autre.
 - **Moral** : panique et fuite sous le seuil, poursuites.
 - **Rage du camp mené** (`rules.underdog`) : garde des retournements possibles.
-- **Incidents** : chute de roche sur la mêlée, boule de feu, éclair en chaîne sur un héros, flaque de boue ; plus fréquents quand l'arène rétrécit.
-- **Fin maîtrisée** : l'arène rétrécit de 45 s à 75 s, victoire aux PV restants à 80 s.
+- **Incidents** : météore qui tombe du ciel et projette tout le monde, chute de roche sur la mêlée, boule de feu, éclair en chaîne sur un héros, flaque de boue ; plus fréquents quand l'arène rétrécit.
+- **Unités en l'air** : projetées par un météore, une charge ou un K.O. aérien, elles volent loin, ne combattent plus pendant le vol et restent étourdies à l'atterrissage. Les héros vaincus s'envolent toujours, les troupes de temps en temps (`rules.tuning.koLaunch`).
+- **Rebonds** : un gros recul fait sauter l'unité, qui rebondit au sol tant qu'elle retombe vite (`rules.tuning.bounce`).
+- **Supporters** : de temps en temps, des spectateurs sautent le muret et rejoignent un camp, ou le camp mené (jusqu'à 58 s).
+- **Fin maîtrisée** : un gaz toxique sort des conduits et resserre l'arène de 45 s à 75 s ; victoire aux PV restants à 80 s.
 
 ## Mise en scène (rendu uniquement, réglable dans `manifest.staging`)
 
 - **Présentation des héros** avant « COMBAT ! » : nom, surnom, upgrades portées.
 - **Caméra** : zoom bref sur un héros qui tombe, un duel de héros gagné, un tir raté, et suivi continu d'un héros seul contre trois ennemis ou plus. L'interface reste fixe (seconde caméra). Les charges de héros sont désactivées par défaut (`triggers.heroCharge`).
-- **Tirs perdus** : une flèche ratée près du bord peut filer dans les gradins et toucher un spectateur.
+- **Public touché** : flèches ratées, explosions au bord et rayons qui finissent dans le muret atteignent les spectateurs.
+- **Gaz** : bouffées vertes crachées par 8 conduits dans les murets (`staging.gas`).
+- **Morts trash** : gouttes de sang aux coups, petite flaque sous chaque corps (`staging.gore`, désactivable).

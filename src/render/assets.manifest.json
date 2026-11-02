@@ -640,6 +640,110 @@
         "mark": "none",
         "outline": "#fff4c2"
       }
+    },
+    "fan_gnome": {
+      "type": "spritesheet",
+      "url": "sprites/generated/fan_gnome.png",
+      "frameWidth": 18,
+      "frameHeight": 18,
+      "size": 18,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "gnome",
+        "size": 10,
+        "color": "#8aa8d8",
+        "accent": "#e8c040",
+        "mark": "none"
+      }
+    },
+    "fan_goblin": {
+      "type": "spritesheet",
+      "url": "sprites/generated/fan_goblin.png",
+      "frameWidth": 18,
+      "frameHeight": 18,
+      "size": 18,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "goblin",
+        "size": 10,
+        "color": "#a8d080",
+        "accent": "#c08040",
+        "mark": "none"
+      }
     }
   },
   "accessories": {
@@ -825,6 +929,42 @@
       "color": "#ffffff",
       "accent": "#ff8a00",
       "size": 1
+    },
+    "laser_beam": {
+      "kind": "line",
+      "color": "#ff2a3a",
+      "accent": "#fff0f2",
+      "size": 3,
+      "duration": 0.4
+    },
+    "meteor": {
+      "kind": "ball",
+      "color": "#ff5a1a",
+      "accent": "#ffe14a",
+      "size": 14
+    },
+    "meteor_blast": {
+      "kind": "ring",
+      "color": "#ff8a2a",
+      "accent": "#fff2b0",
+      "size": 4,
+      "duration": 0.7,
+      "decal": "crater"
+    },
+    "crater": {
+      "kind": "puddle",
+      "color": "#3a2a1a",
+      "accent": "#6a4a2a",
+      "size": 1,
+      "duration": 12
+    },
+    "whirlwind": {
+      "kind": "swirl",
+      "color": "#c8e8ff",
+      "accent": "#ffffff",
+      "size": 2,
+      "duration": 0.45,
+      "spinSource": true
     }
   },
   "staging": {
@@ -839,16 +979,44 @@
         "heroDuel": true,
         "heroCharge": false,
         "misfire": true,
-        "lastStand": true
-      }
+        "lastStand": true,
+        "bigImpact": true
+      },
+      "bigImpactRadius": 30
     },
     "heroIntro": {
       "enabled": true,
       "duration": 2.8
     },
     "strayShots": {
-      "chance": 0.35,
-      "edgeDistance": 30
+      "chance": 0.6,
+      "edgeDistance": 45
+    },
+    "koSplash": {
+      "words": [
+        "BOUM !",
+        "PAF !",
+        "SPLAF !",
+        "BAM !",
+        "VLAN !"
+      ],
+      "color": "#ffe14a",
+      "minImpact": 110,
+      "gapMs": 800
+    },
+    "gas": {
+      "color": "#7ad04a",
+      "accent": "#b8f070",
+      "ventRate": 3,
+      "puffLife": 3,
+      "banner": "GAZ TOXIQUE !"
+    },
+    "gore": {
+      "enabled": true,
+      "color": "#a01818",
+      "dark": "#5a0a0a",
+      "puddle": 1.1,
+      "dropsPerHit": 2
     }
   }
 }

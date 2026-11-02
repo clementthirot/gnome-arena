@@ -82,13 +82,17 @@ const AccessorySchema = z.discriminatedUnion('type', [
 
 /** Rendu d'un effet, d'un projectile ou d'un incident, désigné par la clé "visual" des données. */
 const EffectVisualSchema = z.object({
-  kind: z.enum(['arrow', 'line', 'ball', 'ring', 'puddle', 'bolt', 'spark']),
+  kind: z.enum(['arrow', 'line', 'ball', 'ring', 'puddle', 'bolt', 'spark', 'swirl']),
+  /** Le lanceur tournoie sur lui-même pendant l'effet (tourbillon). */
+  spinSource: z.boolean().default(false),
   color,
   accent: color.optional(),
   /** Taille en px monde (épaisseur, diamètre). */
   size: z.number().positive().default(2),
   /** Durée d'affichage (s) pour les effets qui persistent (flaques, anneaux). */
   duration: z.number().positive().default(0.35),
+  /** Trace laissée au sol après l'effet (clé d'un autre effet, en général une flaque) : cratère… */
+  decal: z.string().optional(),
 });
 
 /** Mise en scène : caméra, présentation des héros, tirs perdus dans le public. */
@@ -102,12 +106,50 @@ const StagingSchema = z.object({
     cooldown: z.number().min(0).default(7),
     /** Douceur du suivi (0..1 par image). */
     follow: z.number().min(0.01).max(1).default(0.1),
+    /** Rayon (px monde) à partir duquel un effet compte comme un gros impact (météore). */
+    bigImpactRadius: z.number().positive().default(30),
     triggers: z
-      .object({ heroDeath: z.boolean(), heroDuel: z.boolean(), heroCharge: z.boolean(), misfire: z.boolean(), lastStand: z.boolean() })
+      .object({
+        heroDeath: z.boolean(),
+        heroDuel: z.boolean(),
+        heroCharge: z.boolean(),
+        misfire: z.boolean(),
+        lastStand: z.boolean(),
+        bigImpact: z.boolean(),
+      })
       .partial()
       .default({}),
   }),
   heroIntro: z.object({ enabled: z.boolean().default(true), duration: z.number().positive().default(2.8) }),
+  /** Onomatopée de bande dessinée quand un K.O. aérien retombe. */
+  koSplash: z.object({
+    words: z.array(z.string()).min(1),
+    color: color,
+    /** Vitesse de chute minimale (px/s) pour mériter une onomatopée. */
+    minImpact: z.number().min(0).default(110),
+    /** Écart minimal entre deux onomatopées (ms). */
+    gapMs: z.number().min(0).default(800),
+  }),
+  /** Gaz toxique de la zone qui se resserre, craché par des conduits. */
+  gas: z.object({
+    color: color,
+    accent: color,
+    /** Bouffées par seconde et par conduit au début du resserrement. */
+    ventRate: z.number().min(0).default(3),
+    /** Durée de vie d'une bouffée (s). */
+    puffLife: z.number().positive().default(3),
+    banner: z.string().default('GAZ TOXIQUE !'),
+  }),
+  /** Morts plus trash : gouttes et flaque sous les corps. */
+  gore: z.object({
+    enabled: z.boolean().default(true),
+    color: color,
+    dark: color,
+    /** Taille de la flaque, en multiple du rayon de l'unité. */
+    puddle: z.number().positive().default(2.6),
+    /** Gouttes projetées à chaque coup reçu. */
+    dropsPerHit: z.number().int().min(0).default(2),
+  }),
   strayShots: z.object({
     /** Probabilité qu'une flèche ratée près du bord file dans les gradins. */
     chance: z.number().min(0).max(1).default(0.35),
@@ -150,7 +192,7 @@ export function resolveAsset(key: string, team: 'gnomes' | 'goblins'): AssetEntr
     : { type: 'placeholder', body: 'goblin', size: 12, color: '#9ab88a', accent: '#7a4a26', mark: 'none' };
 }
 
-const FALLBACK_EFFECT: EffectVisual = { kind: 'spark', color: '#ffffff', size: 2, duration: 0.35 };
+const FALLBACK_EFFECT: EffectVisual = { kind: 'spark', color: '#ffffff', size: 2, duration: 0.35, spinSource: false };
 
 export function effectVisual(key: string): EffectVisual {
   return manifest.effects[key] ?? FALLBACK_EFFECT;

@@ -44,6 +44,11 @@ export interface Unit {
   chargeDir: { x: number; y: number };
   /** Ruée téméraire en cours (un peureux qui se jette dans la mêlée). */
   rushTimer: number;
+  /** Hauteur au-dessus du sol (0 = au sol) et vitesse verticale : unité projetée en l'air. */
+  z: number;
+  vz: number;
+  /** Étourdissement restant après un atterrissage. */
+  stunTimer: number;
   /** Temps passé à approcher sans se rapprocher (bloqué par la foule). */
   blockedTime: number;
   lastGap: number;
@@ -70,6 +75,8 @@ export interface Projectile {
   readonly effects?: readonly EffectDef[];
   readonly visual: string;
   readonly arc: number;
+  /** Tombe du ciel (météore) : le rendu le fait chuter en accélérant au lieu de suivre une cloche. */
+  readonly fall?: boolean;
   readonly fromX: number;
   readonly fromY: number;
   readonly toX: number;
@@ -93,12 +100,25 @@ export type BattleEvent =
   | { type: 'death'; unit: number; killer: number }
   | { type: 'zone'; scale: number }
   | { type: 'special'; unit: number; equipment: string; misfire: boolean }
-  | { type: 'effect'; visual: string; x: number; y: number; radius: number }
-  | { type: 'beam'; visual: string; fromX: number; fromY: number; toX: number; toY: number }
+  | { type: 'effect'; visual: string; x: number; y: number; radius: number; source: number }
+  | { type: 'beam'; visual: string; fromX: number; fromY: number; toX: number; toY: number; width?: number }
+  | { type: 'launch'; unit: number }
+  | { type: 'bounce'; unit: number; x: number; y: number; impact: number }
+  /** Le rayon se charge : sa trajectoire complète, dessinée avant le tir. */
+  | { type: 'beamCharge'; visual: string; width: number; duration: number; source: number; segments: BeamSegment[] }
+  | { type: 'spawn'; unit: number }
+  | { type: 'land'; unit: number; x: number; y: number; impact: number; dead: boolean }
   | { type: 'telegraph'; event: string; visual: string; x: number; y: number; radius: number; duration: number }
   /** Annonce d'un incident (au moment où son télégraphe apparaît). */
   | { type: 'incident'; event: string; label: string; visual: string; x: number; y: number }
   | { type: 'end'; winner: TeamId | 'draw'; reason: 'elimination' | 'timeout' };
+
+export interface BeamSegment {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+}
 
 export interface FieldRect {
   x: number;

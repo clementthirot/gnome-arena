@@ -1,32 +1,136 @@
 [
   {
-    "id": "gnome_melee", "team": "gnomes", "label": "Gnome fantassin", "role": "melee", "visual": "gnome_melee",
-    "hp": 40, "damage": 6, "speed": 26, "radius": 5, "mass": 1,
-    "personalities": { "steady": 6, "coward": 2, "reckless": 2 }
+    "id": "gnome_melee",
+    "team": "gnomes",
+    "label": "Gnome fantassin",
+    "role": "melee",
+    "visual": "gnome_melee",
+    "hp": 40,
+    "damage": 6,
+    "speed": 26,
+    "radius": 5,
+    "mass": 1,
+    "personalities": {
+      "steady": 6,
+      "coward": 2,
+      "reckless": 2
+    }
   },
   {
-    "id": "gnome_archer", "team": "gnomes", "label": "Gnome archer", "role": "archer", "visual": "gnome_archer",
-    "hp": 28, "damage": 9.2, "speed": 27, "radius": 5, "mass": 0.8,
-    "personalities": { "steady": 5, "coward": 3, "reckless": 1 }
+    "id": "gnome_archer",
+    "team": "gnomes",
+    "label": "Gnome archer",
+    "role": "archer",
+    "visual": "gnome_archer",
+    "hp": 28,
+    "damage": 9.6,
+    "speed": 27,
+    "radius": 5,
+    "mass": 0.8,
+    "personalities": {
+      "steady": 5,
+      "coward": 3,
+      "reckless": 1
+    }
   },
   {
-    "id": "gnome_charger", "team": "gnomes", "label": "Gnome chargeur", "role": "charger", "visual": "gnome_charger",
-    "hp": 52, "damage": 7, "speed": 24, "radius": 6, "mass": 1.6,
-    "personalities": { "steady": 4, "reckless": 4, "coward": 1 }
+    "id": "gnome_charger",
+    "team": "gnomes",
+    "label": "Gnome chargeur",
+    "role": "charger",
+    "visual": "gnome_charger",
+    "hp": 52,
+    "damage": 7,
+    "speed": 24,
+    "radius": 6,
+    "mass": 1.6,
+    "personalities": {
+      "steady": 4,
+      "reckless": 4,
+      "coward": 1
+    }
   },
   {
-    "id": "goblin_melee", "team": "goblins", "label": "Gobelin fantassin", "role": "melee", "visual": "goblin_melee",
-    "hp": 36, "damage": 6, "speed": 28, "radius": 5, "mass": 0.9,
-    "personalities": { "steady": 5, "coward": 2, "reckless": 3 }
+    "id": "goblin_melee",
+    "team": "goblins",
+    "label": "Gobelin fantassin",
+    "role": "melee",
+    "visual": "goblin_melee",
+    "hp": 36,
+    "damage": 6,
+    "speed": 28,
+    "radius": 5,
+    "mass": 0.9,
+    "personalities": {
+      "steady": 5,
+      "coward": 2,
+      "reckless": 3
+    }
   },
   {
-    "id": "goblin_archer", "team": "goblins", "label": "Gobelin archer", "role": "skirmisher", "visual": "goblin_archer",
-    "hp": 28, "damage": 6, "speed": 29, "radius": 5, "mass": 0.8,
-    "personalities": { "steady": 4, "coward": 3, "reckless": 2 }
+    "id": "goblin_archer",
+    "team": "goblins",
+    "label": "Gobelin archer",
+    "role": "skirmisher",
+    "visual": "goblin_archer",
+    "hp": 28,
+    "damage": 6,
+    "speed": 29,
+    "radius": 5,
+    "mass": 0.8,
+    "personalities": {
+      "steady": 4,
+      "coward": 3,
+      "reckless": 2
+    }
   },
   {
-    "id": "goblin_charger", "team": "goblins", "label": "Gobelin chargeur", "role": "charger", "visual": "goblin_charger",
-    "hp": 50, "damage": 7, "speed": 25, "radius": 6, "mass": 1.5,
-    "personalities": { "steady": 3, "reckless": 5, "coward": 1 }
+    "id": "goblin_charger",
+    "team": "goblins",
+    "label": "Gobelin chargeur",
+    "role": "charger",
+    "visual": "goblin_charger",
+    "hp": 50,
+    "damage": 7,
+    "speed": 25,
+    "radius": 6,
+    "mass": 1.5,
+    "personalities": {
+      "steady": 3,
+      "reckless": 5,
+      "coward": 1
+    }
+  },
+  {
+    "id": "gnome_fan",
+    "team": "gnomes",
+    "label": "Supporter gnome",
+    "role": "melee",
+    "visual": "fan_gnome",
+    "hp": 22,
+    "damage": 4.5,
+    "speed": 30,
+    "radius": 4.5,
+    "mass": 0.8,
+    "personalities": {
+      "reckless": 3,
+      "steady": 1
+    }
+  },
+  {
+    "id": "goblin_fan",
+    "team": "goblins",
+    "label": "Supporter gobelin",
+    "role": "melee",
+    "visual": "fan_goblin",
+    "hp": 22,
+    "damage": 4.5,
+    "speed": 30,
+    "radius": 4.5,
+    "mass": 0.8,
+    "personalities": {
+      "reckless": 3,
+      "steady": 1
+    }
   }
 ]

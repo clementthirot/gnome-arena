@@ -55,22 +55,26 @@ n'importe quel navigateur.
 ### Upgrades disponibles (votables)
 | Upgrade | Effet | Défaut loufoque |
 | --- | --- | --- |
-| Lunettes laser | tir rapide qui ricoche | peut partir au hasard, et le ricochet touche aussi les alliés |
-| Épée magique | coup de zone qui projette | — |
+| Lunettes laser | grand rayon qui se charge 0,8 s, traverse l'arène et rebondit une fois sur un mur | touche tout ce qui est sur sa ligne, alliés compris, et peut partir au hasard |
+| Épée magique | tourbillon autour du héros qui projette tout le monde | — |
 | Grenades | explosion de zone en cloche | touche aussi les alliés, et parfois explose sur soi |
 | Bombe à glu | ralentit une zone | — |
 | Lance-poulet | projette les ennemis | part parfois sur un allié |
 | Casserole en fonte | plus de PV, plus lourd | un peu plus lent |
 
 ### Incidents d'arène
-Chute de roche sur la mêlée, boule de feu lancée des gradins, éclair en chaîne sur un héros,
-flaque de boue. Une ombre au sol les annonce, et ils deviennent plus fréquents quand l'arène rétrécit.
+Météore qui tombe du ciel et projette les unités dans les airs, chute de roche sur la mêlée,
+boule de feu lancée des gradins, éclair en chaîne sur un héros, flaque de boue, supporters qui
+envahissent l'arène pour se battre. La zone qui se resserre est un gaz toxique craché par des conduits. Une ombre au sol les annonce, et ils deviennent plus fréquents quand l'arène rétrécit.
 
 ### Mise en scène
 - Intro « GNOMES contre GOBELINS », puis présentation des héros et de leurs upgrades, puis « COMBAT ! ».
 - Barre de vie et nom au-dessus des héros uniquement.
 - Caméra qui zoome sur les moments forts : héros K.O., duel de héros, raté d'upgrade, héros seul contre tous.
 - Public qui réagit aux exploits et peut prendre une flèche perdue (« AÏE ! »).
+- K.O. aériens : les vaincus s'envolent parfois en vrille et retombent avec une onomatopée (« BOUM ! », « PAF ! »).
+- Les gros reculs font rebondir les personnages ; les morts laissent une petite flaque de sang.
+- Le public prend les coups manqués : flèches perdues, explosions et rayons qui débordent.
 - Écran de fin : vainqueur, bilan des héros, puis carte de vote :
   « Kevin recevra la prochaine upgrade — votez : 1 laser, 2 épée, 3 grenades ».
 
@@ -93,13 +97,13 @@ on dépose le PNG, `npm run sprites -- check` vérifie, `import` branche.
 
 | Mesure | Valeur |
 | --- | --- |
-| Durée moyenne d'un combat | 72 s (min 62, max 80) |
-| Combats entre 65 et 80 s | 90 % |
-| Victoires | gnomes 53 % · gobelins 47 % |
-| Retournements (le perdant a été 20 % plus fort à un moment) | 12 % |
+| Durée moyenne d'un combat | 70 s (min 60, max 80) |
+| Combats entre 65 et 80 s | 92 % |
+| Victoires | gnomes 52 % · gobelins 48 % |
+| Retournements (le perdant a été 20 % plus fort à un moment) | 10 % |
 | Fins en « héros seul contre 3 ennemis ou plus » | environ 50 % |
 | Part des K.O. faits par les héros (6 % des unités) | 20 % |
-| Poids d'une upgrade sur le taux de victoire | +3 à +13 points |
+| Poids d'une upgrade sur le taux de victoire | +3 à +16 points |
 
 ---
 

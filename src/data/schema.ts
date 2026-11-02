@@ -41,6 +41,8 @@ export const ChargeSchema = z.object({
   knockback: positive,
   /** Rayon des dégâts et du recul à l'impact (projette les voisins). */
   splashRadius: z.number().min(0),
+  /** Envol de la cible principale à l'impact (px/s) : 0 = reste au sol. */
+  lift: z.number().min(0).default(0),
 });
 
 export const RoleSchema = z.object({
@@ -97,9 +99,13 @@ export type UnitDef = z.infer<typeof UnitSchema>;
 
 const visualKey = z.string().regex(/^[a-z0-9_]+$/);
 
+/** Où s'applique un effet de zone : sur la cible (défaut) ou autour du lanceur (tourbillon). */
+const at = z.enum(['target', 'self']).default('target');
+
 /** Dégâts ponctuels ou de zone. power est relatif aux dégâts du porteur, amount est absolu. */
 const DamageEffect = z.object({
   type: z.literal('damage'),
+  at,
   power: z.number().min(0).default(0),
   amount: z.number().min(0).default(0),
   /** 0 = la seule unité visée ; sinon tout ce qui est dans le rayon, avec atténuation vers le bord. */
@@ -114,6 +120,7 @@ const DamageEffect = z.object({
 
 const KnockbackEffect = z.object({
   type: z.literal('knockback'),
+  at,
   force: positive,
   radius: positive,
   edge: fraction.default(0.5),
@@ -122,6 +129,7 @@ const KnockbackEffect = z.object({
 
 const SlowEffect = z.object({
   type: z.literal('slow'),
+  at,
   /** Multiplicateur de vitesse pendant l'effet (0.5 = moitié moins vite). */
   factor: z.number().min(0.05).max(1),
   duration: positive,
@@ -145,11 +153,58 @@ const RicochetEffect = z.object({
   visual: visualKey.default('beam'),
 });
 
+/** Propulsion dans les airs : recul horizontal et envol. Les unités lourdes volent moins haut. */
+const LaunchEffect = z.object({
+  type: z.literal('launch'),
+  at,
+  /** Vitesse horizontale donnée au centre (px/s, divisée par la masse). */
+  force: positive,
+  /** Vitesse d'envol au centre (px/s, divisée par la racine de la masse). */
+  lift: positive,
+  radius: positive,
+  edge: fraction.default(0.5),
+  friendlyFire: z.boolean().default(false),
+});
+
+/** Rayon instantané qui traverse tout ce qui est sur sa ligne jusqu'au mur, puis rebondit. */
+const BeamEffect = z.object({
+  type: z.literal('beam'),
+  /** Largeur du rayon (px monde). */
+  width: positive,
+  power: z.number().min(0).default(0),
+  amount: z.number().min(0).default(0),
+  knockback: z.number().min(0).default(0),
+  /** Rebonds sur les murs du terrain avant de disparaître. */
+  bounces: z.number().int().min(0).default(1),
+  /** Temps de charge (s) : le rayon se dessine sur sa trajectoire avant de frapper. On peut l'esquiver. */
+  delay: z.number().min(0).default(0),
+  /** Part des dégâts conservée après chaque rebond. */
+  falloff: fraction.default(0.8),
+  friendlyFire: z.boolean().default(false),
+  visual: visualKey,
+});
+
+/** Renforts : des unités entrent dans l'arène en sautant le muret (supporters du public). */
+const SpawnEffect = z.object({
+  type: z.literal('spawn'),
+  /** Unité créée pour chaque camp. */
+  units: z.record(TeamId, id),
+  /** Nombre d'unités par camp concerné. */
+  count: z.number().int().positive(),
+  /** Camps qui reçoivent des renforts : l'un, l'autre, les deux, ou celui qui est mené. */
+  team: z.enum(['gnomes', 'goblins', 'both', 'losing']),
+  /** Hauteur du saut par-dessus le muret (px/s). */
+  jump: z.number().min(0).default(140),
+});
+
 export type EffectDef =
   | z.infer<typeof DamageEffect>
   | z.infer<typeof KnockbackEffect>
   | z.infer<typeof SlowEffect>
   | z.infer<typeof RicochetEffect>
+  | z.infer<typeof LaunchEffect>
+  | z.infer<typeof BeamEffect>
+  | z.infer<typeof SpawnEffect>
   | ProjectileEffectDef;
 
 export interface ProjectileEffectDef {
@@ -159,6 +214,10 @@ export interface ProjectileEffectDef {
   /** Hauteur de la cloche (visuel uniquement ; le moteur reste en 2D). */
   arc: number;
   visual: string;
+  /** Durée de vol imposée (s) ; sinon distance / vitesse. */
+  duration?: number;
+  /** Tombe du ciel sur le point visé au lieu de partir du tireur ou des gradins. */
+  fromSky: boolean;
   /** Effets déclenchés au point d'impact. */
   effects: EffectDef[];
 }
@@ -169,12 +228,17 @@ export const EffectSchema: z.ZodType<EffectDef, z.ZodTypeDef, unknown> = z.lazy(
     KnockbackEffect,
     SlowEffect,
     RicochetEffect,
+    LaunchEffect,
+    BeamEffect,
+    SpawnEffect,
     z.object({
       type: z.literal('projectile'),
       speed: positive,
       spread: z.number().min(0).default(0),
       arc: z.number().min(0).default(0),
       visual: visualKey,
+      duration: positive.optional(),
+      fromSky: z.boolean().default(false),
       effects: z.array(EffectSchema).min(1),
     }),
   ]),
@@ -222,6 +286,8 @@ export const ArenaEventSchema = z.object({
   weight: positive,
   /** Pas avant ce moment du combat (s). */
   from: z.number().min(0).default(0),
+  /** Plus après ce moment (s) : par exemple, pas de renforts juste avant la fin. */
+  until: z.number().positive().optional(),
   /** Où l'incident tombe. */
   target: z.enum(['random_point', 'densest', 'random_unit', 'hero']),
   /** Avertissement visible avant l'impact (s) : ombre au sol, zone qui clignote. */
@@ -355,6 +421,47 @@ const TuningSchema = z
     hitTolerance: z.number().min(0).default(2.5),
     /** Portée initiale d'un ricochet quand il ne part pas d'une unité visée. */
     ricochetStartReach: z.number().min(0).default(6),
+    /** Un gros recul fait sauter l'unité ; à l'atterrissage, elle rebondit tant que la chute est assez rapide. */
+    bounce: z
+      .object({
+        /** Recul (après division par la masse) au-delà duquel l'unité décolle. */
+        threshold: z.number().min(0).default(90),
+        /** Vitesse d'envol par unité de recul au-delà du seuil. */
+        lift: z.number().min(0).default(1),
+        /** Part de la vitesse de chute rendue au rebond. */
+        restitution: fraction.default(0.45),
+        /** Vitesse de chute minimale (px/s) pour rebondir au lieu de se poser. */
+        minImpact: z.number().min(0).default(60),
+      })
+      .default({}),
+    /** Unités projetées en l'air : elles ne combattent plus jusqu'à l'atterrissage. */
+    airborne: z
+      .object({
+        /** Gravité (px/s²). */
+        gravity: positive.default(520),
+        /** Part de la vitesse horizontale conservée par seconde en vol (peu de frottement : on vole loin). */
+        airDecay: fraction.default(0.55),
+        /** Étourdissement après l'atterrissage (s). */
+        stun: z.number().min(0).default(0.4),
+        /** Dégâts à l'atterrissage, en part des PV max par 100 px/s de vitesse de chute. */
+        landingDamage: z.number().min(0).default(0.03),
+      })
+      .default({}),
+    /** K.O. aériens : une unité vaincue est parfois projetée en l'air avant de retomber. */
+    koLaunch: z
+      .object({
+        /** Probabilité de base. */
+        chance: fraction.default(0.12),
+        /** Probabilité ajoutée par 100 de recul du coup fatal. */
+        perKnockback: z.number().min(0).default(0.12),
+        maxChance: fraction.default(0.7),
+        /** Probabilité pour un héros. */
+        heroChance: fraction.default(1),
+        lift: range.default([130, 210]),
+        /** Multiplicateur du recul horizontal du coup fatal. */
+        push: z.number().min(0).default(1.6),
+      })
+      .default({}),
   })
   .default({});
 export type Tuning = z.infer<typeof TuningSchema>;
@@ -499,6 +606,19 @@ export const GameDataSchema = z
       });
       if (r.charge && r.charge.minDistance >= r.charge.maxDistance) issue(['roles', i, 'charge'], 'attendu : minDistance < maxDistance');
     });
+    // Les renforts doivent désigner des unités du bon camp, où qu'ils soient dans l'arbre des effets.
+    const walk = (effects: readonly EffectDef[], path: (string | number)[]) =>
+      effects.forEach((e, i) => {
+        if (e.type === 'projectile') walk(e.effects, [...path, i, 'effects']);
+        if (e.type !== 'spawn') return;
+        for (const [team, unitId] of Object.entries(e.units)) {
+          const unit = data.units.find((u) => u.id === unitId);
+          if (!unit) issue([...path, i, 'units', team], `unité inconnue : ${unitId}`);
+          else if (unit.team !== team) issue([...path, i, 'units', team], `${unitId} appartient au camp ${unit.team}`);
+        }
+      });
+    data.events.forEach((ev, i) => walk(ev.effects, ['events', i, 'effects']));
+    data.equipment.forEach((eq, i) => eq.special && walk(eq.special.effects, ['equipment', i, 'special', 'effects']));
     for (const [team, army] of Object.entries(data.battle.armies)) {
       for (const unitId of Object.keys(army)) {
         const unit = data.units.find((u) => u.id === unitId);

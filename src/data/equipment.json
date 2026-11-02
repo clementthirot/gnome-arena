@@ -5,7 +5,7 @@
     "short": "laser",
     "visual": "acc_goggles",
     "special": {
-      "maxRange": 110,
+      "maxRange": 200,
       "cooldown": 6,
       "misfire": {
         "chance": 0.12,
@@ -13,26 +13,15 @@
       },
       "effects": [
         {
-          "type": "projectile",
-          "speed": 520,
-          "visual": "laser",
-          "effects": [
-            {
-              "type": "damage",
-              "power": 1,
-              "knockback": 50,
-              "visual": "spark"
-            },
-            {
-              "type": "ricochet",
-              "bounces": 2,
-              "range": 45,
-              "power": 0.6,
-              "falloff": 0.7,
-              "friendlyFire": true,
-              "visual": "laser"
-            }
-          ]
+          "type": "beam",
+          "width": 7,
+          "power": 1.1,
+          "knockback": 70,
+          "bounces": 1,
+          "falloff": 0.8,
+          "friendlyFire": true,
+          "visual": "laser_beam",
+          "delay": 0.8
         }
       ]
     }
@@ -46,15 +35,24 @@
       "damage": 1.05
     },
     "special": {
-      "maxRange": 5,
-      "cooldown": 7,
+      "maxRange": 6,
+      "cooldown": 8.5,
       "effects": [
         {
           "type": "damage",
-          "power": 1,
-          "radius": 10,
-          "knockback": 130,
-          "visual": "slash"
+          "at": "self",
+          "power": 0.6,
+          "radius": 18,
+          "knockback": 120,
+          "visual": "whirlwind"
+        },
+        {
+          "type": "launch",
+          "at": "self",
+          "force": 90,
+          "lift": 55,
+          "radius": 18,
+          "edge": 0.6
         }
       ]
     }

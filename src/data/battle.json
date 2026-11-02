@@ -117,7 +117,30 @@
       },
       "zonePull": 0.8,
       "hitTolerance": 2.5,
-      "ricochetStartReach": 6
+      "ricochetStartReach": 6,
+      "airborne": {
+        "gravity": 520,
+        "airDecay": 0.55,
+        "stun": 0.4,
+        "landingDamage": 0.03
+      },
+      "koLaunch": {
+        "chance": 0.08,
+        "perKnockback": 0.1,
+        "maxChance": 0.7,
+        "heroChance": 1,
+        "lift": [
+          130,
+          210
+        ],
+        "push": 1.6
+      },
+      "bounce": {
+        "threshold": 90,
+        "lift": 1,
+        "restitution": 0.45,
+        "minImpact": 60
+      }
     }
   },
   "events": {
@@ -138,7 +161,7 @@
     "shrinkStart": 45,
     "shrinkEnd": 75,
     "minScale": 0.25,
-    "zoneDamage": 0.08,
+    "zoneDamage": 0.12,
     "hardCap": 80
   }
 }

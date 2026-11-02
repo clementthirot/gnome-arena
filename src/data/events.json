@@ -1,29 +1,179 @@
 [
   {
-    "id": "rock_fall", "label": "Chute de roche !", "weight": 3, "from": 10, "target": "densest",
-    "telegraph": 1.2, "telegraphRadius": 13, "visual": "rock",
-    "effects": [ { "type": "damage", "amount": 30, "radius": 13, "knockback": 120, "friendlyFire": true, "visual": "dust" } ]
-  },
-  {
-    "id": "fireball", "label": "Boule de feu !", "weight": 2, "from": 20, "target": "random_unit",
-    "telegraph": 0.5, "telegraphRadius": 18, "visual": "fireball",
+    "id": "rock_fall",
+    "label": "Chute de roche !",
+    "weight": 3,
+    "from": 10,
+    "target": "densest",
+    "telegraph": 1.2,
+    "telegraphRadius": 13,
+    "visual": "rock",
     "effects": [
-      { "type": "projectile", "speed": 130, "arc": 30, "visual": "fireball", "effects": [
-        { "type": "damage", "amount": 18, "radius": 18, "knockback": 150, "friendlyFire": true, "visual": "explosion" }
-      ] }
+      {
+        "type": "damage",
+        "amount": 30,
+        "radius": 13,
+        "knockback": 120,
+        "friendlyFire": true,
+        "visual": "dust"
+      }
     ]
   },
   {
-    "id": "lightning", "label": "Éclair !", "weight": 2, "from": 30, "target": "hero",
-    "telegraph": 0.9, "telegraphRadius": 8, "visual": "lightning",
+    "id": "fireball",
+    "label": "Boule de feu !",
+    "weight": 2,
+    "from": 20,
+    "target": "random_unit",
+    "telegraph": 0.5,
+    "telegraphRadius": 18,
+    "visual": "fireball",
     "effects": [
-      { "type": "damage", "amount": 24, "radius": 6, "knockback": 60, "friendlyFire": true, "visual": "lightning" },
-      { "type": "ricochet", "bounces": 3, "range": 35, "amount": 14, "falloff": 0.8, "friendlyFire": true, "visual": "lightning" }
+      {
+        "type": "projectile",
+        "speed": 130,
+        "arc": 30,
+        "visual": "fireball",
+        "effects": [
+          {
+            "type": "damage",
+            "amount": 18,
+            "radius": 18,
+            "knockback": 150,
+            "friendlyFire": true,
+            "visual": "explosion"
+          }
+        ]
+      }
     ]
   },
   {
-    "id": "mud", "label": "Flaque de boue", "weight": 1, "from": 15, "target": "random_point",
-    "telegraph": 0.3, "telegraphRadius": 22, "visual": "mud",
-    "effects": [ { "type": "slow", "factor": 0.45, "duration": 4, "radius": 22, "friendlyFire": true, "visual": "mud" } ]
+    "id": "lightning",
+    "label": "Éclair !",
+    "weight": 2,
+    "from": 30,
+    "target": "hero",
+    "telegraph": 0.9,
+    "telegraphRadius": 8,
+    "visual": "lightning",
+    "effects": [
+      {
+        "type": "damage",
+        "amount": 24,
+        "radius": 6,
+        "knockback": 60,
+        "friendlyFire": true,
+        "visual": "lightning"
+      },
+      {
+        "type": "ricochet",
+        "bounces": 3,
+        "range": 35,
+        "amount": 14,
+        "falloff": 0.8,
+        "friendlyFire": true,
+        "visual": "lightning"
+      }
+    ]
+  },
+  {
+    "id": "mud",
+    "label": "Flaque de boue",
+    "weight": 1,
+    "from": 15,
+    "target": "random_point",
+    "telegraph": 0.3,
+    "telegraphRadius": 22,
+    "visual": "mud",
+    "effects": [
+      {
+        "type": "slow",
+        "factor": 0.45,
+        "duration": 4,
+        "radius": 22,
+        "friendlyFire": true,
+        "visual": "mud"
+      }
+    ]
+  },
+  {
+    "id": "meteor",
+    "label": "MÉTÉORE !",
+    "weight": 3.5,
+    "from": 25,
+    "target": "densest",
+    "telegraph": 1.6,
+    "telegraphRadius": 36,
+    "visual": "meteor",
+    "effects": [
+      {
+        "type": "projectile",
+        "speed": 100,
+        "duration": 1.1,
+        "arc": 260,
+        "fromSky": true,
+        "visual": "meteor",
+        "effects": [
+          {
+            "type": "damage",
+            "amount": 20,
+            "radius": 34,
+            "edge": 0.35,
+            "friendlyFire": true,
+            "visual": "meteor_blast"
+          },
+          {
+            "type": "launch",
+            "force": 300,
+            "lift": 200,
+            "radius": 42,
+            "edge": 0.3,
+            "friendlyFire": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "fans_both",
+    "label": "LE PUBLIC ENVAHIT L'ARÈNE !",
+    "weight": 1.5,
+    "from": 18,
+    "target": "random_point",
+    "telegraph": 0,
+    "visual": "fans",
+    "effects": [
+      {
+        "type": "spawn",
+        "units": {
+          "gnomes": "gnome_fan",
+          "goblins": "goblin_fan"
+        },
+        "count": 3,
+        "team": "both"
+      }
+    ],
+    "until": 58
+  },
+  {
+    "id": "fans_losing",
+    "label": "LES SUPPORTERS À LA RESCOUSSE !",
+    "weight": 1.5,
+    "from": 30,
+    "target": "random_point",
+    "telegraph": 0,
+    "visual": "fans",
+    "effects": [
+      {
+        "type": "spawn",
+        "units": {
+          "gnomes": "gnome_fan",
+          "goblins": "goblin_fan"
+        },
+        "count": 4,
+        "team": "losing"
+      }
+    ],
+    "until": 58
   }
 ]

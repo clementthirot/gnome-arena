@@ -80,7 +80,8 @@ export function aggregate(summaries: readonly BattleSummary[]): BenchReport {
     avgDuration: durations.reduce((a, b) => a + b, 0) / n,
     minDuration: Math.min(...durations),
     maxDuration: Math.max(...durations),
-    inTargetWindow: count((s) => s.duration >= TARGET_WINDOW[0] && s.duration <= TARGET_WINDOW[1]),
+    // Une fin aux points tombe à la limite + un tick : on tolère ce tick.
+    inTargetWindow: count((s) => s.duration >= TARGET_WINDOW[0] && s.duration <= TARGET_WINDOW[1] + 0.05),
     winRate: {
       gnomes: count((s) => s.winner === 'gnomes'),
       goblins: count((s) => s.winner === 'goblins'),
@@ -95,7 +96,7 @@ export function aggregate(summaries: readonly BattleSummary[]): BenchReport {
 
 /** Note de spectacle : sert à repérer les seeds à rejouer (retournement, héros seul contre tous). */
 export function spectacleScore(s: BattleSummary): number {
-  const inWindow = s.duration >= TARGET_WINDOW[0] && s.duration <= TARGET_WINDOW[1] ? 1 : 0;
+  const inWindow = s.duration >= TARGET_WINDOW[0] && s.duration <= TARGET_WINDOW[1] + 0.05 ? 1 : 0;
   return s.loserMaxLead * 4 + (s.lastStand ? 1.5 : 0) + inWindow + (s.survivors <= 3 ? 0.5 : 0);
 }
 

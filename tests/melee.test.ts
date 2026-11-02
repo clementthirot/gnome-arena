@@ -15,7 +15,7 @@ describe('mêlée vivante', () => {
         b.step();
         if (b.tick % b.data.battle.tickRate !== 0) continue;
         const alive = b.units.filter((u) => u.state !== 'dead');
-        const moving = alive.filter((u) => Math.hypot(u.x - last[u.index].x, u.y - last[u.index].y) > 3);
+        const moving = alive.filter((u) => (last[u.index] ? Math.hypot(u.x - last[u.index].x, u.y - last[u.index].y) : 99) > 3);
         if (alive.length > 6) ratios.push(moving.length / alive.length);
         last = b.units.map((u) => ({ x: u.x, y: u.y }));
       }
@@ -36,7 +36,7 @@ describe('mêlée vivante', () => {
       for (const u of b.units) {
         if (u.state === 'dead' || u.target < 0) continue;
         const key = `${u.index}>${u.target}`;
-        const moved = Math.hypot(u.x - last[u.index].x, u.y - last[u.index].y);
+        const moved = (last[u.index] ? Math.hypot(u.x - last[u.index].x, u.y - last[u.index].y) : 99);
         const t = moved < 1.5 ? (still.get(key) ?? 0) + 0.5 : 0;
         still.set(key, t);
         longest = Math.max(longest, t);

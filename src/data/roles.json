@@ -4,7 +4,13 @@
     "label": "Fantassin",
     "keepDistance": 0,
     "attacks": [
-      { "kind": "melee", "maxRange": 3, "damage": 1, "cooldown": 1.0, "knockback": 70 }
+      {
+        "kind": "melee",
+        "maxRange": 3,
+        "damage": 1,
+        "cooldown": 1,
+        "knockback": 70
+      }
     ]
   },
   {
@@ -12,8 +18,23 @@
     "label": "Archer",
     "keepDistance": 45,
     "attacks": [
-      { "kind": "melee", "maxRange": 3, "damage": 0.5, "cooldown": 1.2, "knockback": 40 },
-      { "kind": "ranged", "minRange": 12, "maxRange": 95, "damage": 0.8, "cooldown": 1.7, "knockback": 30, "projectileSpeed": 150, "spread": 7 }
+      {
+        "kind": "melee",
+        "maxRange": 3,
+        "damage": 0.5,
+        "cooldown": 1.2,
+        "knockback": 40
+      },
+      {
+        "kind": "ranged",
+        "minRange": 12,
+        "maxRange": 95,
+        "damage": 0.8,
+        "cooldown": 1.7,
+        "knockback": 30,
+        "projectileSpeed": 150,
+        "spread": 7
+      }
     ]
   },
   {
@@ -21,7 +42,13 @@
     "label": "Chargeur",
     "keepDistance": 0,
     "attacks": [
-      { "kind": "melee", "maxRange": 3, "damage": 0.8, "cooldown": 1.1, "knockback": 60 }
+      {
+        "kind": "melee",
+        "maxRange": 3,
+        "damage": 0.8,
+        "cooldown": 1.1,
+        "knockback": 60
+      }
     ],
     "charge": {
       "minDistance": 25,
@@ -31,7 +58,8 @@
       "cooldown": 6,
       "damage": 1.6,
       "knockback": 190,
-      "splashRadius": 14
+      "splashRadius": 14,
+      "lift": 70
     }
   },
   {
@@ -39,8 +67,23 @@
     "label": "Tirailleur",
     "keepDistance": 0,
     "attacks": [
-      { "kind": "melee", "maxRange": 3, "damage": 1, "cooldown": 1.0, "knockback": 70 },
-      { "kind": "ranged", "minRange": 20, "maxRange": 80, "damage": 0.6, "cooldown": 1.5, "knockback": 25, "projectileSpeed": 150, "spread": 8 }
+      {
+        "kind": "melee",
+        "maxRange": 3,
+        "damage": 1,
+        "cooldown": 1,
+        "knockback": 70
+      },
+      {
+        "kind": "ranged",
+        "minRange": 20,
+        "maxRange": 80,
+        "damage": 0.6,
+        "cooldown": 1.5,
+        "knockback": 25,
+        "projectileSpeed": 150,
+        "spread": 8
+      }
     ]
   }
 ]

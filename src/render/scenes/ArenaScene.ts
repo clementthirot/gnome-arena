@@ -8,7 +8,8 @@ import { Bricks, type BrickContext, type Particle, type UnitView } from '../anim
 import { drawArenaBackground } from '../arenaArt';
 import { Director } from '../director';
 import { FxLayer } from '../fx';
-import { asPlaceholder, bricksFor, manifest, resolveAsset } from '../manifest';
+import { GasLayer } from '../gas';
+import { asPlaceholder, bricksFor, effectVisual, manifest, resolveAsset } from '../manifest';
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
 import { TEAM_COLORS, textStyle } from '../text';
 import type { ResultData } from './ResultScene';
@@ -66,7 +67,10 @@ export class ArenaScene extends Phaser.Scene {
   private heroHud = new Map<number, HeroHud>();
   private accessories = new Map<number, Accessory[]>();
   private fxLayer!: FxLayer;
-  private prev: { x: number; y: number }[] = [];
+  private prev: { x: number; y: number; z: number }[] = [];
+  /** Ombres des unités en l'air. */
+  private airGfx!: Phaser.GameObjects.Graphics;
+  private gas!: GasLayer;
   private particles: Particle[] = [];
   private spectators: Spectator[] = [];
   private fx!: Phaser.GameObjects.Graphics;
@@ -82,6 +86,7 @@ export class ArenaScene extends Phaser.Scene {
   private director!: Director;
   private routed = new WeakSet<Phaser.GameObjects.GameObject>();
   private lastStandCheck = 0;
+  private nextSplashAt = 0;
 
   constructor() {
     super('arena');
@@ -116,8 +121,10 @@ export class ArenaScene extends Phaser.Scene {
 
     this.zoneGfx = this.add.graphics().setDepth(-500);
     const groundFx = this.add.graphics().setDepth(-450);
+    this.airGfx = this.add.graphics().setDepth(-440);
+    this.gas = new GasLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-430), field, manifest.staging.gas, SCALE);
     for (const u of this.battle.units) this.createUnitView(u);
-    this.prev = this.battle.units.map((u) => ({ x: u.x, y: u.y }));
+    this.prev = this.battle.units.map((u) => ({ x: u.x, y: u.y, z: u.z }));
     this.fx = this.add.graphics().setDepth(9000);
     this.fxLayer = new FxLayer(this.fx, groundFx, this.particles, SCALE, field.y);
     this.createHud();
@@ -155,7 +162,7 @@ export class ArenaScene extends Phaser.Scene {
     const baseScale = entry.type === 'placeholder' ? SCALE : (entry.size * SCALE) / entry.frameHeight;
     sprite.setScale(baseScale).setOrigin(0.5, 0.75);
     sprite.setFlipX(u.facing < 0);
-    this.views.push({ sprite, bricks: bricksFor(entry), baseScale, offX: 0, offY: 0, squash: 1, facing: u.facing });
+    this.views.push({ sprite, bricks: bricksFor(entry), baseScale, offX: 0, offY: 0, squash: 1, facing: u.facing, spin: 0, airDeath: false, whirlUntil: 0 });
 
     if (u.hero) {
       const team = TEAM_COLORS[u.team];
@@ -358,6 +365,7 @@ export class ArenaScene extends Phaser.Scene {
         for (let i = 0; i < this.battle.units.length; i++) {
           this.prev[i].x = this.battle.units[i].x;
           this.prev[i].y = this.battle.units[i].y;
+          this.prev[i].z = this.battle.units[i].z;
         }
         this.battle.step();
         this.handleEvents(this.battle.events);
@@ -367,8 +375,9 @@ export class ArenaScene extends Phaser.Scene {
       if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
     }
     const alpha = this.battle.result ? 1 : Math.min(1, this.accumulator / dtMs);
-    this.drawUnits(alpha);
+    this.drawUnits(alpha, this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale : 0);
     this.drawZone();
+    this.gas.update(this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale : 0, this.battle.zone, this.battle.zoneScale);
     this.drawEffects(delta / 1000);
     this.animateCrowd(this.time.now / 1000);
     this.updateHud();
@@ -391,9 +400,17 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleEvents(events: readonly BattleEvent[]): void {
-    const ctx: BrickContext = { scene: this, particles: this.particles, scale: SCALE };
+    const gore = manifest.staging.gore;
+    const ctx: BrickContext = {
+      scene: this,
+      particles: this.particles,
+      scale: SCALE,
+      gore: gore.enabled ? { color: parseInt(gore.color.slice(1), 16), dark: parseInt(gore.dark.slice(1), 16), drops: gore.dropsPerHit } : null,
+    };
     const units = this.battle.units;
     for (const e of events) {
+      // Une unité inconnue du rendu (événement arrivé trop tôt) est ignorée plutôt que de planter.
+      if ('unit' in e && e.type !== 'spawn' && !this.views[e.unit]) continue;
       switch (e.type) {
         case 'attack': {
           const u = units[e.unit];
@@ -428,7 +445,8 @@ export class ArenaScene extends Phaser.Scene {
           view.sprite.setDepth(-400 + u.y * 0.01);
           view.sprite.anims.stop();
           this.playOnce(view, 'death');
-          Bricks.death(ctx, view, u.x, u.y, !!u.hero);
+          Bricks.death(ctx, view, u.x, u.y, !!u.hero, u.z > 0);
+          if (u.z <= 0) this.bloodPuddle(u, u.x, u.y);
           this.cheer(opposingTeam(u.team), u.hero ? 1 : 0.15);
           if (u.hero) {
             const victim = view.sprite;
@@ -444,8 +462,36 @@ export class ArenaScene extends Phaser.Scene {
           }
           break;
         }
+        case 'beamCharge':
+          this.fxLayer.beamCharge(e.visual, e.segments, e.width, e.duration);
+          break;
+        case 'bounce':
+          Bricks.bounce(ctx, this.views[e.unit], e.x, e.y, e.impact);
+          break;
+        case 'spawn':
+          this.addReinforcement(units[e.unit]);
+          break;
+        case 'launch':
+          // Vrille en vol : plus rapide pour un K.O.
+          this.views[e.unit].spin = (Math.random() < 0.5 ? -1 : 1) * (units[e.unit].state === 'dead' ? 900 : 480);
+          break;
+        case 'land': {
+          const splash = manifest.staging.koSplash;
+          // Onomatopée réservée aux vraies grosses chutes, et pas plus d'une à la fois.
+          const loud = e.dead && e.impact >= splash.minImpact && this.time.now >= this.nextSplashAt;
+          if (loud) this.nextSplashAt = this.time.now + splash.gapMs;
+          const word = loud ? { text: splash.words[Math.floor(Math.random() * splash.words.length)], color: splash.color } : undefined;
+          Bricks.land(ctx, this.views[e.unit], e.x, e.y, e.impact, word);
+          if (e.dead) {
+            this.bloodPuddle(units[e.unit], e.x, e.y);
+            // Le corps retourne au sol, sous les vivants.
+            this.views[e.unit].sprite.setDepth(-400 + e.y * 0.01);
+            this.cheer(opposingTeam(units[e.unit].team), 0.25);
+          }
+          break;
+        }
         case 'zone':
-          this.banner("L'ARÈNE SE RESSERRE !", '#ffb347');
+          this.banner(manifest.staging.gas.banner, manifest.staging.gas.accent);
           break;
         case 'special': {
           const u = units[e.unit];
@@ -460,10 +506,22 @@ export class ArenaScene extends Phaser.Scene {
         }
         case 'effect':
           this.fxLayer.effect(e.visual, e.x, e.y, e.radius);
-          if (e.radius >= 12) this.cameras.main.shake(90, 0.003);
+          if (e.source >= 0 && effectVisual(e.visual).spinSource) this.views[e.source].whirlUntil = this.time.now + effectVisual(e.visual).duration * 1000;
+          this.hitStands(e.x, e.y, e.radius + 6);
+          if (e.radius >= manifest.staging.camera.bigImpactRadius) {
+            this.cameras.main.shake(320, 0.014);
+            this.cameras.main.flash(140, 255, 236, 200);
+            this.cheer('gnomes', 0.6);
+            this.cheer('goblins', 0.6);
+            const at = { x: e.x * SCALE, y: e.y * SCALE };
+            this.director.request('bigImpact', () => at, this.battle.time);
+          } else if (e.radius >= 12) this.cameras.main.shake(90, 0.003);
           break;
         case 'beam':
-          this.fxLayer.beam(e.visual, e.fromX, e.fromY, e.toX, e.toY);
+          this.fxLayer.beam(e.visual, e.fromX, e.fromY, e.toX, e.toY, e.width);
+          // Le rayon finit dans le muret : les spectateurs juste derrière trinquent.
+          if (e.width) this.hitStands(e.toX, e.toY, 16);
+          if (e.width) this.cameras.main.shake(120, 0.004);
           break;
         case 'telegraph':
           this.fxLayer.telegraph(e.visual, e.x, e.y, e.radius, e.duration);
@@ -522,13 +580,69 @@ export class ArenaScene extends Phaser.Scene {
       duration: 220,
       onComplete: () => {
         arrow.destroy();
-        target.sprite.setTint(0xff6060);
-        this.time.delayedCall(250, () => target.sprite.clearTint());
-        this.tweens.add({ targets: target.sprite, y: target.baseY - 5 * SCALE, duration: 110, yoyo: true });
-        const ouch = this.add.text(target.sprite.x, target.baseY - 9 * SCALE, 'AÏE !', textStyle(22, '#ffffff')).setOrigin(0.5, 1).setDepth(9850);
-        this.tweens.add({ targets: ouch, y: ouch.y - 30, alpha: 0, delay: 300, duration: 500, onComplete: () => ouch.destroy() });
+        this.hurtSpectator(target, true);
       },
     });
+  }
+
+  /** Un spectateur prend un coup : il rougit, sursaute, et râle parfois. */
+  private hurtSpectator(s: Spectator, shout: boolean): void {
+    if (!s.sprite.visible) return;
+    s.sprite.setTint(0xff6060);
+    this.time.delayedCall(250, () => s.sprite.clearTint());
+    this.tweens.add({ targets: s.sprite, y: s.baseY - 5 * SCALE, duration: 110, yoyo: true });
+    if (!shout) return;
+    const ouch = this.add.text(s.sprite.x, s.baseY - 9 * SCALE, 'AÏE !', textStyle(22, '#ffffff')).setOrigin(0.5, 1).setDepth(9850);
+    this.tweens.add({ targets: ouch, y: ouch.y - 30, alpha: 0, delay: 300, duration: 500, onComplete: () => ouch.destroy() });
+  }
+
+  /** Explosions et rayons qui débordent sur les gradins : les spectateurs à portée trinquent. */
+  private hitStands(x: number, y: number, radius: number): void {
+    const f = this.battle.field;
+    const edge = Math.min(x - f.x, f.x + f.width - x, y - f.y, f.y + f.height - y);
+    if (edge > radius) return;
+    let shouted = false;
+    for (const s of this.spectators) {
+      if (Math.hypot(s.sprite.x / SCALE - x, s.baseY / SCALE - 3 - y) > radius + 4) continue;
+      this.hurtSpectator(s, !shouted);
+      shouted = true;
+    }
+  }
+
+  /** Flaque de sang qui s'étale sous le corps. */
+  private bloodPuddle(u: Unit, x: number, y: number): void {
+    const gore = manifest.staging.gore;
+    if (!gore.enabled) return;
+    const r = u.radius * gore.puddle * (0.8 + Math.random() * 0.4);
+    const color = parseInt(gore.color.slice(1), 16);
+    const dark = parseInt(gore.dark.slice(1), 16);
+    const pool = this.add.ellipse(x * SCALE, (y + 1) * SCALE, r * 2 * SCALE, r * 1.1 * SCALE, dark, 0.7).setDepth(-420).setScale(0.1);
+    const core = this.add.ellipse(x * SCALE, (y + 1) * SCALE, r * 1.2 * SCALE, r * 0.6 * SCALE, color, 0.75).setDepth(-419).setScale(0.1);
+    this.tweens.add({ targets: [pool, core], scale: 1, duration: 900, ease: 'Quad.easeOut' });
+    // Quelques éclaboussures autour.
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = r * (1.1 + Math.random() * 0.5);
+      this.add.ellipse((x + Math.cos(a) * d) * SCALE, (y + 1 + Math.sin(a) * d * 0.55) * SCALE, 1.2 * SCALE, 0.8 * SCALE, color, 0.75).setDepth(-419);
+    }
+  }
+
+  /** Un supporter saute dans l'arène : il apparaît, et sa place dans les gradins se vide. */
+  private addReinforcement(u: Unit): void {
+    this.createUnitView(u);
+    this.prev.push({ x: u.x, y: u.y, z: u.z });
+    let best: Spectator | undefined;
+    let bestD = Infinity;
+    for (const s of this.spectators) {
+      if (!s.sprite.visible || s.side !== u.team) continue;
+      const d = Math.abs(s.sprite.x / SCALE - u.x) + Math.abs(s.baseY / SCALE - u.y) * 0.5;
+      if (d < bestD) {
+        bestD = d;
+        best = s;
+      }
+    }
+    best?.sprite.setVisible(false);
+    this.cheer(u.team, 0.3);
   }
 
   private finish(): void {
@@ -554,14 +668,28 @@ export class ArenaScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- dessin
 
-  private drawUnits(alpha: number): void {
+  private drawUnits(alpha: number, dt: number): void {
     const units = this.battle.units;
+    this.airGfx.clear();
     for (let i = 0; i < units.length; i++) {
       const u = units[i];
       const v = this.views[i];
       const x = (this.prev[i].x + (u.x - this.prev[i].x) * alpha + v.offX) * SCALE;
       const y = (this.prev[i].y + (u.y - this.prev[i].y) * alpha + v.offY) * SCALE;
-      v.sprite.setPosition(Math.round(x), Math.round(y));
+      const z = Math.max(0, this.prev[i].z + (u.z - this.prev[i].z) * alpha);
+      v.sprite.setPosition(Math.round(x), Math.round(y - z * SCALE));
+      if (z > 0 || u.z > 0) {
+        // En l'air : ombre au sol qui rétrécit avec la hauteur, vrille, légère mise à l'échelle.
+        const shrink = Math.max(0.3, 1 - z / 160);
+        this.airGfx.fillStyle(0x000000, 0.35 * shrink).fillEllipse(x, y, u.radius * 2.4 * SCALE * shrink, u.radius * 1.1 * SCALE * shrink);
+        v.sprite.setAngle(v.sprite.angle + v.spin * dt);
+        const grow = 1 + Math.min(0.35, z / 300);
+        v.sprite.setScale(v.baseScale * grow);
+        v.sprite.setDepth(9500 + y * 0.001);
+        const hud = this.heroHud.get(i);
+        if (hud && u.state !== 'dead') this.drawHeroHud(u, v, hud);
+        continue;
+      }
       if (u.state === 'dead') continue;
       v.facing = u.facing;
       v.sprite.setFlipX(u.facing < 0);
@@ -573,7 +701,9 @@ export class ArenaScene extends Phaser.Scene {
       if (!busy && v.sprite.anims.currentAnim?.key !== anim && this.anims.exists(anim)) v.sprite.play(anim);
       const hop = moving ? Math.abs(Math.sin(this.time.now / (u.state === 'flee' ? 50 : 90) + i)) * 0.08 : 0;
       v.sprite.setScale(v.baseScale * (2 - v.squash) * (1 - hop * 0.5), v.baseScale * v.squash * (1 + hop));
-      if (u.charging) v.sprite.setAngle(u.facing * 12);
+      if (v.whirlUntil > this.time.now) v.sprite.setAngle(((v.whirlUntil - this.time.now) * 1.6) % 360);
+      else if (u.stunTimer > 0) v.sprite.setAngle(Math.sin(this.time.now / 40) * 14);
+      else if (u.charging) v.sprite.setAngle(u.facing * 12);
       else if (u.state === 'flee') v.sprite.setAngle(Math.sin(this.time.now / 60) * 10);
       else v.sprite.setAngle(0);
 
@@ -622,7 +752,8 @@ export class ArenaScene extends Phaser.Scene {
     if (this.battle.zoneScale >= 1) return;
     const f = this.battle.field;
     const z = this.battle.zone;
-    g.fillStyle(0x2a0a1a, 0.45);
+    // Hors zone : voile vert du gaz, sous les bouffées.
+    g.fillStyle(parseInt(manifest.staging.gas.color.slice(1), 16), 0.2);
     g.fillRect(f.x * SCALE, f.y * SCALE, f.width * SCALE, (z.y - f.y) * SCALE);
     g.fillRect(f.x * SCALE, (z.y + z.height) * SCALE, f.width * SCALE, (f.y + f.height - z.y - z.height) * SCALE);
     g.fillRect(f.x * SCALE, z.y * SCALE, (z.x - f.x) * SCALE, z.height * SCALE);
@@ -630,7 +761,7 @@ export class ArenaScene extends Phaser.Scene {
     // Bordure en tirets animés.
     const dash = 6;
     const offset = Math.floor(this.time.now / 80) % (dash * 2);
-    g.fillStyle(0xffb347, 1);
+    g.fillStyle(parseInt(manifest.staging.gas.accent.slice(1), 16), 1);
     const edge = (x0: number, y0: number, len: number, horizontal: boolean) => {
       for (let s = -offset; s < len; s += dash * 2) {
         const a = Math.max(0, s);

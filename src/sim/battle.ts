@@ -1,6 +1,7 @@
 // Moteur de combat : boucle à pas fixe, sans aucune dépendance au rendu.
 // Même données + même seed = même combat, tick pour tick.
 import type { ArenaEventDef, AttackDef, EffectDef, EquipmentDef, GameData, HeroDef, TeamId, Tuning, UnitDef } from '../data/schema';
+import type { EffectContext as Ctx } from './effects';
 import { runEffects, type EffectContext, type EffectHost } from './effects';
 import { cos, hypot, nthRoot, sin } from './detmath';
 import { SpatialGrid } from './grid';
@@ -53,6 +54,11 @@ export class Battle implements EffectHost {
 
   private readonly rng: Rng;
   private readonly decayPerTick: number;
+  private readonly airDecayPerTick: number;
+  /** Vrai pendant les dégâts d'atterrissage : un K.O. à l'atterrissage ne relance pas l'unité en l'air. */
+  private landing = false;
+  /** Actions différées (rayons en charge), exécutées dans l'ordre. */
+  private readonly deferred: { at: number; run: () => void }[] = [];
   /** Réglages fins (rules.tuning). */
   readonly tuning: Tuning;
   private readonly grid = new SpatialGrid<Unit>(16);
@@ -79,6 +85,7 @@ export class Battle implements EffectHost {
     this.tuning = data.battle.rules.tuning;
     // knockbackDecay est par seconde ; on en déduit la part conservée à chaque tick.
     this.decayPerTick = nthRoot(data.battle.rules.knockbackDecay, data.battle.tickRate);
+    this.airDecayPerTick = nthRoot(this.tuning.airborne.airDecay, data.battle.tickRate);
     this.field = { ...data.battle.arena.field };
     this.zone = { ...this.field };
     this.extraUpgrades = setup.upgrades ?? {};
@@ -182,6 +189,9 @@ export class Battle implements EffectHost {
       chargeCooldown: this.rng.range(0, 3),
       chargeDir: { x: 0, y: 0 },
       rushTimer: 0,
+      z: 0,
+      vz: 0,
+      stunTimer: 0,
       blockedTime: 0,
       lastGap: Infinity,
       specialCooldowns: equipment.map(() => this.rng.range(...this.tuning.specialStartCooldown)),
@@ -219,10 +229,19 @@ export class Battle implements EffectHost {
     this.grid.rebuild(this.units, (u) => u.state !== 'dead');
     this.countAttackers();
     this.updateFury();
-    for (const u of this.units) if (u.state !== 'dead') this.think(u);
+    for (const u of this.units) {
+      if (u.state === 'dead' || u.z > 0) continue; // en l'air : on ne décide rien
+      if (u.stunTimer > 0) {
+        u.stunTimer -= this.dt;
+        u.vx = u.vy = 0;
+        continue;
+      }
+      this.think(u);
+    }
     for (const u of this.units) this.move(u);
     this.updateProjectiles();
     this.updateIncidents();
+    this.runDeferred();
     if (this.tick % this.data.battle.tickRate === 0) this.sampleStrength();
     this.checkEnd();
   }
@@ -508,6 +527,7 @@ export class Battle implements EffectHost {
         const ky = u.chargeDir.y * tc.pushAlong + (ay / al) * (1 - tc.pushAlong);
         const dmg = this.rollDamage(u, u.damage * charge.damage) * (main ? 1 : tc.splashDamage);
         this.applyDamage(v, dmg, u, kx, ky, charge.knockback * (main ? 1 : tc.splashKnockback));
+        if (main && charge.lift > 0) this.launchUnit(v, charge.lift / Math.sqrt(v.mass));
       }
       u.kx -= u.chargeDir.x * tc.recoil;
       u.ky -= u.chargeDir.y * tc.recoil;
@@ -581,7 +601,70 @@ export class Battle implements EffectHost {
     // Les tirs alliés et sur soi ne comptent pas comme des exploits.
     if (source && source.team !== t.team) source.damageDealt += damage;
     if (!silent) this.events.push({ type: 'hit', unit: t.index, source: source?.index ?? -1, damage, knockback });
-    if (t.hp <= 0) this.kill(t, source);
+    if (t.hp <= 0) {
+      this.kill(t, source);
+      return;
+    }
+    // Gros recul : l'unité décolle et rebondira en retombant.
+    const bounce = this.tuning.bounce;
+    const push = knockback / t.mass;
+    if (push > bounce.threshold) this.launchUnit(t, (push - bounce.threshold) * bounce.lift);
+  }
+
+  /** K.O. aérien : de temps en temps (toujours pour un héros), le vaincu s'envole avant de retomber. */
+  private maybeKoLaunch(t: Unit): void {
+    if (this.landing || t.z > 0) return;
+    const ko = this.tuning.koLaunch;
+    const push = hypot(t.kx, t.ky);
+    const chance = t.hero ? ko.heroChance : Math.min(ko.maxChance, ko.chance + (ko.perKnockback * push) / 100);
+    if (!this.rng.chance(chance)) return;
+    t.kx *= ko.push;
+    t.ky *= ko.push;
+    this.launchUnit(t, this.rng.range(...ko.lift));
+  }
+
+  /** @internal EffectHost — projette une unité en l'air (vitesse verticale minimale). */
+  launchUnit(u: Unit, lift: number): void {
+    if (lift <= 0) return;
+    u.vz = Math.max(u.vz, lift);
+    u.charging = false;
+    if (u.z <= 0) {
+      u.z = 0.001;
+      this.events.push({ type: 'launch', unit: u.index });
+    }
+  }
+
+  /** Vol balistique : peu de frottement, gravité, atterrissage avec étourdissement. */
+  private moveAirborne(u: Unit): void {
+    const dt = this.dt;
+    const air = this.tuning.airborne;
+    u.x += u.kx * dt;
+    u.y += u.ky * dt;
+    u.kx *= this.airDecayPerTick;
+    u.ky *= this.airDecayPerTick;
+    u.vz -= air.gravity * dt;
+    u.z += u.vz * dt;
+    this.clampToField(u);
+    if (u.z > 0) return;
+    const impact = -u.vz;
+    u.z = 0;
+    u.vz = 0;
+    u.vx = u.vy = 0;
+    if (u.state !== 'dead') {
+      this.landing = true;
+      this.applyDamage(u, (air.landingDamage * u.maxHp * impact) / 100, null, 0, 0, 0, true);
+      this.landing = false;
+    }
+    const bounce = this.tuning.bounce;
+    if (impact > bounce.minImpact) {
+      // Rebond : on repart vers le haut, un peu moins vite à chaque fois.
+      u.vz = impact * bounce.restitution;
+      u.z = 0.001;
+      this.events.push({ type: 'bounce', unit: u.index, x: u.x, y: u.y, impact });
+      return;
+    }
+    if (u.state !== 'dead') u.stunTimer = air.stun;
+    this.events.push({ type: 'land', unit: u.index, x: u.x, y: u.y, impact, dead: u.state === 'dead' });
   }
 
   private kill(t: Unit, killer: Unit | null): void {
@@ -593,6 +676,7 @@ export class Battle implements EffectHost {
     this.releaseTarget(t);
     if (killer && killer.team !== t.team) killer.kills++;
     this.events.push({ type: 'death', unit: t.index, killer: killer?.index ?? -1 });
+    this.maybeKoLaunch(t);
     this.grid.query(t.x, t.y, rules.allyDeathRadius, (o) => {
       if (o.state === 'dead' || hypot(o.x - t.x, o.y - t.y) > rules.allyDeathRadius) return;
       // La mort d'un héros pèse plus lourd sur le moral.
@@ -647,6 +731,10 @@ export class Battle implements EffectHost {
     const dt = this.dt;
     const rules = this.data.battle.rules;
     const decay = this.decayPerTick;
+    if (u.z > 0) {
+      this.moveAirborne(u);
+      return;
+    }
     if (u.state === 'dead') {
       // Les corps glissent encore un peu sous l'effet du dernier coup.
       u.x += u.kx * dt;
@@ -660,7 +748,7 @@ export class Battle implements EffectHost {
     let sx = 0;
     let sy = 0;
     this.grid.query(u.x, u.y, u.radius * 2 + 12, (o) => {
-      if (o === u || o.state === 'dead') return;
+      if (o === u || o.state === 'dead' || o.z > 0) return;
       const dx = u.x - o.x;
       const dy = u.y - o.y;
       const d = hypot(dx, dy) || 0.01;
@@ -770,6 +858,49 @@ export class Battle implements EffectHost {
   }
 
   /** @internal EffectHost */
+  defer(delay: number, run: () => void): void {
+    this.deferred.push({ at: this.time + delay, run });
+  }
+
+  private runDeferred(): void {
+    if (this.deferred.length === 0) return;
+    const due = this.deferred.filter((d) => d.at <= this.time);
+    if (due.length === 0) return;
+    const keep = this.deferred.filter((d) => d.at > this.time);
+    this.deferred.length = 0;
+    this.deferred.push(...keep);
+    for (const d of due) d.run();
+  }
+
+  /** @internal EffectHost — des supporters sautent le muret et rejoignent leur camp. */
+  spawnReinforcements(effect: Extract<EffectDef, { type: 'spawn' }>, ctx: Ctx): void {
+    let teams: TeamId[];
+    if (effect.team === 'both') teams = [...TEAMS];
+    else if (effect.team === 'losing') {
+      const sg = this.strength('gnomes');
+      const sb = this.strength('goblins');
+      if (sg === sb) return;
+      teams = [sg < sb ? 'gnomes' : 'goblins'];
+    } else teams = [effect.team];
+    const f = this.field;
+    for (const team of teams) {
+      const def = this.unitDef(effect.units[team]!);
+      // Les gnomes descendent des gradins du bas, les gobelins de ceux du haut.
+      const fromBottom = team === 'gnomes';
+      for (let i = 0; i < effect.count; i++) {
+        const x = Math.min(f.x + f.width - 8, Math.max(f.x + 8, ctx.x + this.rng.range(-30, 30)));
+        const y = fromBottom ? f.y + f.height - def.radius - 1 : f.y + def.radius + 1;
+        this.createUnit(team, def, x, y);
+        const u = this.units[this.units.length - 1];
+        u.ky = (fromBottom ? -1 : 1) * this.rng.range(40, 80);
+        // L'apparition est annoncée avant l'envol : le rendu doit connaître l'unité.
+        this.events.push({ type: 'spawn', unit: u.index });
+        this.launchUnit(u, effect.jump * this.rng.range(0.8, 1.2));
+      }
+    }
+  }
+
+  /** @internal EffectHost */
   random(): number {
     return this.rng.next();
   }
@@ -797,7 +928,10 @@ export class Battle implements EffectHost {
     const offset = this.rng.next() * effect.spread;
     const toX = ctx.x + cos(angle) * offset;
     const toY = ctx.y + sin(angle) * offset;
-    const dist = hypot(toX - ctx.fromX, toY - ctx.fromY);
+    // Tombé du ciel : part d'un peu à côté du point visé, la cloche fait le reste (chute en diagonale).
+    const fromX = effect.fromSky ? toX + (this.rng.chance(0.5) ? -1 : 1) * 50 : ctx.fromX;
+    const fromY = effect.fromSky ? toY : ctx.fromY;
+    const dist = hypot(toX - fromX, toY - fromY);
     this.projectiles.push({
       id: this.nextProjectileId++,
       team: ctx.team,
@@ -806,14 +940,15 @@ export class Battle implements EffectHost {
       effects: effect.effects,
       visual: effect.visual,
       arc: effect.arc,
-      fromX: ctx.fromX,
-      fromY: ctx.fromY,
+      fall: effect.fromSky,
+      fromX,
+      fromY,
       toX,
       toY,
-      flightTime: Math.max(0.1, dist / effect.speed),
+      flightTime: effect.duration ?? Math.max(0.1, dist / effect.speed),
       age: 0,
-      x: ctx.fromX,
-      y: ctx.fromY,
+      x: fromX,
+      y: fromY,
       done: false,
     });
   }
@@ -842,7 +977,7 @@ export class Battle implements EffectHost {
     if (this.nextIncidentAt < 0) this.nextIncidentAt = cfg.firstAt + this.rng.range(0, interval);
 
     if (this.time >= this.nextIncidentAt) {
-      const eligible = this.data.events.filter((e) => e.from <= this.time);
+      const eligible = this.data.events.filter((e) => e.from <= this.time && (e.until === undefined || this.time < e.until));
       if (eligible.length > 0) {
         const weights = Object.fromEntries(eligible.map((e) => [e.id, e.weight]));
         const picked = this.rng.weighted(weights);
