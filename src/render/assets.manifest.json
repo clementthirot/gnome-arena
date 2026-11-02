@@ -826,5 +826,29 @@
       "accent": "#ff8a00",
       "size": 1
     }
+  },
+  "staging": {
+    "camera": {
+      "enabled": true,
+      "zoom": 1.7,
+      "hold": 1.8,
+      "cooldown": 7,
+      "follow": 0.1,
+      "triggers": {
+        "heroDeath": true,
+        "heroDuel": true,
+        "heroCharge": false,
+        "misfire": true,
+        "lastStand": true
+      }
+    },
+    "heroIntro": {
+      "enabled": true,
+      "duration": 2.8
+    },
+    "strayShots": {
+      "chance": 0.35,
+      "edgeDistance": 30
+    }
   }
 }

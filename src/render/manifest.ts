@@ -91,11 +91,38 @@ const EffectVisualSchema = z.object({
   duration: z.number().positive().default(0.35),
 });
 
+/** Mise en scène : caméra, présentation des héros, tirs perdus dans le public. */
+const StagingSchema = z.object({
+  camera: z.object({
+    enabled: z.boolean().default(true),
+    zoom: z.number().min(1).max(3).default(1.7),
+    /** Durée d'un plan rapproché (s de combat). */
+    hold: z.number().positive().default(1.8),
+    /** Repos minimal entre deux plans rapprochés (s de combat). */
+    cooldown: z.number().min(0).default(7),
+    /** Douceur du suivi (0..1 par image). */
+    follow: z.number().min(0.01).max(1).default(0.1),
+    triggers: z
+      .object({ heroDeath: z.boolean(), heroDuel: z.boolean(), heroCharge: z.boolean(), misfire: z.boolean(), lastStand: z.boolean() })
+      .partial()
+      .default({}),
+  }),
+  heroIntro: z.object({ enabled: z.boolean().default(true), duration: z.number().positive().default(2.8) }),
+  strayShots: z.object({
+    /** Probabilité qu'une flèche ratée près du bord file dans les gradins. */
+    chance: z.number().min(0).max(1).default(0.35),
+    /** Distance au bord du terrain (px monde) en dessous de laquelle un raté peut partir dans le public. */
+    edgeDistance: z.number().min(0).default(30),
+  }),
+});
+export type Staging = z.infer<typeof StagingSchema>;
+
 const ManifestSchema = z.object({
   defaults: z.object({ bricks: BricksSchema }),
   assets: z.record(z.string(), z.discriminatedUnion('type', [PlaceholderSchema, SpriteSheetSchema])),
   accessories: z.record(z.string(), AccessorySchema),
   effects: z.record(z.string(), EffectVisualSchema),
+  staging: StagingSchema,
 });
 
 export type AccessoryEntry = z.infer<typeof AccessorySchema>;

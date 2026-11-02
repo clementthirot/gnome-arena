@@ -6,6 +6,7 @@ import { Battle, opposingTeam, TEAMS } from '../../sim/battle';
 import type { BattleEvent, Unit } from '../../sim/types';
 import { Bricks, type BrickContext, type Particle, type UnitView } from '../animations';
 import { drawArenaBackground } from '../arenaArt';
+import { Director } from '../director';
 import { FxLayer } from '../fx';
 import { asPlaceholder, bricksFor, manifest, resolveAsset } from '../manifest';
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
@@ -14,8 +15,12 @@ import type { ResultData } from './ResultScene';
 
 /** Monde 270 x 480 affiché en 1080 x 1920. */
 export const SCALE = 4;
-const INTRO_MS = 2600;
+/** Titre « gnomes contre gobelins », puis « COMBAT ! » (ms). La présentation des héros s'insère entre les deux. */
+const TITLE_MS = 1700;
+const GO_MS = 900;
 const MAX_STEPS_PER_FRAME = 12;
+/** Au-dessus de cette profondeur, un objet appartient à l'interface : la caméra de jeu ne le zoome pas. */
+const UI_DEPTH = 9900;
 
 export interface ArenaParams {
   data: GameData;
@@ -73,6 +78,10 @@ export class ArenaScene extends Phaser.Scene {
   private timeScale = 1;
   private ending = false;
   private currentBanner?: Phaser.GameObjects.Text;
+  private uiCam!: Phaser.Cameras.Scene2D.Camera;
+  private director!: Director;
+  private routed = new WeakSet<Phaser.GameObjects.GameObject>();
+  private lastStandCheck = 0;
 
   constructor() {
     super('arena');
@@ -90,6 +99,8 @@ export class ArenaScene extends Phaser.Scene {
     this.paused = false;
     this.ending = false;
     this.timeScale = params.speed;
+    this.routed = new WeakSet();
+    this.lastStandCheck = 0;
   }
 
   create(): void {
@@ -110,8 +121,24 @@ export class ArenaScene extends Phaser.Scene {
     this.fx = this.add.graphics().setDepth(9000);
     this.fxLayer = new FxLayer(this.fx, groundFx, this.particles, SCALE, field.y);
     this.createHud();
+    // Deux caméras : le jeu (qui peut zoomer sur un héros) et l'interface (fixe).
+    const w = width * SCALE;
+    const h = height * SCALE;
+    this.uiCam = this.cameras.add(0, 0, w, h);
+    this.director = new Director(this.cameras.main, manifest.staging.camera, w, h);
     this.bindInput();
     this.playIntro();
+    this.routeCameras();
+  }
+
+  /** Confie chaque nouvel objet à une seule caméra, selon sa profondeur. */
+  private routeCameras(): void {
+    for (const obj of this.children.list) {
+      if (this.routed.has(obj)) continue;
+      this.routed.add(obj);
+      const ui = ((obj as unknown as { depth?: number }).depth ?? 0) >= UI_DEPTH;
+      obj.cameraFilter = ui ? this.cameras.main.id : this.uiCam.id;
+    }
   }
 
   // ---------------------------------------------------------------- création
@@ -239,16 +266,56 @@ export class ArenaScene extends Phaser.Scene {
     this.tweens.add({ targets: goblins, x: w / 2, duration: 450, delay: 150, ease: 'Back.easeOut' });
     this.tweens.add({ targets: vs, scale: 1, duration: 300, delay: 500, ease: 'Back.easeOut' });
 
-    this.time.delayedCall(INTRO_MS - 900, () => {
+    const heroesMs = this.battle.units.some((u) => u.hero) && manifest.staging.heroIntro.enabled ? manifest.staging.heroIntro.duration * 1000 : 0;
+    const goAt = TITLE_MS + heroesMs;
+    if (heroesMs) {
+      this.time.delayedCall(TITLE_MS, () => {
+        this.tweens.add({ targets: title, alpha: 0, duration: 200 });
+        this.heroRoster(heroesMs, veil);
+      });
+    }
+    this.time.delayedCall(goAt, () => {
       this.tweens.add({ targets: title, alpha: 0, duration: 200 });
       const go = this.add.text(w / 2, h / 2, 'COMBAT !', textStyle(110, '#ffe14a')).setOrigin(0.5).setDepth(9951).setScale(2.5).setAlpha(0);
       this.tweens.add({ targets: go, scale: 1, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
       this.tweens.add({ targets: [go, veil], alpha: 0, delay: 650, duration: 250, onComplete: () => go.destroy() });
     });
-    this.time.delayedCall(INTRO_MS, () => {
+    this.time.delayedCall(goAt + GO_MS, () => {
       title.forEach((t) => t.destroy());
       veil.destroy();
       this.running = true;
+    });
+  }
+
+  /** Présentation des héros et de leurs upgrades : le public retrouve « ses » personnages. */
+  private heroRoster(durationMs: number, veil: Phaser.GameObjects.Rectangle): void {
+    const { width: w, height: h } = this.scale;
+    // Fond plus sombre le temps du carton : le terrain ne doit pas gêner la lecture.
+    this.tweens.add({ targets: veil, fillAlpha: 0.9, duration: 200 });
+    const items: Phaser.GameObjects.GameObject[] = [];
+    const head = this.add.text(w / 2, h * 0.2, 'LES HÉROS', textStyle(56, '#ffe14a')).setOrigin(0.5).setDepth(9951);
+    items.push(head);
+    (['gnomes', 'goblins'] as const).forEach((team, col) => {
+      const heroes = this.battle.units.filter((u) => u.hero && u.team === team);
+      const x = w * (col === 0 ? 0.27 : 0.73);
+      items.push(this.add.text(x, h * 0.29, TEAM_COLORS[team].label, textStyle(34, TEAM_COLORS[team].main)).setOrigin(0.5).setDepth(9951));
+      heroes.forEach((u, i) => {
+        const y = h * 0.36 + i * 230;
+        const view = this.views[u.index];
+        const portrait = this.add.sprite(x, y + 40, view.sprite.texture.key, 0).setScale(view.baseScale * 1.6).setDepth(9951).setFlipX(team === 'goblins');
+        const name = this.add.text(x, y + 110, u.hero!.name.toUpperCase(), textStyle(34, TEAM_COLORS[team].main)).setOrigin(0.5).setDepth(9951);
+        const label = this.add.text(x, y + 150, u.hero!.label, textStyle(20)).setOrigin(0.5).setDepth(9951);
+        const gear = u.equipment.map((e) => e.short).join(' + ');
+        const upgrades = this.add.text(x, y + 182, gear || '—', textStyle(18, gear ? '#ffe14a' : '#a098b0')).setOrigin(0.5).setDepth(9951);
+        const group = [portrait, name, label, upgrades];
+        group.forEach((o) => o.setAlpha(0));
+        this.tweens.add({ targets: group, alpha: 1, duration: 250, delay: 150 + i * 220 + col * 110 });
+        items.push(...group);
+      });
+    });
+    this.time.delayedCall(durationMs - 250, () => {
+      this.tweens.add({ targets: veil, fillAlpha: 0.55, duration: 220 });
+      this.tweens.add({ targets: items, alpha: 0, duration: 220, onComplete: () => items.forEach((o) => o.destroy()) });
     });
   }
 
@@ -305,6 +372,22 @@ export class ArenaScene extends Phaser.Scene {
     this.drawEffects(delta / 1000);
     this.animateCrowd(this.time.now / 1000);
     this.updateHud();
+    this.watchLastStand();
+    this.director.update(this.battle.time);
+    this.routeCameras();
+  }
+
+  /** Un héros seul contre au moins trois ennemis : la caméra ne le lâche plus. */
+  private watchLastStand(): void {
+    if (this.battle.result || this.battle.time < this.lastStandCheck) return;
+    this.lastStandCheck = this.battle.time + 1;
+    for (const team of TEAMS) {
+      const mine = this.battle.alive(team);
+      if (mine.length === 1 && mine[0].hero && this.battle.alive(opposingTeam(team)).length >= 3) {
+        const hero = this.views[mine[0].index].sprite;
+        this.director.request('lastStand', () => hero, this.battle.time, 4);
+      }
+    }
   }
 
   private handleEvents(events: readonly BattleEvent[]): void {
@@ -328,6 +411,13 @@ export class ArenaScene extends Phaser.Scene {
         }
         case 'impact':
           Bricks.impact(ctx, this.views[e.unit], e.x, e.y);
+          if (units[e.unit].hero) {
+            const s = this.views[e.unit].sprite;
+            this.director.request('heroCharge', () => s, this.battle.time);
+          }
+          break;
+        case 'miss':
+          this.strayShot(e.x, e.y, units[e.source]);
           break;
         case 'panic':
           Bricks.panic(ctx, this.views[e.unit]);
@@ -341,6 +431,13 @@ export class ArenaScene extends Phaser.Scene {
           Bricks.death(ctx, view, u.x, u.y, !!u.hero);
           this.cheer(opposingTeam(u.team), u.hero ? 1 : 0.15);
           if (u.hero) {
+            const victim = view.sprite;
+            const killer = e.killer >= 0 ? units[e.killer] : undefined;
+            if (killer?.hero) {
+              // Duel de héros : on cadre les deux.
+              const k = this.views[killer.index].sprite;
+              this.director.request('heroDuel', () => ({ x: (k.x + victim.x) / 2, y: (k.y + victim.y) / 2 }), this.battle.time);
+            } else this.director.request('heroDeath', () => victim, this.battle.time);
             const hud = this.heroHud.get(e.unit);
             hud?.name.setAlpha(0.6);
             this.banner(`${u.hero.name} est K.O. !`, TEAM_COLORS[u.team].main, 1200);
@@ -353,7 +450,11 @@ export class ArenaScene extends Phaser.Scene {
         case 'special': {
           const u = units[e.unit];
           const eq = u.equipment.find((x) => x.id === e.equipment);
-          if (e.misfire) this.popup(u, 'OUPS !', '#ff8080', 32);
+          if (e.misfire) {
+            this.popup(u, 'OUPS !', '#ff8080', 32);
+            const s = this.views[e.unit].sprite;
+            this.director.request('misfire', () => s, this.battle.time);
+          }
           else if (eq) this.popup(u, eq.short.toUpperCase() + ' !', '#ffe14a', 24);
           break;
         }
@@ -387,9 +488,53 @@ export class ArenaScene extends Phaser.Scene {
     if (this.anims.exists(key)) view.sprite.play(key);
   }
 
+  /** Une flèche ratée près du bord file dans les gradins : un spectateur la prend. Purement visuel. */
+  private strayShot(x: number, y: number, shooter: Unit | undefined): void {
+    const cfg = manifest.staging.strayShots;
+    const f = this.battle.field;
+    const edge = Math.min(x - f.x, f.x + f.width - x, y - f.y, f.y + f.height - y);
+    if (!shooter || edge > cfg.edgeDistance || Math.random() > cfg.chance) return;
+    const dx = x - shooter.x;
+    const dy = y - shooter.y;
+    const l = Math.hypot(dx, dy) || 1;
+    // Le spectateur le plus proche de la trajectoire prolongée.
+    let best: Spectator | undefined;
+    let bestScore = Infinity;
+    for (const s of this.spectators) {
+      const sx = s.sprite.x / SCALE - x;
+      const sy = s.baseY / SCALE - 3 - y;
+      const along = (sx * dx + sy * dy) / l;
+      if (along <= 0 || along > 90) continue;
+      const across = Math.abs(sx * dy - sy * dx) / l;
+      const score = across * 3 + along * 0.2;
+      if (score < bestScore) {
+        bestScore = score;
+        best = s;
+      }
+    }
+    if (!best || bestScore > 40) return;
+    const target = best;
+    const arrow = this.add.rectangle(x * SCALE, y * SCALE, 5 * SCALE, SCALE, 0xf4f0e0).setRotation(Math.atan2(dy, dx)).setDepth(9000);
+    this.tweens.add({
+      targets: arrow,
+      x: target.sprite.x,
+      y: target.baseY - 3 * SCALE,
+      duration: 220,
+      onComplete: () => {
+        arrow.destroy();
+        target.sprite.setTint(0xff6060);
+        this.time.delayedCall(250, () => target.sprite.clearTint());
+        this.tweens.add({ targets: target.sprite, y: target.baseY - 5 * SCALE, duration: 110, yoyo: true });
+        const ouch = this.add.text(target.sprite.x, target.baseY - 9 * SCALE, 'AÏE !', textStyle(22, '#ffffff')).setOrigin(0.5, 1).setDepth(9850);
+        this.tweens.add({ targets: ouch, y: ouch.y - 30, alpha: 0, delay: 300, duration: 500, onComplete: () => ouch.destroy() });
+      },
+    });
+  }
+
   private finish(): void {
     if (this.ending) return;
     this.ending = true;
+    this.director.release(this.battle.time);
     const r = this.battle.result!;
     const label = r.winner === 'draw' ? 'ÉGALITÉ !' : `VICTOIRE DES ${TEAM_COLORS[r.winner].label} !`;
     this.cheer(r.winner === 'draw' ? 'gnomes' : r.winner, 1);

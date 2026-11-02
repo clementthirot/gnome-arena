@@ -96,3 +96,9 @@ Effets disponibles : `damage` (ponctuel ou de zone, tir allié possible), `proje
 - **Rage du camp mené** (`rules.underdog`) : garde des retournements possibles.
 - **Incidents** : chute de roche sur la mêlée, boule de feu, éclair en chaîne sur un héros, flaque de boue ; plus fréquents quand l'arène rétrécit.
 - **Fin maîtrisée** : l'arène rétrécit de 45 s à 75 s, victoire aux PV restants à 80 s.
+
+## Mise en scène (rendu uniquement, réglable dans `manifest.staging`)
+
+- **Présentation des héros** avant « COMBAT ! » : nom, surnom, upgrades portées.
+- **Caméra** : zoom bref sur un héros qui tombe, un duel de héros gagné, un tir raté, et suivi continu d'un héros seul contre trois ennemis ou plus. L'interface reste fixe (seconde caméra). Les charges de héros sont désactivées par défaut (`triggers.heroCharge`).
+- **Tirs perdus** : une flèche ratée près du bord peut filer dans les gradins et toucher un spectateur.
