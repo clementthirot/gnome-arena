@@ -12,168 +12,720 @@
   },
   "assets": {
     "gnome_melee": {
-      "type": "placeholder",
-      "body": "gnome",
-      "size": 12,
-      "color": "#5b8def",
-      "accent": "#d83b3b",
-      "mark": "none"
+      "type": "spritesheet",
+      "url": "sprites/generated/gnome_melee.png",
+      "frameWidth": 20,
+      "frameHeight": 20,
+      "size": 20,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "gnome",
+        "size": 12,
+        "color": "#5b8def",
+        "accent": "#d83b3b",
+        "mark": "none"
+      }
     },
     "gnome_archer": {
-      "type": "placeholder",
-      "body": "gnome",
-      "size": 12,
-      "color": "#5b8def",
-      "accent": "#3f9e4a",
-      "mark": "bow"
+      "type": "spritesheet",
+      "url": "sprites/generated/gnome_archer.png",
+      "frameWidth": 20,
+      "frameHeight": 20,
+      "size": 20,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "gnome",
+        "size": 12,
+        "color": "#5b8def",
+        "accent": "#3f9e4a",
+        "mark": "bow"
+      }
     },
     "gnome_charger": {
-      "type": "placeholder",
-      "body": "gnome",
-      "size": 14,
-      "color": "#3d6cc4",
-      "accent": "#d83b3b",
-      "mark": "helmet"
+      "type": "spritesheet",
+      "url": "sprites/generated/gnome_charger.png",
+      "frameWidth": 22,
+      "frameHeight": 22,
+      "size": 22,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "gnome",
+        "size": 14,
+        "color": "#3d6cc4",
+        "accent": "#d83b3b",
+        "mark": "helmet"
+      }
     },
     "goblin_melee": {
-      "type": "placeholder",
-      "body": "goblin",
-      "size": 12,
-      "color": "#7cc243",
-      "accent": "#7a4a26",
-      "mark": "none"
+      "type": "spritesheet",
+      "url": "sprites/generated/goblin_melee.png",
+      "frameWidth": 20,
+      "frameHeight": 20,
+      "size": 20,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "goblin",
+        "size": 12,
+        "color": "#7cc243",
+        "accent": "#7a4a26",
+        "mark": "none"
+      }
     },
     "goblin_archer": {
-      "type": "placeholder",
-      "body": "goblin",
-      "size": 12,
-      "color": "#7cc243",
-      "accent": "#7a4a26",
-      "mark": "bow"
+      "type": "spritesheet",
+      "url": "sprites/generated/goblin_archer.png",
+      "frameWidth": 20,
+      "frameHeight": 20,
+      "size": 20,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "goblin",
+        "size": 12,
+        "color": "#7cc243",
+        "accent": "#7a4a26",
+        "mark": "bow"
+      }
     },
     "goblin_charger": {
-      "type": "placeholder",
-      "body": "goblin",
-      "size": 14,
-      "color": "#5a9a2c",
-      "accent": "#7a4a26",
-      "mark": "helmet"
+      "type": "spritesheet",
+      "url": "sprites/generated/goblin_charger.png",
+      "frameWidth": 22,
+      "frameHeight": 22,
+      "size": 22,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "goblin",
+        "size": 14,
+        "color": "#5a9a2c",
+        "accent": "#7a4a26",
+        "mark": "helmet"
+      }
     },
     "hero_bob": {
-      "type": "placeholder",
-      "body": "gnome",
-      "size": 22,
-      "color": "#6fa0ff",
-      "accent": "#e8b830",
-      "mark": "helmet",
-      "outline": "#fff4c2"
+      "type": "spritesheet",
+      "url": "sprites/generated/hero_bob.png",
+      "frameWidth": 30,
+      "frameHeight": 30,
+      "size": 30,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "gnome",
+        "size": 22,
+        "color": "#6fa0ff",
+        "accent": "#e8b830",
+        "mark": "helmet",
+        "outline": "#fff4c2"
+      }
     },
     "hero_kevin": {
-      "type": "placeholder",
-      "body": "gnome",
-      "size": 20,
-      "color": "#6fa0ff",
-      "accent": "#8a4fd8",
-      "mark": "bow",
-      "outline": "#fff4c2"
+      "type": "spritesheet",
+      "url": "sprites/generated/hero_kevin.png",
+      "frameWidth": 28,
+      "frameHeight": 28,
+      "size": 28,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "gnome",
+        "size": 20,
+        "color": "#6fa0ff",
+        "accent": "#8a4fd8",
+        "mark": "bow",
+        "outline": "#fff4c2"
+      }
     },
     "hero_gertrude": {
-      "type": "placeholder",
-      "body": "gnome",
-      "size": 20,
-      "color": "#6fa0ff",
-      "accent": "#ff7a3a",
-      "mark": "none",
-      "outline": "#fff4c2"
+      "type": "spritesheet",
+      "url": "sprites/generated/hero_gertrude.png",
+      "frameWidth": 28,
+      "frameHeight": 28,
+      "size": 28,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "gnome",
+        "size": 20,
+        "color": "#6fa0ff",
+        "accent": "#ff7a3a",
+        "mark": "none",
+        "outline": "#fff4c2"
+      }
     },
     "hero_grok": {
-      "type": "placeholder",
-      "body": "goblin",
-      "size": 22,
-      "color": "#8fd456",
-      "accent": "#5a3010",
-      "mark": "helmet",
-      "outline": "#fff4c2"
+      "type": "spritesheet",
+      "url": "sprites/generated/hero_grok.png",
+      "frameWidth": 30,
+      "frameHeight": 30,
+      "size": 30,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "goblin",
+        "size": 22,
+        "color": "#8fd456",
+        "accent": "#5a3010",
+        "mark": "helmet",
+        "outline": "#fff4c2"
+      }
     },
     "hero_snik": {
-      "type": "placeholder",
-      "body": "goblin",
-      "size": 20,
-      "color": "#8fd456",
-      "accent": "#40285a",
-      "mark": "bow",
-      "outline": "#fff4c2"
+      "type": "spritesheet",
+      "url": "sprites/generated/hero_snik.png",
+      "frameWidth": 28,
+      "frameHeight": 28,
+      "size": 28,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "goblin",
+        "size": 20,
+        "color": "#8fd456",
+        "accent": "#40285a",
+        "mark": "bow",
+        "outline": "#fff4c2"
+      }
     },
     "hero_morva": {
-      "type": "placeholder",
-      "body": "goblin",
-      "size": 20,
-      "color": "#8fd456",
-      "accent": "#a02020",
-      "mark": "none",
-      "outline": "#fff4c2"
+      "type": "spritesheet",
+      "url": "sprites/generated/hero_morva.png",
+      "frameWidth": 28,
+      "frameHeight": 28,
+      "size": 28,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "goblin",
+        "size": 20,
+        "color": "#8fd456",
+        "accent": "#a02020",
+        "mark": "none",
+        "outline": "#fff4c2"
+      }
     }
   },
   "accessories": {
     "acc_goggles": {
-      "type": "placeholder",
-      "kind": "goggles",
-      "color": "#ff3040",
-      "accent": "#2a2a2a",
+      "type": "image",
+      "url": "sprites/generated/acc_goggles.png",
+      "size": 4,
       "anchor": [
         0.18,
         -0.22
-      ]
+      ],
+      "placeholder": {
+        "kind": "goggles",
+        "color": "#ff3040",
+        "accent": "#2a2a2a"
+      }
     },
     "acc_sword": {
-      "type": "placeholder",
-      "kind": "sword",
-      "color": "#d8f0ff",
-      "accent": "#8a5a2b",
+      "type": "image",
+      "url": "sprites/generated/acc_sword.png",
+      "size": 10,
       "anchor": [
         0.48,
         0
-      ]
+      ],
+      "placeholder": {
+        "kind": "sword",
+        "color": "#d8f0ff",
+        "accent": "#8a5a2b"
+      }
     },
     "acc_grenades": {
-      "type": "placeholder",
-      "kind": "grenades",
-      "color": "#4a5a3a",
-      "accent": "#8a5a2b",
+      "type": "image",
+      "url": "sprites/generated/acc_grenades.png",
+      "size": 4,
       "anchor": [
         0,
         0.22
-      ]
+      ],
+      "placeholder": {
+        "kind": "grenades",
+        "color": "#4a5a3a",
+        "accent": "#8a5a2b"
+      }
     },
     "acc_glue": {
-      "type": "placeholder",
-      "kind": "jar",
-      "color": "#b8f050",
-      "accent": "#8a8a8a",
+      "type": "image",
+      "url": "sprites/generated/acc_glue.png",
+      "size": 5,
       "anchor": [
         -0.42,
         0.1
-      ]
+      ],
+      "placeholder": {
+        "kind": "jar",
+        "color": "#b8f050",
+        "accent": "#8a8a8a"
+      }
     },
     "acc_chicken": {
-      "type": "placeholder",
-      "kind": "chicken",
-      "color": "#ffffff",
-      "accent": "#ff8a00",
+      "type": "image",
+      "url": "sprites/generated/acc_chicken.png",
+      "size": 6,
       "anchor": [
         -0.4,
         -0.15
-      ]
+      ],
+      "placeholder": {
+        "kind": "chicken",
+        "color": "#ffffff",
+        "accent": "#ff8a00"
+      }
     },
     "acc_pot": {
-      "type": "placeholder",
-      "kind": "pot",
-      "color": "#7a7a86",
-      "accent": "#4a4a52",
+      "type": "image",
+      "url": "sprites/generated/acc_pot.png",
+      "size": 5,
       "anchor": [
         0,
         -0.5
-      ]
+      ],
+      "placeholder": {
+        "kind": "pot",
+        "color": "#7a7a86",
+        "accent": "#4a4a52"
+      }
     }
   },
   "effects": {

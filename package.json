@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "bench": "tsx scripts/bench.ts",
-    "episode": "tsx scripts/episode.ts"
+    "episode": "tsx scripts/episode.ts",
+    "sprites": "tsx scripts/sprites.ts"
   },
   "dependencies": {
     "@fontsource/press-start-2p": "^5.2.5",

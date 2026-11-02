@@ -104,6 +104,8 @@ const DamageEffect = z.object({
   amount: z.number().min(0).default(0),
   /** 0 = la seule unité visée ; sinon tout ce qui est dans le rayon, avec atténuation vers le bord. */
   radius: z.number().min(0).default(0),
+  /** Part de l'effet conservée au bord de la zone (1 = uniforme). */
+  edge: fraction.default(0.5),
   knockback: z.number().min(0).default(0),
   /** Touche aussi son propre camp (grenades, catastrophes). */
   friendlyFire: z.boolean().default(false),
@@ -114,6 +116,7 @@ const KnockbackEffect = z.object({
   type: z.literal('knockback'),
   force: positive,
   radius: positive,
+  edge: fraction.default(0.5),
   friendlyFire: z.boolean().default(false),
 });
 
@@ -255,6 +258,107 @@ export const HeroSchema = z.object({
 });
 export type HeroDef = z.infer<typeof HeroSchema>;
 
+const range = z.tuple([z.number(), z.number()]);
+
+/**
+ * Réglages fins du comportement. Chaque valeur a un défaut : battle.json peut n'en citer qu'une partie.
+ * Facteurs de vitesse relatifs à la vitesse de l'unité, distances en px monde, temps en secondes.
+ */
+const TuningSchema = z
+  .object({
+    /** Variation aléatoire des dégâts (multiplicateur tiré dans l'intervalle). */
+    damageSpread: range.default([0.75, 1.25]),
+    /** Variation des dégâts absolus des effets (incidents d'arène). */
+    effectSpread: range.default([0.85, 1.15]),
+    /** Variation aléatoire des recharges d'attaque et de spéciale. */
+    cooldownJitter: range.default([0.85, 1.15]),
+    /** Recharge initiale des attaques spéciales. */
+    specialStartCooldown: range.default([1, 3]),
+    /** Durée d'une ruée téméraire. */
+    rushDuration: range.default([2, 4]),
+    /** Moral rendu au-dessus du seuil de panique quand la fuite se termine. */
+    panicRecovery: z.number().min(0).default(0.3),
+    /** Poids de la mort d'un héros sur le moral de ses voisins. */
+    heroDeathWeight: z.number().min(0).default(2.5),
+    /** Moral regagné par l'ennemi quand une unité tombe près de lui. */
+    moraleGainOnEnemyDeath: z.number().min(0).default(0.05),
+    fleeSpeed: positive.default(1.1),
+    /** Rayon dans lequel un fuyard évite les ennemis. */
+    fleeRadius: positive.default(70),
+    /** Probabilité par seconde de quitter une cible surchargée. */
+    crowdedRetargetChance: z.number().min(0).default(2),
+    /** Temps sans progresser derrière la foule avant de changer de cible. */
+    blockedRetargetAfter: positive.default(1.5),
+    targeting: z
+      .object({
+        /** Pénalité de score d'une cible déjà entourée. */
+        saturatedPenalty: positive.default(4),
+        /** Bonus de score d'un fuyard (moins = plus attirant). */
+        fleeingFactor: positive.default(0.8),
+        /** Pénalité de la cible qu'on vient d'abandonner. */
+        avoidPenalty: positive.default(3),
+      })
+      .default({}),
+    /** Les tireurs qui gardent leurs distances. */
+    ranged: z
+      .object({
+        /** Recule quand la cible est plus près que cette part de la distance voulue. */
+        retreatBelow: fraction.default(0.75),
+        retreatSpeed: positive.default(0.85),
+        /** Vitesse du pas de côté quand il tient sa position. */
+        holdSpeed: z.number().min(0).default(0.35),
+        holdMargin: z.number().min(0).default(12),
+        /** Part de la portée de tir au-delà de laquelle il se rapproche. */
+        holdRangeShare: fraction.default(0.85),
+        /** Distance au mur en dessous de laquelle il se sent acculé. */
+        wallDistance: positive.default(24),
+        /** Acculé au-delà de ce niveau (0..1), il se retourne et se bat. */
+        corneredAt: fraction.default(0.7),
+        corneredRush: positive.default(1.5),
+      })
+      .default({}),
+    /** Un fantassin s'arrête à cette part de sa portée de mêlée. */
+    meleeApproach: fraction.default(0.7),
+    charge: z
+      .object({
+        /** Probabilité par seconde de lancer une charge quand elle est possible. */
+        chancePerSecond: z.number().min(0).default(1.5),
+        splashDamage: fraction.default(0.5),
+        splashKnockback: fraction.default(0.7),
+        /** Part de la direction de charge dans la projection (le reste : éloignement du point d'impact). */
+        pushAlong: fraction.default(0.6),
+        /** Rebond du chargeur à l'impact. */
+        recoil: z.number().min(0).default(40),
+        cooldownJitter: range.default([0.8, 1.3]),
+        /** Part de la recharge appliquée quand la charge ne touche personne. */
+        missCooldown: fraction.default(0.5),
+        /** Délai minimal avant de frapper après un impact. */
+        attackLock: z.number().min(0).default(0.4),
+      })
+      .default({}),
+    separation: z
+      .object({
+        allyGap: z.number().min(0).default(2.5),
+        enemyGap: z.number().min(0).default(0.5),
+        /** Distance au-delà de l'écart minimal où la répulsion commence. */
+        reach: positive.default(3),
+        /** Force de répulsion entre ennemis, relative à celle entre alliés. */
+        enemyFactor: z.number().min(0).default(0.6),
+      })
+      .default({}),
+    /** Vitesse à laquelle tourne la direction d'errance (rad/s). */
+    wanderTurn: z.number().min(0).default(4),
+    walls: z.object({ margin: positive.default(16), push: z.number().min(0).default(1.2) }).default({}),
+    /** Attraction vers le centre pour une unité hors de la zone. */
+    zonePull: z.number().min(0).default(0.8),
+    /** Tolérance (px) pour qu'un tir ou un effet ponctuel touche une unité. */
+    hitTolerance: z.number().min(0).default(2.5),
+    /** Portée initiale d'un ricochet quand il ne part pas d'une unité visée. */
+    ricochetStartReach: z.number().min(0).default(6),
+  })
+  .default({});
+export type Tuning = z.infer<typeof TuningSchema>;
+
 export const BattleConfigSchema = z.object({
   tickRate: z.number().int().positive(),
   arena: z.object({
@@ -295,6 +399,7 @@ export const BattleConfigSchema = z.object({
     }),
     /** Durée de panique (s). */
     panicDuration: z.tuple([positive, positive]),
+    tuning: TuningSchema,
   }),
   /** Fréquence des incidents d'arène. */
   events: z.object({
@@ -304,6 +409,16 @@ export const BattleConfigSchema = z.object({
     endRamp: z.number().min(1),
     /** Pas d'incident avant (s). */
     firstAt: z.number().min(0),
+    /** Variation aléatoire de l'intervalle entre deux incidents. */
+    intervalJitter: range.default([0.6, 1.4]),
+    /** Les projectiles d'incident partent des gradins : décalage latéral max et recul derrière le muret. */
+    launchSpread: z.number().min(0).default(30),
+    launchDepth: z.number().min(0).default(20),
+    /** Cible "densest" : nombre de candidats tirés et rayon de comptage des voisins. */
+    densestCandidates: z.number().int().positive().default(6),
+    densestRadius: positive.default(20),
+    /** Cible "random_point" : marge par rapport au bord de la zone (0..0.5). */
+    pointMargin: z.number().min(0).max(0.45).default(0.1),
   }),
   /** Fin de combat maîtrisée : l'arène rétrécit, puis on tranche aux points. */
   ending: z.object({
@@ -369,6 +484,10 @@ export const GameDataSchema = z
     const { ending, rules } = data.battle;
     if (!(ending.shrinkStart < ending.shrinkEnd && ending.shrinkEnd <= ending.hardCap))
       issue(['battle', 'ending'], 'attendu : shrinkStart < shrinkEnd <= hardCap');
+    const t = rules.tuning;
+    for (const [name, r] of [['damageSpread', t.damageSpread], ['effectSpread', t.effectSpread], ['cooldownJitter', t.cooldownJitter], ['specialStartCooldown', t.specialStartCooldown], ['rushDuration', t.rushDuration], ['charge.cooldownJitter', t.charge.cooldownJitter], ['events.intervalJitter', data.battle.events.intervalJitter]] as const) {
+      if (r[0] > r[1] || r[0] < 0) issue(['battle', 'rules', 'tuning', name], 'attendu : [min, max] positifs avec min <= max');
+    }
     if (rules.underdog.threshold >= rules.underdog.fullAt) issue(['battle', 'rules', 'underdog'], 'attendu : threshold < fullAt');
     for (const key of ['retargetInterval', 'panicDuration'] as const) {
       if (rules[key][0] > rules[key][1]) issue(['battle', 'rules', key], 'attendu : [min, max] avec min <= max');

@@ -1,6 +1,6 @@
 // Bibliothèque d'effets : les seules briques de comportement que les données peuvent combiner.
 // Un équipement ou un événement n'est qu'une liste d'effets ; aucun code spécifique par élément.
-import type { EffectDef, TeamId } from '../data/schema';
+import type { EffectDef, TeamId, Tuning } from '../data/schema';
 import { hypot } from './detmath';
 import type { BattleEvent, Unit } from './types';
 
@@ -8,6 +8,7 @@ import type { BattleEvent, Unit } from './types';
 export interface EffectHost {
   readonly units: readonly Unit[];
   readonly maxRadius: number;
+  readonly tuning: Tuning;
   random(): number;
   queryUnits(x: number, y: number, radius: number, visit: (u: Unit) => void): void;
   rollDamage(source: Unit, base: number): number;
@@ -53,7 +54,8 @@ function nearestAt(host: EffectHost, x: number, y: number, reach: number, accept
 
 function baseDamage(host: EffectHost, ctx: EffectContext, power: number, amount: number): number {
   const fromSource = ctx.source && power > 0 ? host.rollDamage(ctx.source, ctx.source.damage * power) : 0;
-  return fromSource + amount * (0.85 + host.random() * 0.3);
+  const [lo, hi] = host.tuning.effectSpread;
+  return fromSource + amount * (lo + host.random() * (hi - lo));
 }
 
 export function runEffects(host: EffectHost, effects: readonly EffectDef[], ctx: EffectContext): void {
@@ -66,7 +68,7 @@ function runEffect(host: EffectHost, effect: EffectDef, ctx: EffectContext): voi
       if (effect.visual) host.emit({ type: 'effect', visual: effect.visual, x: ctx.x, y: ctx.y, radius: effect.radius });
       const dmg = baseDamage(host, ctx, effect.power, effect.amount);
       if (effect.radius <= 0) {
-        const t = ctx.target && canHit(ctx.target, ctx, effect.friendlyFire) ? ctx.target : nearestAt(host, ctx.x, ctx.y, 2.5, (u) => canHit(u, ctx, effect.friendlyFire));
+        const t = ctx.target && canHit(ctx.target, ctx, effect.friendlyFire) ? ctx.target : nearestAt(host, ctx.x, ctx.y, host.tuning.hitTolerance, (u) => canHit(u, ctx, effect.friendlyFire));
         if (!t) return;
         const [dx, dy] = direction(ctx.fromX, ctx.fromY, t.x, t.y);
         host.damage(t, dmg, ctx.source, dx, dy, effect.knockback);
@@ -79,7 +81,7 @@ function runEffect(host: EffectHost, effect: EffectDef, ctx: EffectContext): voi
       for (const u of victims) {
         const d = hypot(u.x - ctx.x, u.y - ctx.y);
         // Plein effet au centre, moitié au bord.
-        const k = 1 - 0.5 * Math.min(1, d / (effect.radius + u.radius));
+        const k = 1 - (1 - effect.edge) * Math.min(1, d / (effect.radius + u.radius));
         const [dx, dy] = d > 0.5 ? direction(ctx.x, ctx.y, u.x, u.y) : direction(ctx.fromX, ctx.fromY, u.x, u.y);
         host.damage(u, dmg * k, ctx.source, dx, dy, effect.knockback * k);
       }
@@ -91,7 +93,7 @@ function runEffect(host: EffectHost, effect: EffectDef, ctx: EffectContext): voi
         const d = hypot(u.x - ctx.x, u.y - ctx.y);
         if (d > effect.radius + u.radius) return;
         const [dx, dy] = d > 0.5 ? direction(ctx.x, ctx.y, u.x, u.y) : direction(ctx.fromX, ctx.fromY, u.x, u.y);
-        const k = 1 - 0.5 * Math.min(1, d / (effect.radius + u.radius));
+        const k = 1 - (1 - effect.edge) * Math.min(1, d / (effect.radius + u.radius));
         u.kx += (dx * effect.force * k) / u.mass;
         u.ky += (dy * effect.force * k) / u.mass;
       });
@@ -122,7 +124,7 @@ function runEffect(host: EffectHost, effect: EffectDef, ctx: EffectContext): voi
     case 'ricochet': {
       const accept = (u: Unit) => canHit(u, ctx, effect.friendlyFire) && u !== ctx.source;
       // Part de la cible visée même si l'effet précédent vient de la tuer : elle reste le premier maillon.
-      let current: Unit | undefined = ctx.target ?? nearestAt(host, ctx.x, ctx.y, 6, accept);
+      let current: Unit | undefined = ctx.target ?? nearestAt(host, ctx.x, ctx.y, host.tuning.ricochetStartReach, accept);
       if (!current) return;
       const hit = new Set<Unit>([current]);
       let dmg = baseDamage(host, ctx, effect.power, effect.amount);

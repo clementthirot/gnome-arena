@@ -1,6 +1,6 @@
 // Moteur de combat : boucle à pas fixe, sans aucune dépendance au rendu.
 // Même données + même seed = même combat, tick pour tick.
-import type { ArenaEventDef, AttackDef, EffectDef, EquipmentDef, GameData, HeroDef, TeamId, UnitDef } from '../data/schema';
+import type { ArenaEventDef, AttackDef, EffectDef, EquipmentDef, GameData, HeroDef, TeamId, Tuning, UnitDef } from '../data/schema';
 import { runEffects, type EffectContext, type EffectHost } from './effects';
 import { cos, hypot, nthRoot, sin } from './detmath';
 import { SpatialGrid } from './grid';
@@ -53,6 +53,8 @@ export class Battle implements EffectHost {
 
   private readonly rng: Rng;
   private readonly decayPerTick: number;
+  /** Réglages fins (rules.tuning). */
+  readonly tuning: Tuning;
   private readonly grid = new SpatialGrid<Unit>(16);
   private readonly attackers: number[] = [];
   private readonly wanderAngle: number[] = [];
@@ -74,6 +76,7 @@ export class Battle implements EffectHost {
     this.dt = 1 / data.battle.tickRate;
     this.seed = hashSeed(setup.seed);
     this.rng = new Rng(this.seed);
+    this.tuning = data.battle.rules.tuning;
     // knockbackDecay est par seconde ; on en déduit la part conservée à chaque tick.
     this.decayPerTick = nthRoot(data.battle.rules.knockbackDecay, data.battle.tickRate);
     this.field = { ...data.battle.arena.field };
@@ -181,7 +184,7 @@ export class Battle implements EffectHost {
       rushTimer: 0,
       blockedTime: 0,
       lastGap: Infinity,
-      specialCooldowns: equipment.map(() => this.rng.range(1, 3)),
+      specialCooldowns: equipment.map(() => this.rng.range(...this.tuning.specialStartCooldown)),
       slowUntil: 0,
       slowFactor: 1,
       kills: 0,
@@ -242,53 +245,11 @@ export class Battle implements EffectHost {
 
   // ---------------------------------------------------------------- décisions
 
+  /** Un tick de décision : moral, cible, déplacement, attaque. */
   private think(u: Unit): void {
-    const dt = this.dt;
-    const rules = this.data.battle.rules;
-    const p = u.personality;
-    for (let i = 0; i < u.attackCooldowns.length; i++) u.attackCooldowns[i] -= dt;
-    for (let i = 0; i < u.specialCooldowns.length; i++) u.specialCooldowns[i] -= dt;
-    u.chargeCooldown -= dt;
-    u.retargetIn -= dt;
-    u.rushTimer -= dt;
-    u.morale = Math.min(1, u.morale + rules.moraleRegen * dt);
-
-    // Fuite : on court loin de l'ennemi le plus proche jusqu'à reprendre ses esprits.
-    if (u.state === 'flee') {
-      u.stateTimer -= dt;
-      if (u.stateTimer <= 0) {
-        u.state = 'choose';
-        u.morale = Math.max(u.morale, p.panicThreshold + 0.3);
-      } else {
-        this.steerFlee(u);
-        return;
-      }
-    }
-    if (u.morale < p.panicThreshold && this.rng.chance(p.panicChance * dt)) {
-      u.state = 'flee';
-      u.charging = false;
-      u.stateTimer = this.rng.range(...rules.panicDuration);
-      this.releaseTarget(u);
-      this.events.push({ type: 'panic', unit: u.index });
-      this.steerFlee(u);
-      return;
-    }
-    // Tendance, pas règle : même un peureux peut se jeter dans la mêlée.
-    if (u.rushTimer <= 0 && this.rng.chance(p.recklessChance * dt)) {
-      u.rushTimer = this.rng.range(2, 4);
-      if (u.role.keepDistance > 0 || p.distanceFactor > 1) this.events.push({ type: 'rush', unit: u.index });
-    }
-
-    let target = u.target >= 0 ? this.units[u.target] : undefined;
-    if (!target || target.state === 'dead') {
-      target = this.chooseTarget(u);
-    } else if (this.occupiesSlot(u) && this.attackers[target.index] > rules.maxAttackersPerTarget && !u.charging && this.rng.chance(2 * this.dt)) {
-      // Cible surchargée : on va chercher quelqu'un d'autre plutôt que de faire la queue.
-      target = this.chooseTarget(u);
-    } else if (u.retargetIn <= 0) {
-      u.retargetIn = this.rng.range(...rules.retargetInterval);
-      if (!u.charging && this.rng.chance(p.fickleness)) target = this.chooseTarget(u);
-    }
+    this.tickTimers(u);
+    if (this.updateMorale(u)) return;
+    const target = this.pickTarget(u);
     if (!target) {
       u.state = 'choose';
       u.vx = u.vy = 0;
@@ -303,77 +264,148 @@ export class Battle implements EffectHost {
     const gap = dist - u.radius - target.radius;
     if (Math.abs(dx) > 1) u.facing = dx > 0 ? 1 : -1;
 
-    // Bloqué derrière la foule sans progresser : on change de cible plutôt que de piétiner.
-    if (u.state === 'approach' && !u.charging && gap >= u.lastGap - 0.02) u.blockedTime += dt;
+    if (this.isBlocked(u, gap) && this.chooseTarget(u, target.index)) return;
+    if (this.tryCharge(u, gap, nx, ny)) return;
+    this.steer(u, gap, nx, ny);
+    if (this.trySpecial(u, target, gap)) return;
+    this.tryAttack(u, target, gap, nx, ny, dist);
+  }
+
+  private tickTimers(u: Unit): void {
+    const dt = this.dt;
+    for (let i = 0; i < u.attackCooldowns.length; i++) u.attackCooldowns[i] -= dt;
+    for (let i = 0; i < u.specialCooldowns.length; i++) u.specialCooldowns[i] -= dt;
+    u.chargeCooldown -= dt;
+    u.retargetIn -= dt;
+    u.rushTimer -= dt;
+    u.morale = Math.min(1, u.morale + this.data.battle.rules.moraleRegen * dt);
+  }
+
+  /** Panique, fuite et ruées téméraires. Renvoie vrai si l'unité fuit ce tick. */
+  private updateMorale(u: Unit): boolean {
+    const dt = this.dt;
+    const rules = this.data.battle.rules;
+    const p = u.personality;
+    // Fuite : on court loin de l'ennemi le plus proche jusqu'à reprendre ses esprits.
+    if (u.state === 'flee') {
+      u.stateTimer -= dt;
+      if (u.stateTimer > 0) {
+        this.steerFlee(u);
+        return true;
+      }
+      u.state = 'choose';
+      u.morale = Math.max(u.morale, p.panicThreshold + this.tuning.panicRecovery);
+    }
+    if (u.morale < p.panicThreshold && this.rng.chance(p.panicChance * dt)) {
+      u.state = 'flee';
+      u.charging = false;
+      u.stateTimer = this.rng.range(...rules.panicDuration);
+      this.releaseTarget(u);
+      this.events.push({ type: 'panic', unit: u.index });
+      this.steerFlee(u);
+      return true;
+    }
+    // Tendance, pas règle : même un peureux peut se jeter dans la mêlée.
+    if (u.rushTimer <= 0 && this.rng.chance(p.recklessChance * dt)) {
+      u.rushTimer = this.rng.range(...this.tuning.rushDuration);
+      if (u.role.keepDistance > 0 || p.distanceFactor > 1) this.events.push({ type: 'rush', unit: u.index });
+    }
+    return false;
+  }
+
+  /** Garde la cible, ou en change : morte, surchargée, ou simple caprice selon la personnalité. */
+  private pickTarget(u: Unit): Unit | undefined {
+    const rules = this.data.battle.rules;
+    const target = u.target >= 0 ? this.units[u.target] : undefined;
+    if (!target || target.state === 'dead') return this.chooseTarget(u);
+    const crowded = this.occupiesSlot(u) && this.attackers[target.index] > rules.maxAttackersPerTarget;
+    if (crowded && !u.charging && this.rng.chance(this.tuning.crowdedRetargetChance * this.dt)) {
+      // Cible surchargée : on va chercher quelqu'un d'autre plutôt que de faire la queue.
+      return this.chooseTarget(u);
+    }
+    if (u.retargetIn <= 0) {
+      u.retargetIn = this.rng.range(...rules.retargetInterval);
+      if (!u.charging && this.rng.chance(u.personality.fickleness)) return this.chooseTarget(u);
+    }
+    return target;
+  }
+
+  /** Bloqué derrière la foule sans progresser depuis un moment ? */
+  private isBlocked(u: Unit, gap: number): boolean {
+    if (u.state === 'approach' && !u.charging && gap >= u.lastGap - 0.02) u.blockedTime += this.dt;
     else u.blockedTime = 0;
     u.lastGap = gap;
-    if (u.blockedTime > 1.5) {
-      u.blockedTime = 0;
-      u.lastGap = Infinity;
-      const next = this.chooseTarget(u, target.index);
-      if (next) return;
-    }
+    if (u.blockedTime <= this.tuning.blockedRetargetAfter) return false;
+    u.blockedTime = 0;
+    u.lastGap = Infinity;
+    return true;
+  }
 
+  /** Charge en cours ou nouvelle charge. Renvoie vrai si l'unité charge ce tick. */
+  private tryCharge(u: Unit, gap: number, nx: number, ny: number): boolean {
     if (u.charging) {
       this.updateCharge(u);
-      return;
+      return true;
     }
     const charge = u.role.charge;
-    if (charge && u.chargeCooldown <= 0 && gap >= charge.minDistance && gap <= charge.maxDistance && this.rng.chance(1.5 * dt)) {
-      u.charging = true;
-      u.stateTimer = charge.duration;
-      u.chargeDir = { x: nx, y: ny };
-      u.state = 'approach';
-      this.events.push({ type: 'charge', unit: u.index });
-      this.updateCharge(u);
-      return;
-    }
+    if (!charge || u.chargeCooldown > 0 || gap < charge.minDistance || gap > charge.maxDistance) return false;
+    if (!this.rng.chance(this.tuning.charge.chancePerSecond * this.dt)) return false;
+    u.charging = true;
+    u.stateTimer = charge.duration;
+    u.chargeDir = { x: nx, y: ny };
+    u.state = 'approach';
+    this.events.push({ type: 'charge', unit: u.index });
+    this.updateCharge(u);
+    return true;
+  }
 
-    // Déplacement : garder ses distances (tireurs), sinon aller au contact.
-    const keep = u.rushTimer > 0 ? 0 : u.role.keepDistance * p.distanceFactor;
+  /** Déplacement voulu : garder ses distances (tireurs), sinon aller au contact. */
+  private steer(u: Unit, gap: number, nx: number, ny: number): void {
+    const t = this.tuning.ranged;
+    const keep = u.rushTimer > 0 ? 0 : u.role.keepDistance * u.personality.distanceFactor;
     const ranged = u.role.attacks.find((a) => a.kind === 'ranged');
     const melee = u.role.attacks.find((a) => a.kind === 'melee');
     let speed = 0;
     let dirX = nx;
     let dirY = ny;
-    if (keep > 0 && gap < keep * 0.75) {
+    if (keep > 0 && gap < keep * t.retreatBelow) {
       // Recul, en glissant vers le centre quand un mur barre la route.
       const f = this.field;
       const cx = f.x + f.width / 2 - u.x;
       const cy = f.y + f.height / 2 - u.y;
       const cl = hypot(cx, cy) || 1;
-      const wall = Math.max(0, 1 - Math.min(u.x - f.x, f.x + f.width - u.x, u.y - f.y, f.y + f.height - u.y) / 24);
+      const wall = Math.max(0, 1 - Math.min(u.x - f.x, f.x + f.width - u.x, u.y - f.y, f.y + f.height - u.y) / t.wallDistance);
       const rx = -nx + (cx / cl) * wall * 2;
       const ry = -ny + (cy / cl) * wall * 2;
       const rl = hypot(rx, ry) || 1;
       dirX = rx / rl;
       dirY = ry / rl;
-      speed = u.speed * 0.85;
+      speed = u.speed * t.retreatSpeed;
       // Acculé : il se retourne et se bat.
-      if (wall > 0.7) u.rushTimer = Math.max(u.rushTimer, 1.5);
+      if (wall > t.corneredAt) u.rushTimer = Math.max(u.rushTimer, t.corneredRush);
     } else if (keep > 0) {
-      const holdMax = Math.max(keep + 12, (ranged?.maxRange ?? keep) * 0.85);
+      const holdMax = Math.max(keep + t.holdMargin, (ranged?.maxRange ?? keep) * t.holdRangeShare);
       if (gap > holdMax) speed = u.speed;
       else {
         // Tient sa position en se décalant latéralement.
-        speed = u.speed * 0.35;
+        speed = u.speed * t.holdSpeed;
         dirX = -ny * u.facing;
         dirY = nx * u.facing;
       }
-    } else if (gap > (melee?.maxRange ?? 2) * 0.7) {
+    } else if (gap > (melee?.maxRange ?? 2) * this.tuning.meleeApproach) {
       speed = u.speed;
     }
     u.vx = dirX * speed;
     u.vy = dirY * speed;
+  }
 
-    if (this.trySpecial(u, target, gap)) return;
+  private tryAttack(u: Unit, target: Unit, gap: number, nx: number, ny: number, dist: number): void {
     const attackIndex = u.role.attacks.findIndex((a) => gap >= a.minRange && gap <= a.maxRange);
     u.state = attackIndex >= 0 ? 'attack' : 'approach';
-    if (attackIndex >= 0 && u.attackCooldowns[attackIndex] <= 0) {
-      const attack = u.role.attacks[attackIndex];
-      u.attackCooldowns[attackIndex] = attack.cooldown * this.rng.range(0.85, 1.15);
-      this.performAttack(u, target, attack, nx, ny, dist);
-    }
+    if (attackIndex < 0 || u.attackCooldowns[attackIndex] > 0) return;
+    const attack = u.role.attacks[attackIndex];
+    u.attackCooldowns[attackIndex] = attack.cooldown * this.rng.range(...this.tuning.cooldownJitter);
+    this.performAttack(u, target, attack, nx, ny, dist);
   }
 
   private chooseTarget(u: Unit, avoid = -1): Unit | undefined {
@@ -384,9 +416,10 @@ export class Battle implements EffectHost {
     for (const e of this.units) {
       if (e.team === u.team || e.state === 'dead') continue;
       let score = hypot(e.x - u.x, e.y - u.y) * (1 + this.rng.next() * rules.targetRandomness);
-      if (this.attackers[e.index] >= rules.maxAttackersPerTarget && this.occupiesSlot(u)) score *= 4;
-      if (e.state === 'flee') score *= 0.8; // les fuyards attirent les poursuivants
-      if (e.index === avoid) score *= 3;
+      const t = this.tuning.targeting;
+      if (this.attackers[e.index] >= rules.maxAttackersPerTarget && this.occupiesSlot(u)) score *= t.saturatedPenalty;
+      if (e.state === 'flee') score *= t.fleeingFactor; // les fuyards attirent les poursuivants
+      if (e.index === avoid) score *= t.avoidPenalty;
       if (score < bestScore) {
         bestScore = score;
         best = e;
@@ -421,7 +454,7 @@ export class Battle implements EffectHost {
   private steerFlee(u: Unit): void {
     let fx = 0;
     let fy = 0;
-    this.grid.query(u.x, u.y, 70, (e) => {
+    this.grid.query(u.x, u.y, this.tuning.fleeRadius, (e) => {
       if (e.team === u.team) return;
       const dx = u.x - e.x;
       const dy = u.y - e.y;
@@ -439,8 +472,8 @@ export class Battle implements EffectHost {
       fx /= len;
       fy /= len;
     }
-    u.vx = fx * u.speed * 1.1;
-    u.vy = fy * u.speed * 1.1;
+    u.vx = fx * u.speed * this.tuning.fleeSpeed;
+    u.vy = fy * u.speed * this.tuning.fleeSpeed;
     if (Math.abs(u.vx) > 1) u.facing = u.vx > 0 ? 1 : -1;
   }
 
@@ -448,6 +481,7 @@ export class Battle implements EffectHost {
 
   private updateCharge(u: Unit): void {
     const charge = u.role.charge!;
+    const tc = this.tuning.charge;
     u.stateTimer -= this.dt;
     u.vx = u.chargeDir.x * u.speed * charge.speedMultiplier;
     u.vy = u.chargeDir.y * u.speed * charge.speedMultiplier;
@@ -470,19 +504,19 @@ export class Battle implements EffectHost {
         const ay = v.y - u.y;
         const al = hypot(ax, ay) || 1;
         // Mélange direction de charge et éloignement : la cible est projetée, les voisins écartés.
-        const kx = u.chargeDir.x * 0.6 + (ax / al) * 0.4;
-        const ky = u.chargeDir.y * 0.6 + (ay / al) * 0.4;
-        const dmg = this.rollDamage(u, u.damage * charge.damage) * (main ? 1 : 0.5);
-        this.applyDamage(v, dmg, u, kx, ky, charge.knockback * (main ? 1 : 0.7));
+        const kx = u.chargeDir.x * tc.pushAlong + (ax / al) * (1 - tc.pushAlong);
+        const ky = u.chargeDir.y * tc.pushAlong + (ay / al) * (1 - tc.pushAlong);
+        const dmg = this.rollDamage(u, u.damage * charge.damage) * (main ? 1 : tc.splashDamage);
+        this.applyDamage(v, dmg, u, kx, ky, charge.knockback * (main ? 1 : tc.splashKnockback));
       }
-      u.kx -= u.chargeDir.x * 40;
-      u.ky -= u.chargeDir.y * 40;
+      u.kx -= u.chargeDir.x * tc.recoil;
+      u.ky -= u.chargeDir.y * tc.recoil;
       u.charging = false;
-      u.chargeCooldown = charge.cooldown * this.rng.range(0.8, 1.3);
-      u.attackCooldowns = u.attackCooldowns.map((c) => Math.max(c, 0.4));
+      u.chargeCooldown = charge.cooldown * this.rng.range(...tc.cooldownJitter);
+      u.attackCooldowns = u.attackCooldowns.map((c) => Math.max(c, tc.attackLock));
     } else if (u.stateTimer <= 0) {
       u.charging = false;
-      u.chargeCooldown = charge.cooldown * 0.5;
+      u.chargeCooldown = charge.cooldown * tc.missCooldown;
     }
   }
 
@@ -522,7 +556,7 @@ export class Battle implements EffectHost {
   /** @internal EffectHost */
   rollDamage(u: Unit, base: number): number {
     const fury = 1 + this.fury[u.team] * (u.hero ? this.data.battle.rules.underdog.heroFactor : 1);
-    return base * fury * this.data.battle.rules.damageScale * this.rng.range(0.75, 1.25);
+    return base * fury * this.data.battle.rules.damageScale * this.rng.range(...this.tuning.damageSpread);
   }
 
   /** Rage du camp mené : plus l'écart de force est grand, plus il frappe fort. Empêche l'effet boule de neige. */
@@ -562,9 +596,9 @@ export class Battle implements EffectHost {
     this.grid.query(t.x, t.y, rules.allyDeathRadius, (o) => {
       if (o.state === 'dead' || hypot(o.x - t.x, o.y - t.y) > rules.allyDeathRadius) return;
       // La mort d'un héros pèse plus lourd sur le moral.
-      const weight = t.hero ? 2.5 : 1;
+      const weight = t.hero ? this.tuning.heroDeathWeight : 1;
       if (o.team === t.team) o.morale -= rules.moraleLossOnAllyDeath * weight;
-      else o.morale = Math.min(1, o.morale + 0.05 * weight);
+      else o.morale = Math.min(1, o.morale + this.tuning.moraleGainOnEnemyDeath * weight);
     });
   }
 
@@ -583,10 +617,10 @@ export class Battle implements EffectHost {
       }
       let hit: Unit | undefined;
       let best = Infinity;
-      this.grid.query(p.x, p.y, this.maxRadius + 2.5, (e) => {
+      this.grid.query(p.x, p.y, this.maxRadius + this.tuning.hitTolerance, (e) => {
         if (e.team === p.team || e.state === 'dead') return;
         const d = hypot(e.x - p.x, e.y - p.y);
-        if (d <= e.radius + 2.5 && d < best) {
+        if (d <= e.radius + this.tuning.hitTolerance && d < best) {
           best = d;
           hit = e;
         }
@@ -630,9 +664,11 @@ export class Battle implements EffectHost {
       const dx = u.x - o.x;
       const dy = u.y - o.y;
       const d = hypot(dx, dy) || 0.01;
-      const minD = u.radius + o.radius + (o.team === u.team ? 2.5 : 0.5);
-      if (d < minD + 3) {
-        const push = ((minD + 3 - d) / (minD + 3)) * rules.separationStrength * (o.team === u.team ? 1 : 0.6);
+      const sep = this.tuning.separation;
+      const ally = o.team === u.team;
+      const minD = u.radius + o.radius + (ally ? sep.allyGap : sep.enemyGap);
+      if (d < minD + sep.reach) {
+        const push = ((minD + sep.reach - d) / (minD + sep.reach)) * rules.separationStrength * (ally ? 1 : sep.enemyFactor);
         sx += (dx / d) * push;
         sy += (dy / d) * push;
       }
@@ -645,7 +681,7 @@ export class Battle implements EffectHost {
       }
     });
 
-    this.wanderAngle[u.index] += this.rng.range(-1, 1) * 4 * dt;
+    this.wanderAngle[u.index] += this.rng.range(-1, 1) * this.tuning.wanderTurn * dt;
     const wa = this.wanderAngle[u.index];
     const slow = u.slowUntil > this.time ? u.slowFactor : 1;
     if (slow === 1) u.slowFactor = 1;
@@ -654,8 +690,8 @@ export class Battle implements EffectHost {
 
     // Les murs repoussent doucement : personne ne reste coincé dans un coin.
     const f = this.field;
-    const margin = 16;
-    const wallPush = u.speed * 1.2;
+    const margin = this.tuning.walls.margin;
+    const wallPush = u.speed * this.tuning.walls.push;
     const near = (d: number) => Math.max(0, (margin - d) / margin) * wallPush;
     vx += near(u.x - f.x) - near(f.x + f.width - u.x);
     vy += near(u.y - f.y) - near(f.y + f.height - u.y);
@@ -666,8 +702,8 @@ export class Battle implements EffectHost {
       const cx = z.x + z.width / 2 - u.x;
       const cy = z.y + z.height / 2 - u.y;
       const cl = hypot(cx, cy) || 1;
-      vx += (cx / cl) * u.speed * 0.8;
-      vy += (cy / cl) * u.speed * 0.8;
+      vx += (cx / cl) * u.speed * this.tuning.zonePull;
+      vy += (cy / cl) * u.speed * this.tuning.zonePull;
       const zoneDamage = this.data.battle.ending.zoneDamage * u.maxHp * dt;
       if (zoneDamage > 0) this.applyDamage(u, zoneDamage, null, 0, 0, 0, true);
       if (u.hp <= 0) return;
@@ -694,7 +730,7 @@ export class Battle implements EffectHost {
       const eq = u.equipment[i];
       const sp = eq.special;
       if (!sp || u.specialCooldowns[i] > 0 || gap < sp.minRange || gap > sp.maxRange) continue;
-      u.specialCooldowns[i] = sp.cooldown * this.rng.range(0.85, 1.15);
+      u.specialCooldowns[i] = sp.cooldown * this.rng.range(...this.tuning.cooldownJitter);
       const ctx: EffectContext = { source: u, team: u.team, x: target.x, y: target.y, target, fromX: u.x, fromY: u.y };
       let misfire = false;
       if (sp.misfire && this.rng.chance(sp.misfire.chance)) {
@@ -786,10 +822,10 @@ export class Battle implements EffectHost {
     const source = p.owner >= 0 ? this.units[p.owner] : null;
     let target: Unit | undefined;
     let best = Infinity;
-    this.grid.query(p.x, p.y, this.maxRadius + 2.5, (e) => {
+    this.grid.query(p.x, p.y, this.maxRadius + this.tuning.hitTolerance, (e) => {
       if (e.state === 'dead' || (p.team !== null && e.team === p.team)) return;
       const d = hypot(e.x - p.x, e.y - p.y);
-      if (d <= e.radius + 2.5 && d < best) {
+      if (d <= e.radius + this.tuning.hitTolerance && d < best) {
         best = d;
         target = e;
       }
@@ -816,8 +852,8 @@ export class Battle implements EffectHost {
           const [x, y] = target;
           // Les projectiles d'incident tombent des gradins, du côté le plus proche.
           const f = this.field;
-          const fromX = x + this.rng.range(-30, 30);
-          const fromY = y < f.y + f.height / 2 ? f.y - 20 : f.y + f.height + 20;
+          const fromX = x + this.rng.range(-cfg.launchSpread, cfg.launchSpread);
+          const fromY = y < f.y + f.height / 2 ? f.y - cfg.launchDepth : f.y + f.height + cfg.launchDepth;
           // L'ombre reste jusqu'à l'impact, vol du projectile compris.
           const projectile = def.effects.find((e) => e.type === 'projectile');
           const flight = projectile ? Math.max(0.1, hypot(x - fromX, y - fromY) / projectile.speed) : 0;
@@ -831,7 +867,7 @@ export class Battle implements EffectHost {
       // Les catastrophes s'intensifient à mesure que l'arène se resserre.
       const { minScale } = this.data.battle.ending;
       const ramp = minScale < 1 ? 1 + ((cfg.endRamp - 1) * (1 - this.zoneScale)) / (1 - minScale) : 1;
-      this.nextIncidentAt = this.time + (interval / ramp) * this.rng.range(0.6, 1.4);
+      this.nextIncidentAt = this.time + (interval / ramp) * this.rng.range(...cfg.intervalJitter);
     }
 
     for (let i = this.pendingIncidents.length - 1; i >= 0; i--) {
@@ -861,11 +897,12 @@ export class Battle implements EffectHost {
         // Quelques candidats tirés au sort, on garde celui qui a le plus de voisins.
         let best = pick();
         let bestCount = -1;
-        for (let i = 0; i < 6; i++) {
+        const { densestCandidates, densestRadius } = this.data.battle.events;
+        for (let i = 0; i < densestCandidates; i++) {
           const c = pick();
           let count = 0;
-          this.grid.query(c.x, c.y, 20, (o) => {
-            if (o.state !== 'dead' && hypot(o.x - c.x, o.y - c.y) <= 20) count++;
+          this.grid.query(c.x, c.y, densestRadius, (o) => {
+            if (o.state !== 'dead' && hypot(o.x - c.x, o.y - c.y) <= densestRadius) count++;
           });
           if (count > bestCount) {
             bestCount = count;
@@ -874,8 +911,10 @@ export class Battle implements EffectHost {
         }
         return [best.x, best.y];
       }
-      default:
-        return [z.x + this.rng.range(0.1, 0.9) * z.width, z.y + this.rng.range(0.1, 0.9) * z.height];
+      default: {
+        const m = this.data.battle.events.pointMargin;
+        return [z.x + this.rng.range(m, 1 - m) * z.width, z.y + this.rng.range(m, 1 - m) * z.height];
+      }
     }
   }
 

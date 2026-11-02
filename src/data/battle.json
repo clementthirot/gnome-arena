@@ -3,16 +3,32 @@
   "arena": {
     "width": 270,
     "height": 480,
-    "field": { "x": 18, "y": 70, "width": 234, "height": 350 }
+    "field": {
+      "x": 18,
+      "y": 70,
+      "width": 234,
+      "height": 350
+    }
   },
   "armies": {
-    "gnomes": { "gnome_melee": 24, "gnome_archer": 14, "gnome_charger": 9 },
-    "goblins": { "goblin_melee": 24, "goblin_archer": 14, "goblin_charger": 9 }
+    "gnomes": {
+      "gnome_melee": 24,
+      "gnome_archer": 14,
+      "gnome_charger": 9
+    },
+    "goblins": {
+      "goblin_melee": 24,
+      "goblin_archer": 14,
+      "goblin_charger": 9
+    }
   },
   "rules": {
     "maxAttackersPerTarget": 3,
     "targetRandomness": 0.6,
-    "retargetInterval": [2, 5],
+    "retargetInterval": [
+      2,
+      5
+    ],
     "damageScale": 0.22,
     "knockbackDecay": 0.02,
     "separationStrength": 40,
@@ -21,10 +37,103 @@
     "moraleLossOnHit": 0.9,
     "moraleLossOnAllyDeath": 0.12,
     "allyDeathRadius": 30,
-    "underdog": { "threshold": 0.05, "fullAt": 0.3, "maxBonus": 1, "heroFactor": 2 },
-    "panicDuration": [1.5, 3.5]
+    "underdog": {
+      "threshold": 0.05,
+      "fullAt": 0.3,
+      "maxBonus": 1,
+      "heroFactor": 2
+    },
+    "panicDuration": [
+      1.5,
+      3.5
+    ],
+    "tuning": {
+      "damageSpread": [
+        0.75,
+        1.25
+      ],
+      "effectSpread": [
+        0.85,
+        1.15
+      ],
+      "cooldownJitter": [
+        0.85,
+        1.15
+      ],
+      "specialStartCooldown": [
+        1,
+        3
+      ],
+      "rushDuration": [
+        2,
+        4
+      ],
+      "panicRecovery": 0.3,
+      "heroDeathWeight": 2.5,
+      "moraleGainOnEnemyDeath": 0.05,
+      "fleeSpeed": 1.1,
+      "fleeRadius": 70,
+      "crowdedRetargetChance": 2,
+      "blockedRetargetAfter": 1.5,
+      "targeting": {
+        "saturatedPenalty": 4,
+        "fleeingFactor": 0.8,
+        "avoidPenalty": 3
+      },
+      "ranged": {
+        "retreatBelow": 0.75,
+        "retreatSpeed": 0.85,
+        "holdSpeed": 0.35,
+        "holdMargin": 12,
+        "holdRangeShare": 0.85,
+        "wallDistance": 24,
+        "corneredAt": 0.7,
+        "corneredRush": 1.5
+      },
+      "meleeApproach": 0.7,
+      "charge": {
+        "chancePerSecond": 1.5,
+        "splashDamage": 0.5,
+        "splashKnockback": 0.7,
+        "pushAlong": 0.6,
+        "recoil": 40,
+        "cooldownJitter": [
+          0.8,
+          1.3
+        ],
+        "missCooldown": 0.5,
+        "attackLock": 0.4
+      },
+      "separation": {
+        "allyGap": 2.5,
+        "enemyGap": 0.5,
+        "reach": 3,
+        "enemyFactor": 0.6
+      },
+      "wanderTurn": 4,
+      "walls": {
+        "margin": 16,
+        "push": 1.2
+      },
+      "zonePull": 0.8,
+      "hitTolerance": 2.5,
+      "ricochetStartReach": 6
+    }
   },
-  "events": { "perMinute": 3, "endRamp": 4, "firstAt": 12 },
+  "events": {
+    "perMinute": 3,
+    "endRamp": 4,
+    "firstAt": 12,
+    "intervalJitter": [
+      0.6,
+      1.4
+    ],
+    "launchSpread": 30,
+    "launchDepth": 20,
+    "densestCandidates": 6,
+    "densestRadius": 20,
+    "pointMargin": 0.1
+  },
   "ending": {
     "shrinkStart": 45,
     "shrinkEnd": 75,

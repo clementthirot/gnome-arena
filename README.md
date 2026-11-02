@@ -1,8 +1,12 @@
 # Gnomes vs Gobelins — l'arène feuilleton
 
 Une mêlée autonome de 2 × 50 unités au format vertical 9:16, avec des héros nommés, des upgrades
-votées par le public et des incidents d'arène. Les formes sont des placeholders générés en attendant
-les sprites (voir [docs/sprites.md](docs/sprites.md)).
+votées par le public et des incidents d'arène. Les personnages sont des sprite sheets animées de
+remplacement, générées à partir de silhouettes, en attendant les sprites PixelLab
+(voir [docs/sprites.md](docs/sprites.md) : `npm run sprites -- check` puis `import`).
+
+Les réglages fins du comportement (variations aléatoires, distances des tireurs, charge, fuite,
+murs, cadence des incidents…) sont dans `src/data/battle.json` (`rules.tuning` et `events`).
 
 ## Lancer
 
@@ -12,6 +16,7 @@ npm run dev          # http://localhost:5173
 npm test             # déterminisme, données, mêlée vivante, durée, effets, arcs
 npm run bench        # mode accéléré sans rendu (100 seeds)
 npm run episode      # état de l'arc en cours
+npm run sprites      # vérifie les sprite sheets de public/sprites
 ```
 
 ### Dans le navigateur

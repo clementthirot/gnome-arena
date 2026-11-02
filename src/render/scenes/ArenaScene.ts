@@ -7,7 +7,7 @@ import type { BattleEvent, Unit } from '../../sim/types';
 import { Bricks, type BrickContext, type Particle, type UnitView } from '../animations';
 import { drawArenaBackground } from '../arenaArt';
 import { FxLayer } from '../fx';
-import { bricksFor, manifest, resolveAsset } from '../manifest';
+import { asPlaceholder, bricksFor, manifest, resolveAsset } from '../manifest';
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
 import { TEAM_COLORS, textStyle } from '../text';
 import type { ResultData } from './ResultScene';
@@ -117,7 +117,9 @@ export class ArenaScene extends Phaser.Scene {
   // ---------------------------------------------------------------- création
 
   private createUnitView(u: Unit): void {
-    const entry = resolveAsset(u.visual, u.team);
+    let entry = resolveAsset(u.visual, u.team);
+    const failed = this.registry.get('fallbackVisuals') as Set<string> | undefined;
+    if (entry.type === 'spritesheet' && failed?.has(u.visual)) entry = asPlaceholder(entry) ?? entry;
     const key = `unit_${u.visual}`;
     // Clé absente du manifeste : on génère le placeholder de secours à la volée.
     if (!this.textures.exists(key) && entry.type === 'placeholder') this.textures.addCanvas(key, drawPlaceholder(entry));
@@ -145,11 +147,12 @@ export class ArenaScene extends Phaser.Scene {
       return undefined;
     }
     const texture = `acc_tex_${key}`;
-    if (entry.type === 'placeholder' && !this.textures.exists(texture)) {
-      this.textures.addCanvas(texture, drawAccessory(entry.kind, entry.color, entry.accent));
-    }
-    const img = this.add.image(0, 0, entry.type === 'placeholder' ? texture : `acc_img_${key}`);
-    img.setScale(entry.type === 'placeholder' ? SCALE : (entry.size * SCALE) / img.height);
+    const loaded = entry.type === 'image' && this.textures.exists(`acc_img_${key}`);
+    // Image absente : on retombe sur le dessin de secours.
+    const shape = entry.type === 'placeholder' ? entry : entry.placeholder;
+    if (!loaded && shape && !this.textures.exists(texture)) this.textures.addCanvas(texture, drawAccessory(shape.kind, shape.color, shape.accent));
+    const img = this.add.image(0, 0, loaded ? `acc_img_${key}` : texture);
+    img.setScale(loaded && entry.type === 'image' ? (entry.size * SCALE) / img.height : SCALE);
     return { img, ax: entry.anchor[0], ay: entry.anchor[1] };
   }
 

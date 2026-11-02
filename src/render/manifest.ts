@@ -9,7 +9,8 @@ export const BRICKS = {
   attack: ['lunge', 'none'],
   shoot: ['recoil', 'none'],
   hurt: ['flash', 'none'],
-  death: ['topple', 'fade'],
+  // stay : le corps reste tel que l'a laissé l'animation de mort de la sheet (juste grisé).
+  death: ['topple', 'fade', 'stay'],
   impact: ['explode', 'none'],
   panic: ['exclaim', 'none'],
 } as const;
@@ -24,8 +25,7 @@ const BricksSchema = z.object({
 });
 export type Bricks = z.infer<typeof BricksSchema>;
 
-const PlaceholderSchema = z.object({
-  type: z.literal('placeholder'),
+const PlaceholderShapeSchema = z.object({
   /** Silhouette : gnome = rond à bonnet, gobelin = triangle à oreilles. Les camps ne se distinguent pas que par la couleur. */
   body: z.enum(['gnome', 'goblin']),
   size: z.number().int().min(6).max(48),
@@ -33,6 +33,10 @@ const PlaceholderSchema = z.object({
   accent: color,
   mark: z.enum(['none', 'bow', 'helmet']),
   outline: color.optional(),
+});
+
+const PlaceholderSchema = PlaceholderShapeSchema.extend({
+  type: z.literal('placeholder'),
   bricks: BricksSchema.partial().optional(),
 });
 
@@ -48,15 +52,20 @@ const SpriteSheetSchema = z.object({
   size: z.number().positive(),
   animations: z.object({ idle: AnimationSchema, walk: AnimationSchema.optional(), attack: AnimationSchema.optional(), death: AnimationSchema.optional() }),
   bricks: BricksSchema.partial().optional(),
+  /** Silhouette de secours si l'image ne charge pas ; sert aussi à générer une sheet de remplacement. */
+  placeholder: PlaceholderShapeSchema.optional(),
 });
 
 /** Accessoire d'upgrade superposé au héros, sans régénérer le personnage. */
+const AccessoryShapeSchema = z.object({
+  kind: z.enum(['goggles', 'sword', 'grenades', 'jar', 'chicken', 'pot']),
+  color,
+  accent: color,
+});
+
 const AccessorySchema = z.discriminatedUnion('type', [
-  z.object({
+  AccessoryShapeSchema.extend({
     type: z.literal('placeholder'),
-    kind: z.enum(['goggles', 'sword', 'grenades', 'jar', 'chicken', 'pot']),
-    color,
-    accent: color,
     /** Position relative au centre du sprite, en fraction de sa taille (x vers l'avant du regard). */
     anchor: z.tuple([z.number(), z.number()]),
   }),
@@ -66,6 +75,8 @@ const AccessorySchema = z.discriminatedUnion('type', [
     /** Hauteur d'affichage en px monde. */
     size: z.number().positive(),
     anchor: z.tuple([z.number(), z.number()]),
+    /** Dessin de secours si l'image ne charge pas. */
+    placeholder: AccessoryShapeSchema.optional(),
   }),
 ]);
 
@@ -96,6 +107,11 @@ export type AssetEntry = PlaceholderAsset | SpriteSheetAsset;
 export type Manifest = z.infer<typeof ManifestSchema>;
 
 export const manifest: Manifest = ManifestSchema.parse(raw);
+
+/** Une sheet qui n'a pas chargé retombe sur sa silhouette de secours. */
+export function asPlaceholder(entry: SpriteSheetAsset): PlaceholderAsset | undefined {
+  return entry.placeholder && { type: 'placeholder', ...entry.placeholder, bricks: entry.bricks?.death === 'stay' ? { ...entry.bricks, death: 'topple' } : entry.bricks };
+}
 
 /** Placeholder de secours pour une clé absente du manifeste : l'unité s'affiche quand même. */
 export function resolveAsset(key: string, team: 'gnomes' | 'goblins'): AssetEntry {

@@ -1,8 +1,21 @@
 # Lot 3 — Intégrer les sprites générés
 
 Le moteur ne connaît que des **clés visuelles** (`gnome_melee`, `hero_bob`, `acc_goggles`…).
-Remplacer un placeholder par un vrai sprite = déposer le fichier dans `public/sprites/` et
-modifier une entrée de `src/render/assets.manifest.json`. Aucun code à toucher.
+Remplacer un sprite = déposer `public/sprites/<clé>.png` puis lancer :
+
+```bash
+npm run sprites -- check     # vérifie dimensions, découpage, animations, noms de fichiers
+npm run sprites -- import    # écrit le manifeste (src/render/assets.manifest.json)
+```
+
+Aucun code à toucher. Tes fichiers passent avant les sheets de remplacement de
+`public/sprites/generated/` (produites par `npm run sprites -- generate` à partir des silhouettes,
+dans le même format que les vraies). Une exportation Aseprite `<clé>.json` (« Horizontal strip »,
+avec des tags `idle`, `walk`, `attack`, `death`) posée à côté du PNG fixe le découpage et les animations ;
+sans elle, les images sont supposées carrées et dans l'ordre standard ci-dessous.
+
+Si une image manque ou ne se lit pas, le jeu affiche la silhouette de secours (`placeholder` de
+l'entrée) et le signale dans la console, au lieu de planter.
 
 ## Ce qu'il faut générer
 
@@ -32,7 +45,7 @@ Règles communes, pour que la nuée reste lisible sur téléphone :
 
 Retouche dans Aseprite : vérifier que chaque cellule fait exactement la taille prévue et que les pieds sont au même endroit d'une image à l'autre.
 
-## Entrée de manifeste
+## Entrée de manifeste (écrite par `npm run sprites -- import`)
 
 ```json
 "gnome_melee": {

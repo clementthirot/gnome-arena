@@ -78,6 +78,12 @@ export const Bricks = {
     const s = view.sprite;
     s.clearTint();
     burst(ctx, x, y, isHero ? 18 : 8, [0xc8a46c, 0xe0c590, 0x8a7050], isHero ? 60 : 40, 0.6);
+    if (view.bricks.death === 'stay') {
+      // La sheet a sa propre animation de chute : on se contente de griser le corps.
+      ctx.scene.time.delayedCall(400, () => s.active && s.setTint(0x9a9088));
+      ctx.scene.tweens.add({ targets: s, alpha: 0.7, delay: 400, duration: 300 });
+      return;
+    }
     if (view.bricks.death === 'fade') {
       ctx.scene.tweens.add({ targets: s, alpha: 0, duration: 600 });
       return;

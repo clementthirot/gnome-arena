@@ -132,7 +132,8 @@ function parseUpgrades(value: string | null): Record<string, string[]> | undefin
   return Object.fromEntries(
     value.split(',').map((part) => {
       const [hero, items = ''] = part.split(':');
-      return [hero, items.split('+').filter(Boolean)];
+      // Dans une URL, « + » arrive décodé en espace : on accepte les deux.
+      return [hero, items.split(/[+ ]/).filter(Boolean)];
     }),
   );
 }
