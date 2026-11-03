@@ -1051,6 +1051,35 @@
       "itemChance": 0.35,
       "stars": true,
       "sweat": true
+    },
+    "show": {
+      "lines": {
+        "start": "Que le massacre commence !",
+        "firstBlood": "PREMIER SANG !",
+        "triple": "TRIPLE K.O. !",
+        "tripleHero": "TRIPLE K.O. POUR {hero} !",
+        "onFire": "{hero} EST EN FEU !",
+        "heroDown": "Oh non… {hero} !",
+        "meteor": "Qui a commandé un météore ?!",
+        "headClash": "BONK ! Quels cerveaux !",
+        "comeback": "QUEL RETOURNEMENT DES {team} !",
+        "victory": "Gloire aux {team} !",
+        "draw": "Égalité ? Remboursez !",
+        "roulette": "Place à la roulette des upgrades !"
+      },
+      "announceGapMs": 2500,
+      "streakWindow": 5,
+      "onFireKills": 5,
+      "duelDistance": 35,
+      "prono": {
+        "title": "QUI VA GAGNER ?",
+        "subtitle": "Dis-le en commentaire !",
+        "duration": 1.5
+      },
+      "countdown": true,
+      "finale": 4.5,
+      "slowmo": 0.35,
+      "runningGag": true
     }
   }
 }

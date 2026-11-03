@@ -130,6 +130,7 @@ function plan() {
     options,
     votes: null,
     upgrade: null,
+    heroKills: summary.heroKills,
   });
   saveArc(parseArc(arc, data));
   console.log(`Épisode ${n} figé : seed ${seed}, victoire des ${WINNER_LABEL[summary.winner]} en ${summary.duration.toFixed(1)} s.`);

@@ -252,6 +252,31 @@ export class Battle implements EffectHost {
     this.checkEnd();
   }
 
+  /**
+   * Après la fin : l'arène continue de vivre le temps de l'annonce (les corps retombent, les
+   * vainqueurs reprennent leur souffle). Ne décide plus rien et ne change pas le résultat.
+   */
+  epilogue(): void {
+    if (!this.result) return;
+    this.events = [];
+    this.time += this.dt;
+    this.tick++;
+    this.grid.rebuild(this.units, (u) => u.state !== 'dead');
+    for (const u of this.units) {
+      if (u.state !== 'dead' && u.z <= 0) u.vx = u.vy = 0;
+      this.move(u);
+    }
+    // Les projectiles encore en vol finissent leur course, sans effet.
+    for (const p of this.projectiles) {
+      p.age += this.dt;
+      const k = Math.min(1, p.age / p.flightTime);
+      p.x = p.fromX + (p.toX - p.fromX) * k;
+      p.y = p.fromY + (p.toY - p.fromY) * k;
+      if (k >= 1) p.done = true;
+    }
+    for (let i = this.projectiles.length - 1; i >= 0; i--) if (this.projectiles[i].done) this.projectiles.splice(i, 1);
+  }
+
   /** Simule jusqu'à la fin (mode accéléré). */
   runToEnd(): BattleResult {
     while (!this.result) this.step();

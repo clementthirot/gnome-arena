@@ -11,6 +11,7 @@ import { Director } from '../director';
 import { FxLayer } from '../fx';
 import { GasLayer } from '../gas';
 import { Juice } from '../juice';
+import { runningGagCanvas, Show } from '../show';
 import { asPlaceholder, bricksFor, effectVisual, manifest, resolveAsset } from '../manifest';
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
 import { rand, seedRender, seedTick } from '../random';
@@ -39,7 +40,9 @@ export interface ArenaParams {
     number: number;
     /** Résultat figé à la planification, pour détecter un épisode qui ne se rejoue plus pareil. */
     expected?: { winner: TeamId | 'draw'; duration: number };
-    vote?: { recipient: string; team: TeamId; options: { label: string; visual: string }[] };
+    vote?: { recipient: string; team: TeamId; portrait: string; options: { label: string; visual: string }[] };
+    /** K.O. cumulés de chaque héros (par nom) avant cet épisode. */
+    arcKills?: Record<string, number>;
   };
   /** Enregistrement : pas d'interaction, la fin de l'écran de vote clôt la vidéo. */
   record?: boolean;
@@ -75,6 +78,14 @@ export class ArenaScene extends Phaser.Scene {
   private airGfx!: Phaser.GameObjects.Graphics;
   private gas!: GasLayer;
   private juice!: Juice;
+  private show!: Show;
+  /** Dernière unité tombée : la caméra la suit au ralenti à la fin. */
+  private lastVictim = -1;
+  /** Ralenti de fin (facteur appliqué au temps du combat). */
+  private slowmo = 1;
+  /** Tirs alliés des héros : le « meilleur raté » de l'épisode. */
+  private friendlyHits = new Map<number, number>();
+  private gagSpectator?: Spectator;
   /** Arrêt sur image en cours (horloge de la scène, ms). */
   private hitStopUntil = 0;
   /** Armes tombées au sol, en attendant que leur propriétaire les ramasse. */
@@ -108,6 +119,10 @@ export class ArenaScene extends Phaser.Scene {
   init(params: ArenaParams): void {
     this.params = params;
     this.lostWeapons = new Map();
+    this.lastVictim = -1;
+    this.slowmo = 1;
+    this.friendlyHits = new Map();
+    this.gagSpectator = undefined;
     this.balanceShown = 0.5;
     this.balanceKick = 0;
     this.balanceFlash = 0;
@@ -142,6 +157,21 @@ export class ArenaScene extends Phaser.Scene {
     const groundFx = this.add.graphics().setDepth(-450);
     this.airGfx = this.add.graphics().setDepth(-440);
     this.juice = new Juice(this, this.particles, SCALE, manifest.staging.juice, manifest.staging.gore);
+    this.show = new Show(this, this.battle, SCALE, manifest.staging.show, this.params.heroes ?? data.heroes, {
+      banner: (text, color, hold) => this.banner(text, color, hold),
+      toast: (text) => this.toast(text),
+      focus: (target) => this.director.request('heroDuel', target, this.battle.time),
+      spriteOf: (unit) => this.views[unit]?.sprite,
+    });
+    if (manifest.staging.show.runningGag) {
+      // Toujours au même endroit, épisode après épisode.
+      if (!this.textures.exists('running_gag')) this.textures.addCanvas('running_gag', runningGagCanvas());
+      const gx = field.x + field.width * 0.78;
+      const gy = field.y + field.height + 23;
+      const sprite = this.add.image(gx * SCALE, gy * SCALE, 'running_gag').setScale(SCALE).setOrigin(0.5, 1).setDepth(-900 + gy + 1);
+      this.gagSpectator = { sprite, baseY: gy * SCALE, phase: 0, side: 'gnomes' };
+      this.spectators.push(this.gagSpectator);
+    }
     this.gas = new GasLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-430), field, manifest.staging.gas, SCALE);
     for (const u of this.battle.units) this.createUnitView(u);
     this.prev = this.battle.units.map((u) => ({ x: u.x, y: u.y, z: u.z }));
@@ -219,6 +249,7 @@ export class ArenaScene extends Phaser.Scene {
     };
     let k = 0;
     const place = (x: number, y: number, side: 'gnomes' | 'goblins') => {
+      if (Show.logeContains(field, x, y)) return;
       const pal = palettes[side];
       const key = `spect_${side}_${k % 9}`;
       if (!this.textures.exists(key)) {
@@ -287,15 +318,32 @@ export class ArenaScene extends Phaser.Scene {
     if (this.params.episode) {
       title.push(this.add.text(w / 2, h * 0.3, `ÉPISODE ${this.params.episode.number}`, textStyle(44, '#ffe14a')).setOrigin(0.5).setDepth(9951));
     }
-    gnomes.x = -w;
-    goblins.x = w * 2;
+    // Le titre tombe du ciel et rebondit.
+    gnomes.y = -200;
+    goblins.y = -200;
     vs.setScale(0);
-    this.tweens.add({ targets: gnomes, x: w / 2, duration: 450, ease: 'Back.easeOut' });
-    this.tweens.add({ targets: goblins, x: w / 2, duration: 450, delay: 150, ease: 'Back.easeOut' });
-    this.tweens.add({ targets: vs, scale: 1, duration: 300, delay: 500, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: gnomes, y: h * 0.4, duration: 650, ease: 'Bounce.easeOut' });
+    this.tweens.add({ targets: goblins, y: h * 0.54, duration: 650, delay: 180, ease: 'Bounce.easeOut' });
+    this.tweens.add({ targets: vs, scale: 1, duration: 300, delay: 650, ease: 'Back.easeOut' });
 
     const heroesMs = this.battle.units.some((u) => u.hero) && manifest.staging.heroIntro.enabled ? manifest.staging.heroIntro.duration * 1000 : 0;
-    const goAt = TITLE_MS + heroesMs;
+    const show = manifest.staging.show;
+    const pronoMs = show.prono.duration * 1000;
+    const countMs = show.countdown ? 3 * 550 : 0;
+    const goAt = TITLE_MS + heroesMs + pronoMs + countMs;
+    this.time.delayedCall(TITLE_MS + heroesMs, () => {
+      this.tweens.add({ targets: title, alpha: 0, duration: 200 });
+      this.prono(pronoMs);
+    });
+    if (countMs) {
+      ['3', '2', '1'].forEach((n, i) =>
+        this.time.delayedCall(TITLE_MS + heroesMs + pronoMs + i * 550, () => {
+          const t = this.add.text(w / 2, h / 2, n, textStyle(160, '#ffffff')).setOrigin(0.5).setDepth(9952).setScale(2);
+          this.tweens.add({ targets: t, scale: 0.9, duration: 260, ease: 'Back.easeOut' });
+          this.tweens.add({ targets: t, alpha: 0, delay: 380, duration: 150, onComplete: () => t.destroy() });
+        }),
+      );
+    }
     if (heroesMs) {
       this.time.delayedCall(TITLE_MS, () => {
         this.tweens.add({ targets: title, alpha: 0, duration: 200 });
@@ -312,7 +360,26 @@ export class ArenaScene extends Phaser.Scene {
       title.forEach((t) => t.destroy());
       veil.destroy();
       this.running = true;
+      this.show.start();
     });
+  }
+
+  /** « Qui va gagner ? Dis-le en commentaire ! » */
+  private prono(durationMs: number): void {
+    const { width: w, height: h } = this.scale;
+    const p = manifest.staging.show.prono;
+    const items = [
+      this.add.text(w / 2, h * 0.38, p.title, textStyle(64, '#ffe14a')).setOrigin(0.5).setDepth(9951),
+      this.add.text(w * 0.27, h * 0.48, TEAM_COLORS.gnomes.label, textStyle(44, TEAM_COLORS.gnomes.main)).setOrigin(0.5).setDepth(9951),
+      this.add.text(w / 2, h * 0.48, 'ou', textStyle(32)).setOrigin(0.5).setDepth(9951),
+      this.add.text(w * 0.73, h * 0.48, TEAM_COLORS.goblins.label, textStyle(44, TEAM_COLORS.goblins.main)).setOrigin(0.5).setDepth(9951),
+      this.add.text(w / 2, h * 0.57, p.subtitle, textStyle(30)).setOrigin(0.5).setDepth(9951),
+    ];
+    items.forEach((t, i) => {
+      t.setScale(0.3).setAlpha(0);
+      this.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 240, delay: i * 90, ease: 'Back.easeOut' });
+    });
+    this.time.delayedCall(durationMs - 200, () => this.tweens.add({ targets: items, alpha: 0, duration: 180, onComplete: () => items.forEach((t) => t.destroy()) }));
   }
 
   /** Présentation des héros et de leurs upgrades : le public retrouve « ses » personnages. */
@@ -380,15 +447,17 @@ export class ArenaScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     const dtMs = this.battle.dt * 1000;
     if (this.running && !this.paused) {
-      if (this.time.now >= this.hitStopUntil) this.accumulator += Math.min(delta, 100) * this.timeScale;
+      if (this.time.now >= this.hitStopUntil) this.accumulator += Math.min(delta, 100) * this.timeScale * this.slowmo;
       let steps = 0;
-      while (this.accumulator >= dtMs && steps < MAX_STEPS_PER_FRAME && !this.battle.result) {
+      while (this.accumulator >= dtMs && steps < MAX_STEPS_PER_FRAME) {
         for (let i = 0; i < this.battle.units.length; i++) {
           this.prev[i].x = this.battle.units[i].x;
           this.prev[i].y = this.battle.units[i].y;
           this.prev[i].z = this.battle.units[i].z;
         }
-        this.battle.step();
+        // Après la fin, l'arène continue de vivre (épilogue) pendant l'annonce.
+        if (this.battle.result) this.battle.epilogue();
+        else this.battle.step();
         seedTick(this.battle.tick);
         this.handleEvents(this.battle.events);
         this.accumulator -= dtMs;
@@ -396,7 +465,7 @@ export class ArenaScene extends Phaser.Scene {
       }
       if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
     }
-    const alpha = this.battle.result ? 1 : Math.min(1, this.accumulator / dtMs);
+    const alpha = Math.min(1, this.accumulator / dtMs);
     this.drawUnits(alpha, this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale : 0);
     this.drawZone();
     this.gas.update(this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale : 0, this.battle.zone, this.battle.zoneScale);
@@ -405,6 +474,7 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud();
     this.watchLastStand();
     this.juice.drawStatus(this.battle.units, this.views, this.time.now);
+    this.show.update();
     this.drawBalance(Math.min(delta, 100) / 1000);
     this.director.update(this.battle.time);
     this.routeCameras();
@@ -433,6 +503,11 @@ export class ArenaScene extends Phaser.Scene {
     };
     const units = this.battle.units;
     for (const e of events) {
+      this.show.onEvent(e);
+      if (e.type === 'death') this.lastVictim = e.unit;
+      if (e.type === 'hit' && e.source >= 0 && units[e.source]?.hero && units[e.source].team === units[e.unit]?.team && e.source !== e.unit) {
+        this.friendlyHits.set(e.source, (this.friendlyHits.get(e.source) ?? 0) + 1);
+      }
       // Une unité inconnue du rendu (événement arrivé trop tôt) est ignorée plutôt que de planter.
       if ('unit' in e && e.type !== 'spawn' && !this.views[e.unit]) continue;
       switch (e.type) {
@@ -709,9 +784,20 @@ export class ArenaScene extends Phaser.Scene {
     this.ending = true;
     this.director.release(this.battle.time);
     const r = this.battle.result!;
-    const label = r.winner === 'draw' ? 'ÉGALITÉ !' : `VICTOIRE DES ${TEAM_COLORS[r.winner].label} !`;
-    this.cheer(r.winner === 'draw' ? 'gnomes' : r.winner, 1);
-    this.banner(label, r.winner === 'draw' ? '#ffffff' : TEAM_COLORS[r.winner].main, 1700);
+    const cfg = manifest.staging.show;
+    // Ralenti sur le dernier K.O., caméra sur la victime.
+    this.slowmo = cfg.slowmo;
+    const last = this.views[this.lastVictim]?.sprite;
+    if (last) this.director.request('lastStand', () => last, this.battle.time, 1.2);
+    this.time.delayedCall(1200, () => {
+      this.slowmo = 1;
+      this.director.release(this.battle.time);
+      const label = r.winner === 'draw' ? 'ÉGALITÉ !' : `VICTOIRE DES ${TEAM_COLORS[r.winner].label} !`;
+      this.banner(label, r.winner === 'draw' ? '#ffffff' : TEAM_COLORS[r.winner].main, 2200);
+      this.show.victory(r.winner);
+      if (r.winner !== 'draw') this.celebrate(r.winner);
+      this.finalGag();
+    });
     const result: ResultData = {
       params: this.params,
       winner: r.winner,
@@ -722,7 +808,57 @@ export class ArenaScene extends Phaser.Scene {
         .filter((u) => u.hero)
         .map((u) => ({ name: u.hero!.name, label: u.hero!.label, team: u.team, kills: u.kills, alive: u.state !== 'dead', hp: u.hp / u.maxHp })),
     };
-    this.time.delayedCall(2300, () => this.scene.start('result', result));
+    result.friendlyFire = [...this.friendlyHits.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (result.friendlyFire) result.friendlyFireName = this.battle.units[result.friendlyFire[0]].hero!.name;
+    this.time.delayedCall(cfg.finale * 1000, () => this.scene.start('result', result));
+  }
+
+  /** Bannières aux couleurs du vainqueur, confettis, public qui saute, vainqueurs qui sautillent. */
+  private celebrate(winner: TeamId): void {
+    const { width: w } = this.scale;
+    const f = this.battle.field;
+    const colors = [TEAM_COLORS[winner].bar, 0xffe14a, 0xffffff];
+    const flags = this.add.graphics().setDepth(-350);
+    for (const y of [f.y - 2, f.y + f.height + 2]) {
+      for (let x = f.x; x < f.x + f.width; x += 9) {
+        flags.fillStyle(colors[(x / 9) % 2 | 0], 1).fillTriangle(x * SCALE, y * SCALE, (x + 7) * SCALE, y * SCALE, (x + 3.5) * SCALE, (y + 6) * SCALE);
+      }
+    }
+    flags.setAlpha(0);
+    this.tweens.add({ targets: flags, alpha: 1, duration: 300 });
+    this.time.addEvent({
+      delay: 40,
+      repeat: 60,
+      callback: () => {
+        for (let i = 0; i < 3; i++) {
+          this.particles.push({ x: (rand() * w) / SCALE, y: f.y - 30 + rand() * 10, vx: (rand() - 0.5) * 40, vy: 10 + rand() * 30, life: 2.2, maxLife: 2.2, color: colors[Math.floor(rand() * 3)], size: 2 });
+        }
+      },
+    });
+    this.cheer(winner, 1);
+    this.time.addEvent({ delay: 600, repeat: 4, callback: () => this.cheer(winner, 0.7) });
+  }
+
+  /** Le spectateur récurrent finit toujours touché. */
+  private finalGag(): void {
+    const s = this.gagSpectator;
+    if (!s) return;
+    this.time.delayedCall(900, () => {
+      const from = { x: this.battle.field.x + this.battle.field.width / 2, y: this.battle.field.y + this.battle.field.height * 0.6 };
+      const tomato = this.add.circle(from.x * SCALE, from.y * SCALE, 2 * SCALE, 0xe83a2a).setDepth(9000);
+      this.tweens.add({
+        targets: tomato,
+        x: s.sprite.x,
+        y: s.baseY - 9 * SCALE,
+        duration: 420,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          tomato.destroy();
+          this.hurtSpectator(s, true);
+          this.comic(s.sprite.x / SCALE, s.baseY / SCALE - 14, 'SPLOTCH !', '#e83a2a', 32);
+        },
+      });
+    });
   }
 
   // ---------------------------------------------------------------- dessin
@@ -758,7 +894,8 @@ export class ArenaScene extends Phaser.Scene {
       const anim = `${v.sprite.texture.key}_${moving ? 'walk' : 'idle'}`;
       const busy = v.sprite.anims.isPlaying && v.sprite.anims.currentAnim?.key.endsWith('_attack');
       if (!busy && v.sprite.anims.currentAnim?.key !== anim && this.anims.exists(anim)) v.sprite.play(anim);
-      const hop = moving ? Math.abs(Math.sin(this.time.now / (u.state === 'flee' ? 50 : 90) + i)) * 0.08 : 0;
+      const celebrating = this.ending && this.battle.result?.winner === u.team;
+      const hop = moving || celebrating ? Math.abs(Math.sin(this.time.now / (u.state === 'flee' || celebrating ? 50 : 90) + i)) * (celebrating ? 0.2 : 0.08) : 0;
       v.sprite.setScale(v.baseScale * (2 - v.squash) * (1 - hop * 0.5), v.baseScale * v.squash * (1 + hop));
       if (v.whirlUntil > this.time.now) v.sprite.setAngle(((v.whirlUntil - this.time.now) * 1.6) % 360);
       else if (u.gag === 'dance') v.sprite.setAngle(Math.sin(this.time.now / 90) * 22);

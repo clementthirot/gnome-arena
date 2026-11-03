@@ -154,6 +154,38 @@ const StagingSchema = z.object({
     /** Gouttes projetées à chaque coup reçu. */
     dropsPerHit: z.number().int().min(0).default(2),
   }),
+  /** Spectacle : empereur, commentateur, répliques, duels, prono, compte à rebours, célébration. */
+  show: z.object({
+    lines: z.object({
+      start: z.string(),
+      firstBlood: z.string(),
+      triple: z.string(),
+      tripleHero: z.string(),
+      onFire: z.string(),
+      heroDown: z.string(),
+      meteor: z.string(),
+      headClash: z.string(),
+      comeback: z.string(),
+      victory: z.string(),
+      draw: z.string(),
+      roulette: z.string(),
+    }),
+    /** Écart minimal entre deux annonces (ms). */
+    announceGapMs: z.number().min(0).default(2500),
+    /** Fenêtre (s de combat) pour compter un triple K.O. */
+    streakWindow: z.number().positive().default(5),
+    /** K.O. d'un héros pour « EN FEU ». */
+    onFireKills: z.number().int().positive().default(5),
+    /** Distance (px monde) à laquelle deux rivaux déclenchent le carton DUEL. */
+    duelDistance: z.number().positive().default(35),
+    prono: z.object({ title: z.string(), subtitle: z.string(), duration: z.number().positive().default(1.5) }),
+    countdown: z.boolean().default(true),
+    /** Durée de la fin (ralenti, annonce, célébration) avant l'écran de vote (s). */
+    finale: z.number().positive().default(4.5),
+    /** Facteur de ralenti sur le dernier K.O. */
+    slowmo: z.number().min(0.05).max(1).default(0.35),
+    runningGag: z.boolean().default(true),
+  }),
   /** Effets cartoon : arrêt sur image aux gros impacts, étoiles, sueur, débris et objets perdus. */
   juice: z.object({
     /** Arrêt sur image (ms) sur les gros impacts : météore, charge de héros. */

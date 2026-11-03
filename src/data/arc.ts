@@ -21,6 +21,8 @@ export const EpisodeSchema = z.object({
   /** Upgrade gagnante, attribuée à recipient pour les épisodes suivants. */
   upgrade: id.nullable().default(null),
   publishedAt: z.string().optional(),
+  /** K.O. de chaque héros dans ce combat (statistiques cumulées de l'arc). */
+  heroKills: z.record(z.string(), z.number().int().min(0)).optional(),
 });
 export type Episode = z.infer<typeof EpisodeSchema>;
 
@@ -64,6 +66,16 @@ export function upgradesBefore(arc: Arc, episodeNumber: number): Record<string, 
   for (const ep of arc.episodes) {
     if (ep.number >= episodeNumber || !ep.upgrade) continue;
     (out[ep.recipient] ??= []).push(ep.upgrade);
+  }
+  return out;
+}
+
+/** K.O. cumulés de chaque héros sur les épisodes précédents. */
+export function killsBefore(arc: Arc, episodeNumber: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const ep of arc.episodes) {
+    if (ep.number >= episodeNumber || !ep.heroKills) continue;
+    for (const [hero, k] of Object.entries(ep.heroKills)) out[hero] = (out[hero] ?? 0) + k;
   }
   return out;
 }

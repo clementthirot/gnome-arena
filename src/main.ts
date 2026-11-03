@@ -9,7 +9,7 @@ import '@fontsource/press-start-2p';
 import Phaser from 'phaser';
 import { startRecording } from './capture/recorder';
 import { loadGameData, type GameData } from './data';
-import { arcHeroes, parseArc, upgradesBefore } from './data/arc';
+import { arcHeroes, killsBefore, parseArc, upgradesBefore } from './data/arc';
 import { Battle } from './sim/battle';
 import type { ArenaParams } from './render/scenes/ArenaScene';
 import { ArenaScene } from './render/scenes/ArenaScene';
@@ -97,12 +97,14 @@ function arenaParams(data: GameData): ArenaParams {
     upgrades: upgradesBefore(arc, number),
     episode: {
       number,
+      arcKills: Object.fromEntries(Object.entries(killsBefore(arc, number)).map(([id, k]) => [data.heroes.find((h) => h.id === id)?.name ?? id, k])),
       expected: ep && params.get('seed') === null ? { winner: ep.winner, duration: ep.duration } : undefined,
       vote:
         ep && hero && team
           ? {
               recipient: hero.name,
               team,
+              portrait: `unit_${hero.visual}`,
               options: ep.options.map((o) => {
                 const eq = data.equipment.find((e) => e.id === o)!;
                 return { label: eq.label, visual: eq.visual };

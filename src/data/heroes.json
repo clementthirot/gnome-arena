@@ -1,26 +1,180 @@
 [
   {
-    "id": "bob", "name": "Bob", "label": "le vaillant", "base": "gnome_charger", "visual": "hero_bob",
-    "personality": "valiant", "stats": { "hp": 3.2, "damage": 1.6, "speed": 1.05, "size": 1.7, "mass": 2.2 }
+    "id": "bob",
+    "name": "Bob",
+    "label": "le vaillant",
+    "base": "gnome_charger",
+    "visual": "hero_bob",
+    "personality": "valiant",
+    "stats": {
+      "hp": 3.2,
+      "damage": 1.6,
+      "speed": 1.05,
+      "size": 1.7,
+      "mass": 2.2
+    },
+    "rival": "grok",
+    "quotes": {
+      "cry": [
+        "POUR LES GNOMES !",
+        "EN AVANT !",
+        "CHAAARGE !"
+      ],
+      "fear": [
+        "Même pas peur !"
+      ],
+      "win": [
+        "Au suivant !",
+        "Trop facile !"
+      ]
+    }
   },
   {
-    "id": "kevin", "name": "Kevin", "label": "le prudent", "base": "gnome_archer", "visual": "hero_kevin",
-    "personality": "cautious", "stats": { "hp": 2.8, "damage": 1.8, "speed": 1.05, "size": 1.6, "mass": 1.6 }
+    "id": "kevin",
+    "name": "Kevin",
+    "label": "le prudent",
+    "base": "gnome_archer",
+    "visual": "hero_kevin",
+    "personality": "cautious",
+    "stats": {
+      "hp": 2.8,
+      "damage": 1.8,
+      "speed": 1.05,
+      "size": 1.6,
+      "mass": 1.6
+    },
+    "rival": "snik",
+    "quotes": {
+      "cry": [
+        "On reste groupés…",
+        "Je couvre !"
+      ],
+      "fear": [
+        "Pas moi !",
+        "Maman !",
+        "Je reviens !"
+      ],
+      "win": [
+        "Ouf…",
+        "Je l'ai eu ?!"
+      ]
+    }
   },
   {
-    "id": "gertrude", "name": "Gertrude", "label": "la téméraire", "base": "gnome_melee", "visual": "hero_gertrude",
-    "personality": "reckless", "stats": { "hp": 3, "damage": 1.7, "speed": 1.1, "size": 1.6, "mass": 1.8 }
+    "id": "gertrude",
+    "name": "Gertrude",
+    "label": "la téméraire",
+    "base": "gnome_melee",
+    "visual": "hero_gertrude",
+    "personality": "reckless",
+    "stats": {
+      "hp": 3,
+      "damage": 1.7,
+      "speed": 1.1,
+      "size": 1.6,
+      "mass": 1.8
+    },
+    "rival": "morva",
+    "quotes": {
+      "cry": [
+        "À MOI !",
+        "Qui veut des gnons ?"
+      ],
+      "fear": [
+        "Ça chatouille !"
+      ],
+      "win": [
+        "Suivant !",
+        "HA !"
+      ]
+    }
   },
   {
-    "id": "grok", "name": "Grok", "label": "la brute", "base": "goblin_charger", "visual": "hero_grok",
-    "personality": "reckless", "stats": { "hp": 3.2, "damage": 1.6, "speed": 1.05, "size": 1.75, "mass": 2.3 }
+    "id": "grok",
+    "name": "Grok",
+    "label": "la brute",
+    "base": "goblin_charger",
+    "visual": "hero_grok",
+    "personality": "reckless",
+    "stats": {
+      "hp": 3.2,
+      "damage": 1.6,
+      "speed": 1.05,
+      "size": 1.75,
+      "mass": 2.3
+    },
+    "rival": "bob",
+    "quotes": {
+      "cry": [
+        "GROK ÉCRASER !",
+        "GRAAAH !"
+      ],
+      "fear": [
+        "Grok pas content !"
+      ],
+      "win": [
+        "Grok gagner !",
+        "Trop mou !"
+      ]
+    }
   },
   {
-    "id": "snik", "name": "Snik", "label": "le fourbe", "base": "goblin_archer", "visual": "hero_snik",
-    "personality": "sneaky", "stats": { "hp": 2.8, "damage": 1.8, "speed": 1.1, "size": 1.6, "mass": 1.5 }
+    "id": "snik",
+    "name": "Snik",
+    "label": "le fourbe",
+    "base": "goblin_archer",
+    "visual": "hero_snik",
+    "personality": "sneaky",
+    "stats": {
+      "hp": 2.8,
+      "damage": 1.8,
+      "speed": 1.1,
+      "size": 1.6,
+      "mass": 1.5
+    },
+    "rival": "kevin",
+    "quotes": {
+      "cry": [
+        "Hé hé hé…",
+        "Par derrière !"
+      ],
+      "fear": [
+        "Pas le visage !",
+        "Je me rends ! (non)"
+      ],
+      "win": [
+        "Hé hé !",
+        "Trop lent !"
+      ]
+    }
   },
   {
-    "id": "morva", "name": "Morva", "label": "la vaillante", "base": "goblin_melee", "visual": "hero_morva",
-    "personality": "valiant", "stats": { "hp": 3, "damage": 1.7, "speed": 1.05, "size": 1.6, "mass": 1.8 }
+    "id": "morva",
+    "name": "Morva",
+    "label": "la vaillante",
+    "base": "goblin_melee",
+    "visual": "hero_morva",
+    "personality": "valiant",
+    "stats": {
+      "hp": 3,
+      "damage": 1.7,
+      "speed": 1.05,
+      "size": 1.6,
+      "mass": 1.8
+    },
+    "rival": "gertrude",
+    "quotes": {
+      "cry": [
+        "POUR LA HORDE !",
+        "Personne ne passe !"
+      ],
+      "fear": [
+        "Une égratignure !"
+      ],
+      "win": [
+        "Au tapis !",
+        "Debout, si tu peux !"
+      ]
+    }
   }
 ]

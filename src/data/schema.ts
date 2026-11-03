@@ -331,6 +331,12 @@ export const HeroSchema = z.object({
       mass: positive.default(1),
     })
     .default({}),
+  /** Répliques en bulle, selon le moment (tirées au hasard). */
+  quotes: z
+    .object({ cry: z.array(z.string()).default([]), fear: z.array(z.string()).default([]), win: z.array(z.string()).default([]) })
+    .default({}),
+  /** Rival attitré : un carton « DUEL » quand ils se croisent. */
+  rival: id.optional(),
   /** Équipements de départ ; un arc y ajoute les upgrades gagnées au fil des épisodes. */
   upgrades: z.array(id).default([]),
   active: z.boolean().default(true),
@@ -630,6 +636,7 @@ export const GameDataSchema = z
     });
     const equipment = new Set(data.equipment.map((e) => e.id));
     data.heroes.forEach((h, i) => {
+      if (h.rival && !data.heroes.some((o) => o.id === h.rival)) issue(['heroes', i, 'rival'], `rival inconnu : ${h.rival}`);
       h.upgrades.forEach((up, j) => {
         if (!equipment.has(up)) issue(['heroes', i, 'upgrades', j], `équipement inconnu : ${up}`);
       });

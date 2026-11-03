@@ -14,6 +14,9 @@ export interface ResultData {
   duration: number;
   survivors: Record<TeamId, number>;
   heroes: { name: string; label: string; team: TeamId; kills: number; alive: boolean; hp: number }[];
+  /** Meilleur raté de l'épisode : héros et nombre d'alliés touchés. */
+  friendlyFire?: [number, number];
+  friendlyFireName?: string;
 }
 
 /** Durée d'affichage de l'écran de fin avant la fin d'un enregistrement (ms). */
@@ -59,10 +62,18 @@ export class ResultScene extends Phaser.Scene {
         const status = hero.alive ? `debout ${Math.round(hero.hp * 100)} %` : 'K.O.';
         this.add.text(x, y, hero.name, textStyle(28, '#ffffff')).setOrigin(0.5);
         this.add.text(x, y + 38, `${hero.kills} K.O. · ${status}`, textStyle(18, hero.alive ? '#ffffff' : '#a098b0')).setOrigin(0.5);
+        const arc = r.params.episode?.arcKills;
+        if (arc) this.add.text(x, y + 62, `arc : ${(arc[hero.name] ?? 0) + hero.kills} K.O.`, textStyle(14, '#ffe14a')).setOrigin(0.5);
         y += 92;
       }
     });
 
+    if (r.friendlyFire && r.friendlyFireName) {
+      const [, n] = r.friendlyFire;
+      this.add
+        .text(w / 2, 930, `Raté de l'épisode : ${r.friendlyFireName}, ${n} allié${n > 1 ? 's' : ''} touché${n > 1 ? 's' : ''}`, textStyle(18, '#ff9a8a'))
+        .setOrigin(0.5);
+    }
     if (vote) this.voteCard(vote, 1000);
 
     if (r.params.record) {
@@ -91,6 +102,19 @@ export class ResultScene extends Phaser.Scene {
     const line = this.add.text(w / 2, top + 120, 'recevra la prochaine upgrade', textStyle(30)).setOrigin(0.5).setAlpha(0);
     const call = this.add.text(w / 2, top + 185, 'VOTEZ EN COMMENTAIRE', textStyle(34, '#ffe14a')).setOrigin(0.5).setAlpha(0);
     this.tweens.add({ targets: [name, line, call], alpha: 1, duration: 300, delay: this.tweens.stagger(250, { start: 800 }) });
+    // Portrait du héros bénéficiaire, à gauche de son nom.
+    if (this.textures.exists(vote.portrait)) {
+      const portrait = this.add.image(w / 2 - name.width / 2 - 70, top + 44, vote.portrait, 0).setScale(3).setAlpha(0);
+      this.tweens.add({ targets: portrait, alpha: 1, duration: 300, delay: 800 });
+    }
+    // Toutes les icônes d'accessoires, pour faire défiler les rouleaux.
+    const reel = Object.entries(manifest.accessories).flatMap(([key, acc]) => {
+      const shape = acc.type === 'placeholder' ? acc : acc.placeholder;
+      if (!shape) return [];
+      const tex = `acc_tex_${key}`;
+      if (!this.textures.exists(tex)) this.textures.addCanvas(tex, drawAccessory(shape.kind, shape.color, shape.accent));
+      return [tex];
+    });
 
     const n = vote.options.length;
     const cardW = (w - 160) / n - 20;
@@ -101,10 +125,25 @@ export class ResultScene extends Phaser.Scene {
       card.add(this.add.rectangle(0, 0, cardW, 330, 0x3d3555).setStrokeStyle(6, 0x000000));
       card.add(this.add.text(0, -110, String(i + 1), textStyle(88, '#ffe14a')).setOrigin(0.5));
       const acc = manifest.accessories[o.visual];
-      if (acc?.type === 'placeholder') {
+      const shape = acc ? (acc.type === 'placeholder' ? acc : acc.placeholder) : undefined;
+      if (shape) {
         const key = `acc_tex_${o.visual}`;
-        if (!this.textures.exists(key)) this.textures.addCanvas(key, drawAccessory(acc.kind, acc.color, acc.accent));
-        card.add(this.add.image(0, 10, key).setScale(10));
+        if (!this.textures.exists(key)) this.textures.addCanvas(key, drawAccessory(shape.kind, shape.color, shape.accent));
+        const icon = this.add.image(0, 10, reel[0] ?? key).setScale(10);
+        card.add(icon);
+        // Rouleau : les icônes défilent de plus en plus lentement, puis s'arrêtent sur l'option.
+        let k = 0;
+        const spins = 10 + i * 4;
+        const step = (n: number) => {
+          if (n >= spins) {
+            icon.setTexture(key);
+            this.tweens.add({ targets: icon, scale: { from: 13, to: 10 }, duration: 200, ease: 'Back.easeOut' });
+            return;
+          }
+          icon.setTexture(reel[k++ % reel.length]);
+          this.time.delayedCall(50 + n * 12, () => step(n + 1));
+        };
+        this.time.delayedCall(1700 + i * 350, () => step(0));
       }
       card.add(this.add.text(0, 120, o.label, textStyle(24, '#ffffff', { wordWrap: { width: cardW - 20 } })).setOrigin(0.5));
       this.tweens.add({ targets: card, scale: 1, duration: 350, delay: 1700 + i * 350, ease: 'Back.easeOut' });
