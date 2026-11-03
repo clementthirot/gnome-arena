@@ -143,6 +143,31 @@
       }
     }
   },
+  "gags": {
+    "headClash": {
+      "chance": 1,
+      "cap": 3,
+      "stun": 1.5
+    },
+    "victoryDance": {
+      "chance": 0.12,
+      "cap": 2,
+      "duration": 1.6,
+      "isolation": 28
+    },
+    "lostWeapon": {
+      "chance": 0.025,
+      "cap": 2,
+      "distance": 16,
+      "timeout": 1.8
+    },
+    "bowling": {
+      "minImpact": 80,
+      "reach": 3,
+      "push": 90,
+      "stun": 0.25
+    }
+  },
   "events": {
     "perMinute": 3,
     "endRamp": 4,

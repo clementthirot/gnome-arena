@@ -184,6 +184,17 @@ const BeamEffect = z.object({
   visual: visualKey,
 });
 
+/** Étourdissement : l'unité titube (étoiles au-dessus de la tête) puis reprend le combat. */
+const StunEffect = z.object({
+  type: z.literal('stun'),
+  at,
+  duration: positive,
+  /** 0 = la seule unité visée. */
+  radius: z.number().min(0).default(0),
+  friendlyFire: z.boolean().default(true),
+  visual: visualKey.optional(),
+});
+
 /** Renforts : des unités entrent dans l'arène en sautant le muret (supporters du public). */
 const SpawnEffect = z.object({
   type: z.literal('spawn'),
@@ -205,6 +216,7 @@ export type EffectDef =
   | z.infer<typeof LaunchEffect>
   | z.infer<typeof BeamEffect>
   | z.infer<typeof SpawnEffect>
+  | z.infer<typeof StunEffect>
   | ProjectileEffectDef;
 
 export interface ProjectileEffectDef {
@@ -231,6 +243,7 @@ export const EffectSchema: z.ZodType<EffectDef, z.ZodTypeDef, unknown> = z.lazy(
     LaunchEffect,
     BeamEffect,
     SpawnEffect,
+    StunEffect,
     z.object({
       type: z.literal('projectile'),
       speed: positive,
@@ -508,6 +521,43 @@ export const BattleConfigSchema = z.object({
     panicDuration: z.tuple([positive, positive]),
     tuning: TuningSchema,
   }),
+  /** Gags slapstick : rares, chacun avec une probabilité et un plafond par combat. */
+  gags: z
+    .object({
+      /** Deux chargeurs qui se percutent restent tous deux assommés. */
+      headClash: z.object({ chance: fraction.default(1), cap: z.number().int().min(0).default(3), stun: positive.default(1.5) }).default({}),
+      /** Danse après un K.O., interrompue par un coup ; seulement à l'écart de la mêlée. */
+      victoryDance: z
+        .object({
+          chance: fraction.default(0.12),
+          cap: z.number().int().min(0).default(2),
+          duration: positive.default(1.6),
+          /** Aucun ennemi à moins de cette distance pour oser danser. */
+          isolation: positive.default(28),
+        })
+        .default({}),
+      /** L'arme s'envole sur un gros coup ; l'unité court la ramasser. */
+      lostWeapon: z
+        .object({
+          chance: fraction.default(0.06),
+          cap: z.number().int().min(0).default(2),
+          /** Distance à laquelle l'arme retombe (px monde). */
+          distance: positive.default(16),
+          /** Abandon de la recherche après ce délai (s). */
+          timeout: positive.default(1.8),
+        })
+        .default({}),
+      /** Effet bowling : une unité qui retombe repousse et étourdit ses voisins (règle permanente). */
+      bowling: z
+        .object({
+          minImpact: z.number().min(0).default(80),
+          reach: z.number().min(0).default(3),
+          push: z.number().min(0).default(90),
+          stun: z.number().min(0).default(0.5),
+        })
+        .default({}),
+    })
+    .default({}),
   /** Fréquence des incidents d'arène. */
   events: z.object({
     /** Incidents par minute en début de combat. */

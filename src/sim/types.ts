@@ -49,6 +49,12 @@ export interface Unit {
   vz: number;
   /** Étourdissement restant après un atterrissage. */
   stunTimer: number;
+  /** Gag en cours : danse de victoire ou course après son arme. */
+  gag: 'none' | 'dance' | 'fetch';
+  gagTimer: number;
+  /** Où est tombée l'arme perdue. */
+  gagX: number;
+  gagY: number;
   /** Temps passé à approcher sans se rapprocher (bloqué par la foule). */
   blockedTime: number;
   lastGap: number;
@@ -107,6 +113,8 @@ export type BattleEvent =
   /** Le rayon se charge : sa trajectoire complète, dessinée avant le tir. */
   | { type: 'beamCharge'; visual: string; width: number; duration: number; source: number; segments: BeamSegment[] }
   | { type: 'spawn'; unit: number }
+  | { type: 'gag'; unit: number; kind: 'dance' | 'danceInterrupted' | 'weaponLost' | 'weaponFound' | 'headClash' | 'bowled'; x: number; y: number }
+  | { type: 'stun'; unit: number; duration: number }
   | { type: 'land'; unit: number; x: number; y: number; impact: number; dead: boolean }
   | { type: 'telegraph'; event: string; visual: string; x: number; y: number; radius: number; duration: number }
   /** Annonce d'un incident (au moment où son télégraphe apparaît). */

@@ -71,6 +71,8 @@ export class Battle implements EffectHost {
   /** Plus grand rayon d'unité : borne les recherches dans la grille. */
   maxRadius = 0;
   private nextIncidentAt = -1;
+  /** Gags déjà joués dans ce combat, pour respecter les plafonds. */
+  private readonly gagCount = { headClash: 0, victoryDance: 0, lostWeapon: 0 };
   private readonly pendingIncidents: PendingIncident[] = [];
   private readonly extraUpgrades: Readonly<Record<string, readonly string[]>>;
   private zoneAnnounced = false;
@@ -192,6 +194,10 @@ export class Battle implements EffectHost {
       z: 0,
       vz: 0,
       stunTimer: 0,
+      gag: 'none',
+      gagTimer: 0,
+      gagX: 0,
+      gagY: 0,
       blockedTime: 0,
       lastGap: Infinity,
       specialCooldowns: equipment.map(() => this.rng.range(...this.tuning.specialStartCooldown)),
@@ -267,6 +273,7 @@ export class Battle implements EffectHost {
   /** Un tick de décision : moral, cible, déplacement, attaque. */
   private think(u: Unit): void {
     this.tickTimers(u);
+    if (this.updateGag(u)) return;
     if (this.updateMorale(u)) return;
     const target = this.pickTarget(u);
     if (!target) {
@@ -288,6 +295,38 @@ export class Battle implements EffectHost {
     this.steer(u, gap, nx, ny);
     if (this.trySpecial(u, target, gap)) return;
     this.tryAttack(u, target, gap, nx, ny, dist);
+  }
+
+  /** Danse ou course après son arme : l'unité ne combat pas pendant le gag. Renvoie vrai si un gag est en cours. */
+  private updateGag(u: Unit): boolean {
+    if (u.gag === 'none') return false;
+    u.gagTimer -= this.dt;
+    if (u.gag === 'dance') {
+      u.vx = u.vy = 0;
+      if (u.gagTimer <= 0) u.gag = 'none';
+      return u.gag !== 'none';
+    }
+    const dx = u.gagX - u.x;
+    const dy = u.gagY - u.y;
+    const d = hypot(dx, dy);
+    if (d < u.radius || u.gagTimer <= 0) {
+      u.gag = 'none';
+      u.vx = u.vy = 0;
+      this.events.push({ type: 'gag', unit: u.index, kind: 'weaponFound', x: u.gagX, y: u.gagY });
+      return false;
+    }
+    u.vx = (dx / d) * u.speed * 1.2;
+    u.vy = (dy / d) * u.speed * 1.2;
+    if (Math.abs(dx) > 1) u.facing = dx > 0 ? 1 : -1;
+    return true;
+  }
+
+  /** @internal EffectHost */
+  stunUnit(u: Unit, duration: number): void {
+    if (u.state === 'dead') return;
+    u.stunTimer = Math.max(u.stunTimer, duration);
+    u.charging = false;
+    this.events.push({ type: 'stun', unit: u.index, duration });
   }
 
   private tickTimers(u: Unit): void {
@@ -509,6 +548,24 @@ export class Battle implements EffectHost {
       if (hit || e.team === u.team || e.state === 'dead') return;
       if (hypot(e.x - u.x, e.y - u.y) <= u.radius + e.radius + 1.5) hit = e;
     });
+    const clash = this.data.battle.gags.headClash;
+    if (hit && hit.charging && this.gagCount.headClash < clash.cap && this.rng.chance(clash.chance)) {
+      // Choc de têtes : les deux chargeurs rebondissent l'un sur l'autre et restent assommés.
+      this.gagCount.headClash++;
+      const other = hit;
+      for (const [a, b] of [[u, other], [other, u]] as const) {
+        const ax = a.x - b.x;
+        const ay = a.y - b.y;
+        const al = hypot(ax, ay) || 1;
+        a.kx += (ax / al) * 120;
+        a.ky += (ay / al) * 120;
+        a.charging = false;
+        a.chargeCooldown = a.role.charge ? a.role.charge.cooldown : 3;
+        this.stunUnit(a, clash.stun);
+      }
+      this.events.push({ type: 'gag', unit: u.index, kind: 'headClash', x: (u.x + other.x) / 2, y: (u.y + other.y) / 2 });
+      return;
+    }
     if (hit) {
       const ix = (u.x + hit.x) / 2;
       const iy = (u.y + hit.y) / 2;
@@ -605,10 +662,44 @@ export class Battle implements EffectHost {
       this.kill(t, source);
       return;
     }
+    if (t.gag === 'dance' && !silent) {
+      t.gag = 'none';
+      this.events.push({ type: 'gag', unit: t.index, kind: 'danceInterrupted', x: t.x, y: t.y });
+    }
+    this.maybeLoseWeapon(t, dirX, dirY, knockback);
     // Gros recul : l'unité décolle et rebondira en retombant.
     const bounce = this.tuning.bounce;
     const push = knockback / t.mass;
     if (push > bounce.threshold) this.launchUnit(t, (push - bounce.threshold) * bounce.lift);
+  }
+
+  /** Arme perdue : sur un gros coup, rarement, l'arme s'envole et l'unité court la ramasser. */
+  private maybeLoseWeapon(t: Unit, dirX: number, dirY: number, knockback: number): void {
+    const lw = this.data.battle.gags.lostWeapon;
+    if (t.hero || t.gag !== 'none' || knockback / t.mass < this.tuning.bounce.threshold * 0.6) return;
+    if (this.gagCount.lostWeapon >= lw.cap || !this.rng.chance(lw.chance)) return;
+    this.gagCount.lostWeapon++;
+    const f = this.field;
+    t.gag = 'fetch';
+    t.gagTimer = lw.timeout;
+    t.gagX = Math.min(f.x + f.width - 4, Math.max(f.x + 4, t.x + dirX * lw.distance + this.rng.range(-4, 4)));
+    t.gagY = Math.min(f.y + f.height - 4, Math.max(f.y + 4, t.y + dirY * lw.distance + this.rng.range(-4, 4)));
+    this.events.push({ type: 'gag', unit: t.index, kind: 'weaponLost', x: t.gagX, y: t.gagY });
+  }
+
+  /** Danse de victoire prématurée : rare, et seulement à l'écart de la mêlée. */
+  private maybeDance(killer: Unit): void {
+    const vd = this.data.battle.gags.victoryDance;
+    if (killer.state === 'dead' || killer.gag !== 'none' || killer.z > 0 || this.gagCount.victoryDance >= vd.cap) return;
+    let alone = true;
+    this.grid.query(killer.x, killer.y, vd.isolation, (o) => {
+      if (o.team !== killer.team && o.state !== 'dead' && hypot(o.x - killer.x, o.y - killer.y) <= vd.isolation) alone = false;
+    });
+    if (!alone || !this.rng.chance(vd.chance)) return;
+    this.gagCount.victoryDance++;
+    killer.gag = 'dance';
+    killer.gagTimer = vd.duration;
+    this.events.push({ type: 'gag', unit: killer.index, kind: 'dance', x: killer.x, y: killer.y });
   }
 
   /** K.O. aérien : de temps en temps (toujours pour un héros), le vaincu s'envole avant de retomber. */
@@ -655,6 +746,7 @@ export class Battle implements EffectHost {
       this.applyDamage(u, (air.landingDamage * u.maxHp * impact) / 100, null, 0, 0, 0, true);
       this.landing = false;
     }
+    this.bowl(u, impact);
     const bounce = this.tuning.bounce;
     if (impact > bounce.minImpact) {
       // Rebond : on repart vers le haut, un peu moins vite à chaque fois.
@@ -667,6 +759,23 @@ export class Battle implements EffectHost {
     this.events.push({ type: 'land', unit: u.index, x: u.x, y: u.y, impact, dead: u.state === 'dead' });
   }
 
+  /** Effet bowling : en retombant, l'unité (vivante ou non) repousse et étourdit ceux sur qui elle tombe, sans dégâts. */
+  private bowl(u: Unit, impact: number): void {
+    const b = this.data.battle.gags.bowling;
+    if (impact < b.minImpact) return;
+    this.grid.query(u.x, u.y, u.radius + this.maxRadius + b.reach, (o) => {
+      if (o === u || o.state === 'dead' || o.z > 0) return;
+      const d = hypot(o.x - u.x, o.y - u.y);
+      if (d > u.radius + o.radius + b.reach) return;
+      const nx = d > 0.01 ? (o.x - u.x) / d : 1;
+      const ny = d > 0.01 ? (o.y - u.y) / d : 0;
+      o.kx += (nx * b.push) / o.mass;
+      o.ky += (ny * b.push) / o.mass;
+      if (b.stun > 0) this.stunUnit(o, b.stun);
+      this.events.push({ type: 'gag', unit: o.index, kind: 'bowled', x: o.x, y: o.y });
+    });
+  }
+
   private kill(t: Unit, killer: Unit | null): void {
     const rules = this.data.battle.rules;
     t.hp = 0;
@@ -677,6 +786,7 @@ export class Battle implements EffectHost {
     if (killer && killer.team !== t.team) killer.kills++;
     this.events.push({ type: 'death', unit: t.index, killer: killer?.index ?? -1 });
     this.maybeKoLaunch(t);
+    if (killer && killer.team !== t.team) this.maybeDance(killer);
     this.grid.query(t.x, t.y, rules.allyDeathRadius, (o) => {
       if (o.state === 'dead' || hypot(o.x - t.x, o.y - t.y) > rules.allyDeathRadius) return;
       // La mort d'un héros pèse plus lourd sur le moral.

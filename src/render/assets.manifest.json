@@ -965,6 +965,30 @@
       "size": 2,
       "duration": 0.45,
       "spinSource": true
+    },
+    "tomato": {
+      "kind": "ball",
+      "color": "#e83a2a",
+      "accent": "#4aa83a",
+      "size": 3
+    },
+    "tomato_splat": {
+      "kind": "spark",
+      "color": "#e83a2a",
+      "accent": "#ffb0a0",
+      "size": 1
+    },
+    "shoe": {
+      "kind": "ball",
+      "color": "#7a4a26",
+      "accent": "#e8e0d0",
+      "size": 4
+    },
+    "crowd_bomb": {
+      "kind": "ball",
+      "color": "#202024",
+      "accent": "#ffb347",
+      "size": 5
     }
   },
   "staging": {

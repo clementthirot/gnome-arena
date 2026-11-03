@@ -77,6 +77,13 @@ export class ArenaScene extends Phaser.Scene {
   private juice!: Juice;
   /** Arrêt sur image en cours (horloge de la scène, ms). */
   private hitStopUntil = 0;
+  /** Armes tombées au sol, en attendant que leur propriétaire les ramasse. */
+  private lostWeapons = new Map<number, Phaser.GameObjects.Image>();
+  /** Barre de rapport de force : part des gnomes affichée (lissée), éclat de la jonction. */
+  private balanceBar!: Phaser.GameObjects.Graphics;
+  private balanceShown = 0.5;
+  private balanceKick = 0;
+  private balanceFlash = 0;
   private particles: Particle[] = [];
   private spectators: Spectator[] = [];
   private fx!: Phaser.GameObjects.Graphics;
@@ -100,6 +107,10 @@ export class ArenaScene extends Phaser.Scene {
 
   init(params: ArenaParams): void {
     this.params = params;
+    this.lostWeapons = new Map();
+    this.balanceShown = 0.5;
+    this.balanceKick = 0;
+    this.balanceFlash = 0;
     this.views = [];
     this.heroHud.clear();
     this.accessories.clear();
@@ -234,6 +245,7 @@ export class ArenaScene extends Phaser.Scene {
   private createHud(): void {
     const w = this.scale.width;
     this.add.rectangle(0, 0, w, 96, 0x000000, 0.45).setOrigin(0).setDepth(9900);
+    this.balanceBar = this.add.graphics().setDepth(9902);
     this.hud = {
       left: this.add.text(24, 48, '', textStyle(30, TEAM_COLORS.gnomes.main)).setOrigin(0, 0.5).setDepth(9901),
       right: this.add.text(w - 24, 48, '', textStyle(30, TEAM_COLORS.goblins.main)).setOrigin(1, 0.5).setDepth(9901),
@@ -393,6 +405,7 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud();
     this.watchLastStand();
     this.juice.drawStatus(this.battle.units, this.views, this.time.now);
+    this.drawBalance(Math.min(delta, 100) / 1000);
     this.director.update(this.battle.time);
     this.routeCameras();
   }
@@ -435,6 +448,7 @@ export class ArenaScene extends Phaser.Scene {
         case 'hit': {
           const u = units[e.unit];
           if (e.knockback > 100) this.juice.debris(u.x, u.y, 3);
+          if (e.damage > 8) this.balanceKick = Math.min(1, this.balanceKick + 0.5);
           Bricks.hurt(ctx, this.views[e.unit], u.x, u.y - u.radius, e.knockback > 100);
           break;
         }
@@ -480,8 +494,35 @@ export class ArenaScene extends Phaser.Scene {
             } else this.director.request('heroDeath', () => victim, this.battle.time);
             const hud = this.heroHud.get(e.unit);
             hud?.name.setAlpha(0.6);
+            this.balanceFlash = 1;
+            this.balanceKick = 1;
             this.banner(`${u.hero.name} est K.O. !`, TEAM_COLORS[u.team].main, 1200);
           }
+          break;
+        }
+        case 'gag': {
+          const u = units[e.unit];
+          if (e.kind === 'headClash') {
+            this.comic(e.x, e.y, 'BONK !', '#ffffff', 46);
+            this.cameras.main.shake(140, 0.006);
+            this.hitStop();
+          } else if (e.kind === 'dance') this.popup(u, '♪ ♫', '#ffe14a', 28);
+          else if (e.kind === 'danceInterrupted') this.popup(u, '!?', '#ff8080', 32);
+          else if (e.kind === 'weaponLost') {
+            this.popup(u, '?!', '#ffffff', 28);
+            // L'arme s'envole en tournoyant jusqu'à son point de chute.
+            if (!this.textures.exists('lost_weapon')) this.textures.addCanvas('lost_weapon', drawAccessory('sword', '#d8dce8', '#8a5a2b'));
+            const v = this.views[e.unit].sprite;
+            const img = this.add.image(v.x, v.y - 10, 'lost_weapon').setScale(SCALE * 0.8).setDepth(9600);
+            this.tweens.add({ targets: img, x: e.x * SCALE, duration: 450 });
+            this.tweens.add({ targets: img, y: [v.y - 60, e.y * SCALE], angle: 540, duration: 450, ease: 'Sine.easeIn', onComplete: () => img.setDepth(-413) });
+            this.lostWeapons.get(e.unit)?.destroy();
+            this.lostWeapons.set(e.unit, img);
+          } else if (e.kind === 'weaponFound') {
+            this.lostWeapons.get(e.unit)?.destroy();
+            this.lostWeapons.delete(e.unit);
+            this.popup(u, '!', '#ffffff', 26);
+          } else if (e.kind === 'bowled') this.juice.debris(e.x, e.y, 2);
           break;
         }
         case 'beamCharge':
@@ -720,6 +761,7 @@ export class ArenaScene extends Phaser.Scene {
       const hop = moving ? Math.abs(Math.sin(this.time.now / (u.state === 'flee' ? 50 : 90) + i)) * 0.08 : 0;
       v.sprite.setScale(v.baseScale * (2 - v.squash) * (1 - hop * 0.5), v.baseScale * v.squash * (1 + hop));
       if (v.whirlUntil > this.time.now) v.sprite.setAngle(((v.whirlUntil - this.time.now) * 1.6) % 360);
+      else if (u.gag === 'dance') v.sprite.setAngle(Math.sin(this.time.now / 90) * 22);
       else if (u.stunTimer > 0) v.sprite.setAngle(Math.sin(this.time.now / 40) * 14);
       else if (u.charging) v.sprite.setAngle(u.facing * 12);
       else if (u.state === 'flee') v.sprite.setAngle(Math.sin(this.time.now / 60) * 10);
@@ -826,6 +868,43 @@ export class ArenaScene extends Phaser.Scene {
       if (this.tweens.isTweening(s.sprite)) continue;
       s.sprite.y = s.baseY - Math.round(Math.max(0, Math.sin(t * 3 + s.phase)) * 1) * SCALE;
     }
+  }
+
+  /** Une seule barre partagée entre les deux camps, selon les PV restants (la mesure de la victoire aux points). */
+  private drawBalance(dt: number): void {
+    const g = this.balanceBar;
+    const w = this.scale.width;
+    const sg = this.battle.strength('gnomes');
+    const sb = this.battle.strength('goblins');
+    const target = sg + sb > 0 ? sg / (sg + sb) : 0.5;
+    this.balanceShown += (target - this.balanceShown) * Math.min(1, dt * 4);
+    this.balanceKick = Math.max(0, this.balanceKick - dt * 3);
+    this.balanceFlash = Math.max(0, this.balanceFlash - dt * 2.5);
+    const x = 24;
+    const y = 104;
+    const bw = w - 48;
+    const bh = 22;
+    const split = Math.round(x + bw * this.balanceShown + (rand() - 0.5) * 16 * this.balanceKick);
+    g.clear();
+    g.fillStyle(0x000000, 1).fillRect(x - 5, y - 5, bw + 10, bh + 10);
+    g.fillStyle(TEAM_COLORS.gnomes.bar, 1).fillRect(x, y, split - x, bh);
+    g.fillStyle(TEAM_COLORS.goblins.bar, 1).fillRect(split, y, x + bw - split, bh);
+    // Reflet en haut de la barre, jonction qui brille sur les gros coups.
+    g.fillStyle(0xffffff, 0.25).fillRect(x, y, bw, 5);
+    g.fillStyle(0xffffff, 0.6 + 0.4 * this.balanceKick).fillRect(split - 3, y - 7, 6, bh + 14);
+    if (this.balanceFlash > 0) g.fillStyle(0xffffff, this.balanceFlash * 0.7).fillRect(x, y, bw, bh);
+  }
+
+  /** Onomatopée de bande dessinée, posée dans l'arène. */
+  private comic(x: number, y: number, text: string, color = '#ffe14a', size = 40): void {
+    const t = this.add
+      .text(x * SCALE, y * SCALE - 20, text, textStyle(size, color, { strokeThickness: 10 }))
+      .setOrigin(0.5)
+      .setDepth(9850)
+      .setAngle(rand() * 20 - 10)
+      .setScale(0.2);
+    this.tweens.add({ targets: t, scale: 1.1, duration: 160, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: t, alpha: 0, y: t.y - 30, delay: 650, duration: 350, onComplete: () => t.destroy() });
   }
 
   private updateHud(): void {

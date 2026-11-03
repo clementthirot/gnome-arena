@@ -175,5 +175,97 @@
       }
     ],
     "until": 58
+  },
+  {
+    "id": "tomato",
+    "label": "Une tomate du public !",
+    "weight": 2,
+    "from": 8,
+    "target": "random_unit",
+    "telegraph": 0.5,
+    "telegraphRadius": 6,
+    "visual": "tomato",
+    "effects": [
+      {
+        "type": "projectile",
+        "speed": 120,
+        "arc": 30,
+        "visual": "tomato",
+        "effects": [
+          {
+            "type": "stun",
+            "duration": 1.2,
+            "visual": "tomato_splat"
+          },
+          {
+            "type": "damage",
+            "amount": 2,
+            "knockback": 40
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "shoe",
+    "label": "Une chaussure vole !",
+    "weight": 1.5,
+    "from": 8,
+    "target": "hero",
+    "telegraph": 0.5,
+    "telegraphRadius": 6,
+    "visual": "shoe",
+    "effects": [
+      {
+        "type": "projectile",
+        "speed": 130,
+        "arc": 24,
+        "visual": "shoe",
+        "effects": [
+          {
+            "type": "stun",
+            "duration": 1.5
+          },
+          {
+            "type": "damage",
+            "amount": 4,
+            "knockback": 110
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "crowd_bomb",
+    "label": "Le public lance une bombe !",
+    "weight": 1,
+    "from": 20,
+    "target": "densest",
+    "telegraph": 0.9,
+    "telegraphRadius": 12,
+    "visual": "crowd_bomb",
+    "effects": [
+      {
+        "type": "projectile",
+        "speed": 90,
+        "arc": 40,
+        "visual": "crowd_bomb",
+        "effects": [
+          {
+            "type": "damage",
+            "amount": 10,
+            "radius": 12,
+            "knockback": 120,
+            "friendlyFire": true,
+            "visual": "explosion"
+          },
+          {
+            "type": "stun",
+            "duration": 0.8,
+            "radius": 14
+          }
+        ]
+      }
+    ]
   }
 ]

@@ -19,6 +19,7 @@ export interface EffectHost {
   spawnReinforcements(effect: Extract<EffectDef, { type: 'spawn' }>, ctx: EffectContext): void;
   /** Exécute une action plus tard (en secondes de combat), dans l'ordre des demandes. */
   defer(delay: number, run: () => void): void;
+  stunUnit(u: Unit, duration: number): void;
   emit(event: BattleEvent): void;
   readonly time: number;
 }
@@ -209,6 +210,18 @@ function runEffect(host: EffectHost, effect: EffectDef, base: EffectContext): vo
     case 'spawn':
       host.spawnReinforcements(effect, ctx);
       return;
+    case 'stun': {
+      if (effect.visual) host.emit({ type: 'effect', visual: effect.visual, x: ctx.x, y: ctx.y, radius: effect.radius, source });
+      if (effect.radius <= 0) {
+        const t = ctx.target && canHit(ctx.target, ctx, effect.friendlyFire) ? ctx.target : nearestAt(host, ctx.x, ctx.y, host.tuning.hitTolerance + 2, (u) => canHit(u, ctx, effect.friendlyFire));
+        if (t) host.stunUnit(t, effect.duration);
+        return;
+      }
+      host.queryUnits(ctx.x, ctx.y, effect.radius + host.maxRadius, (u) => {
+        if (canHit(u, ctx, effect.friendlyFire) && hypot(u.x - ctx.x, u.y - ctx.y) <= effect.radius + u.radius) host.stunUnit(u, effect.duration);
+      });
+      return;
+    }
     case 'projectile':
       host.spawnEffectProjectile(effect, ctx);
       return;
