@@ -7,11 +7,18 @@
 //                         public/sprites/generated/<clé>.png  (remplacement, sauf --no-generated)
 //                       une exportation Aseprite <clé>.json à côté du PNG fixe le découpage et les animations
 //   check               comme import, sans rien écrire ; code de sortie 1 en cas de problème
+//   pixellab <dossier> <clé> [clés…] [--scale=1.25] [--hit=attack:5,kick:3]
+//                       assemble un export PixelLab en 8 directions (metadata.json, rotations/,
+//                       animations/<nom>/<direction>/) en public/sprites/<clé>.png, une ligne par
+//                       direction, puis lance import ; plusieurs clés partagent le même skin, et
+//                       --scale grossit le personnage par rapport à sa silhouette ;
+//                       --hit donne, par attaque, l'image où le coup touche (rang dans l'animation)
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { accessoryPixels, placeholderPixels, type PlaceholderShape } from '../src/render/pixels';
 import { buildSheet, SHEET_FRAMES, SHEET_LAYOUT, sheetGrid } from '../src/render/spriteFrames';
-import { encodePng, pngSize } from './lib/png';
+import { DIRECTIONS } from '../src/render/manifest';
+import { decodePng, encodePng, encodeRgba, pngSize, type Rgba } from './lib/png';
 
 const ROOT = join(import.meta.dirname, '..');
 const MANIFEST = join(ROOT, 'src/render/assets.manifest.json');
@@ -70,9 +77,124 @@ function find(key: string): Found | undefined {
   return undefined;
 }
 
-/** Découpage d'une sheet : export Aseprite si présent, sinon images carrées et disposition standard. */
+/** Description d'une sheet en 8 directions, écrite par la commande pixellab à côté du PNG. */
+interface DirectionalSidecar {
+  frameWidth: number;
+  frameHeight: number;
+  /** Hauteur du personnage dans l'image (px), pour l'afficher à la taille de sa silhouette. */
+  bodyHeight: number;
+  /** Facteur appliqué à cette taille (un personnage fin paraît plus petit que sa silhouette). */
+  scale?: number;
+  animations: Json;
+}
+
+type AnimName = 'idle' | 'walk' | 'attack' | 'kick' | 'hurt' | 'getup' | 'death';
+/** Cadence par défaut des animations qui n'existent pas dans la disposition standard. */
+const EXTRA_FPS: Record<string, number> = { kick: 14, hurt: 16, getup: 10 };
+
+/** Noms d'animations PixelLab reconnus, vers les animations du jeu (l'ordre des tests compte). */
+function animationFor(name: string): AnimName | undefined {
+  const n = name.toLowerCase();
+  if (/death|die|dying/.test(n)) return 'death';
+  if (/getting.?up|get.?up|stand.?up|rise/.test(n)) return 'getup';
+  if (/taking|hurt|hit.?react|damage|flinch/.test(n)) return 'hurt';
+  if (/kick/.test(n)) return 'kick';
+  if (/punch|attack|slash|strike|swing|jab/.test(n)) return 'attack';
+  if (/walk|run/.test(n)) return 'walk';
+  if (/idle|breath/.test(n)) return 'idle';
+  return undefined;
+}
+
+/** Images d'une direction ; PixelLab nomme parfois les variantes « west-8062cc6e » : on prend la première. */
+function framesFor(byDir: Record<string, string[]>, d: string): string[] | undefined {
+  return byDir[d] ?? Object.entries(byDir).find(([k]) => k.startsWith(`${d}-`))?.[1];
+}
+
+/** Première et dernière lignes non transparentes. */
+function opaqueRows(img: Rgba): [number, number] {
+  let top = img.height;
+  let bottom = -1;
+  for (let y = 0; y < img.height; y++)
+    for (let x = 0; x < img.width; x++)
+      if (img.data[(y * img.width + x) * 4 + 3] > 0) {
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+  return [top, bottom];
+}
+
+/** Assemble un export PixelLab : une ligne par direction (ordre DIRECTIONS), rotation fixe puis animations. */
+function pixellab(folder: string | undefined, keys: string[], scale: number, hits: Record<string, number>) {
+  if (!folder || !keys.length) throw new Error('usage : npm run sprites -- pixellab <dossier> <clé> [clés…] [--scale=1.25]');
+  const unknown = keys.filter((k) => !(k in manifest.assets));
+  if (unknown.length) throw new Error(`« ${unknown.join(', ')} » : pas dans le manifeste (${Object.keys(manifest.assets).join(', ')})`);
+  if (!(scale > 0)) throw new Error('--scale doit être un nombre positif');
+  const meta: Json = JSON.parse(readFileSync(join(folder, 'metadata.json'), 'utf8'));
+  const state = meta.states?.[0];
+  if (!state?.frames?.rotations) throw new Error('metadata.json sans rotations');
+  // Les chemins du metadata.json sont relatifs à son dossier.
+  const load = (p: string) => decodePng(readFileSync(join(folder, p)));
+
+  // Colonnes : 0 = rotation fixe (idle), puis les images de chaque animation reconnue.
+  const rotations: Record<string, string> = state.frames.rotations;
+  const columns: Record<string, string | undefined>[] = [rotations];
+  const animations: Json = {};
+  const ignored: string[] = [];
+  for (const [name, byDir] of Object.entries<Record<string, string[]>>(state.frames.animations ?? {})) {
+    const anim = animationFor(name);
+    if (!anim || anim === 'idle' || animations[anim]) {
+      ignored.push(name);
+      continue;
+    }
+    const count = framesFor(byDir, 'south')?.length ?? 0;
+    const fps = anim in SHEET_LAYOUT ? SHEET_LAYOUT[anim as keyof typeof SHEET_LAYOUT].fps : EXTRA_FPS[anim];
+    animations[anim] = { frames: Array.from({ length: count }, (_, i) => columns.length + i), fps };
+    for (let i = 0; i < count; i++) columns.push(Object.fromEntries(DIRECTIONS.map((d) => [d, framesFor(byDir, d)?.[i]])));
+  }
+  animations.idle = { frames: [0], fps: 1 };
+  for (const [anim, hit] of Object.entries(hits)) {
+    if (!animations[anim]) throw new Error(`--hit : pas d'animation ${anim} dans cet export`);
+    if (!(hit >= 0 && hit < animations[anim].frames.length)) throw new Error(`--hit : ${anim} n'a que ${animations[anim].frames.length} images`);
+    animations[anim].hit = hit;
+  }
+
+  const cells = DIRECTIONS.map((d) => columns.map((c) => (c[d] ? load(c[d]!) : undefined)));
+  const missing = DIRECTIONS.filter((_, r) => cells[r].some((c) => !c));
+  if (missing.length) throw new Error(`directions incomplètes : ${missing.join(', ')}`);
+  const size = Math.max(...cells.flat().map((c) => Math.max(c!.width, c!.height)));
+  const sheet: Rgba = { width: size * columns.length, height: size * DIRECTIONS.length, data: Buffer.alloc(size * columns.length * size * DIRECTIONS.length * 4) };
+  cells.forEach((row, r) =>
+    row.forEach((img, c) => {
+      // PixelLab agrandit le canevas des animations en gardant le personnage centré.
+      const dx = c * size + (size - img!.width) / 2;
+      const dy = r * size + (size - img!.height) / 2;
+      for (let y = 0; y < img!.height; y++) img!.data.copy(sheet.data, ((dy + y) * sheet.width + dx) * 4, y * img!.width * 4, (y + 1) * img!.width * 4);
+    }),
+  );
+  const [top, bottom] = opaqueRows(load(rotations.south));
+  const sidecar: DirectionalSidecar = { frameWidth: size, frameHeight: size, bodyHeight: bottom - top + 1, ...(scale !== 1 ? { scale } : {}), animations };
+  mkdirSync(SPRITES, { recursive: true });
+  // Une copie par clé : chaque unité garde son fichier, remplaçable seule quand son vrai sprite arrive.
+  const png = encodeRgba(sheet);
+  for (const key of keys) {
+    writeFileSync(join(SPRITES, `${key}.png`), png);
+    writeFileSync(join(SPRITES, `${key}.directions.json`), JSON.stringify(sidecar, null, 2) + '\n');
+  }
+  console.log(`${keys.join(', ')} : ${columns.length} images × 8 directions de ${size} px · ${Object.keys(animations).join(', ')}`);
+  if (ignored.length) console.log(`  animations ignorées : ${ignored.join(', ')}`);
+  console.log('');
+  importSprites(true);
+}
+
+/** Découpage d'une sheet : description 8 directions ou export Aseprite si présents, sinon images carrées et disposition standard. */
 function readSheet(found: Found, problems: string[], key: string) {
   const { width, height } = pngSize(readFileSync(found.path));
+  const directionalPath = found.path.replace(/\.png$/, '.directions.json');
+  if (existsSync(directionalPath)) {
+    const d: DirectionalSidecar = JSON.parse(readFileSync(directionalPath, 'utf8'));
+    if (height !== d.frameHeight * DIRECTIONS.length) problems.push(`${key} : ${height} px de haut au lieu de 8 lignes de ${d.frameHeight} px`);
+    return { frameWidth: d.frameWidth, frameHeight: d.frameHeight, animations: d.animations as Json, directions: DIRECTIONS.length, bodyHeight: d.bodyHeight / (d.scale ?? 1) }; // grossir = compter un corps plus petit
+  }
   const asepritePath = found.path.replace(/\.png$/, '.json');
   let frameWidth = height;
   let frameHeight = height;
@@ -110,7 +232,7 @@ function readSheet(found: Found, problems: string[], key: string) {
   for (const [name, anim] of Object.entries<Json>(animations)) {
     if (anim.frames.some((f: number) => f >= count)) problems.push(`${key} : l'animation ${name} dépasse les ${count} images de la sheet`);
   }
-  return { frameWidth, frameHeight, animations };
+  return { frameWidth, frameHeight, animations, directions: undefined, bodyHeight: undefined as number | undefined };
 }
 
 function importSprites(write: boolean) {
@@ -131,17 +253,20 @@ function importSprites(write: boolean) {
     const sheet = readSheet(found, problems, key);
     const bricks = { ...(entry.bricks ?? {}), ...(sheet.animations.death ? { death: 'stay' } : {}) };
     if (!sheet.animations.death && bricks.death === 'stay') delete bricks.death;
+    // Une sheet en 8 directions s'affiche à la hauteur de la silhouette qu'elle remplace.
+    const size = sheet.bodyHeight && shape ? Math.round((sheet.frameHeight * shape.size) / sheet.bodyHeight) : sheet.frameHeight;
     manifest.assets[key] = {
       type: 'spritesheet',
       url: found.url,
       frameWidth: sheet.frameWidth,
       frameHeight: sheet.frameHeight,
-      size: sheet.frameHeight,
+      size,
+      ...(sheet.directions ? { directions: sheet.directions } : {}),
       animations: sheet.animations,
       ...(Object.keys(bricks).length ? { bricks } : {}),
       ...(shape ? { placeholder: shape } : {}),
     };
-    report.push(`  ${key.padEnd(16)} ${found.source.padEnd(12)} ${sheet.frameWidth}×${sheet.frameHeight} · ${Object.keys(sheet.animations).join(', ')}`);
+    report.push(`  ${key.padEnd(16)} ${found.source.padEnd(12)} ${sheet.frameWidth}×${sheet.frameHeight}${sheet.directions ? ' · 8 directions' : ''} · ${Object.keys(sheet.animations).join(', ')}`);
   }
 
   for (const [key, entry] of Object.entries<Json>(manifest.accessories)) {
@@ -176,7 +301,14 @@ function importSprites(write: boolean) {
 if (command === 'generate') generate();
 else if (command === 'import') importSprites(true);
 else if (command === 'check') process.exit(importSprites(false) ? 1 : 0);
+else if (command === 'pixellab') {
+  const scale = Number(args.find((a) => a.startsWith('--scale='))?.slice(8) ?? 1);
+  const [folder, ...keys] = args.filter((a) => !a.startsWith('--'));
+  const hit = args.find((a) => a.startsWith('--hit='))?.slice(6);
+  const hits = Object.fromEntries((hit ? hit.split(',') : []).map((p) => p.split(':')).map(([a, n]) => [a, Number(n)]));
+  pixellab(folder, keys, scale, hits);
+}
 else {
-  console.error(`Commande inconnue : ${command} (generate, import, check)`);
+  console.error(`Commande inconnue : ${command} (generate, import, check, pixellab)`);
   process.exit(1);
 }

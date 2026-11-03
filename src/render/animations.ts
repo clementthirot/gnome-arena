@@ -20,6 +20,22 @@ export interface UnitView {
   airDeath: boolean;
   /** Tournoie jusqu'à cet instant (ms, horloge de la scène) : tourbillon. */
   whirlUntil: number;
+  /** Sheet en 8 directions : direction affichée (indice dans DIRECTIONS). Absent : miroir gauche/droite. */
+  dir?: number;
+  /** Prochain point de la traînée de vol (ms, horloge de la scène). */
+  trailAt?: number;
+}
+
+/** Direction (indice dans DIRECTIONS) la plus proche d'un vecteur écran (y vers le bas). */
+export function directionOf(dx: number, dy: number): number {
+  const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+  return (((Math.round((90 - deg) / 45) % 8) + 8) % 8);
+}
+
+/** Clé d'animation d'une vue, déclinée par direction si la sheet en a. */
+export function animKey(view: UnitView, name: string): string {
+  const base = `${view.sprite.texture.key}_${name}`;
+  return view.dir === undefined ? base : `${base}_${view.dir}`;
 }
 
 export interface Particle {

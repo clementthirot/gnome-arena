@@ -32,7 +32,8 @@ describe('sprite sheets', () => {
       const file = join(PUBLIC, entry.url);
       expect(existsSync(file), key).toBe(true);
       const { width, height } = pngSize(readFileSync(file));
-      expect(height, key).toBe(entry.frameHeight);
+      // Sheet en 8 directions : une ligne par direction.
+      expect(height, key).toBe(entry.frameHeight * (entry.directions ?? 1));
       expect(width % entry.frameWidth, key).toBe(0);
       const frames = width / entry.frameWidth;
       for (const anim of Object.values<Record<string, number[]>>(entry.animations)) expect(Math.max(...anim.frames), key).toBeLessThan(frames);

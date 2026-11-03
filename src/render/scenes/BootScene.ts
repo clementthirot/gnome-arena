@@ -41,14 +41,19 @@ export class BootScene extends Phaser.Scene {
         if (fallback) this.textures.addCanvas(texture, drawPlaceholder(fallback));
         continue;
       }
+      // Sheet en 8 directions : une animation par ligne (clé suffixée par l'indice de direction).
+      const columns = this.textures.get(texture).source[0].width / entry.frameWidth;
+      const rows = entry.directions ? Array.from({ length: entry.directions }, (_, d) => d) : [undefined];
       for (const [name, anim] of Object.entries(entry.animations)) {
         if (!anim) continue;
-        this.anims.create({
-          key: `${texture}_${name}`,
-          frames: this.anims.generateFrameNumbers(texture, { frames: anim.frames }),
-          frameRate: anim.fps,
-          repeat: name === 'death' || name === 'attack' ? 0 : -1,
-        });
+        for (const d of rows) {
+          this.anims.create({
+            key: d === undefined ? `${texture}_${name}` : `${texture}_${name}_${d}`,
+            frames: this.anims.generateFrameNumbers(texture, { frames: anim.frames.map((f) => f + (d ?? 0) * columns) }),
+            frameRate: anim.fps,
+            repeat: name === 'death' || name === 'attack' ? 0 : -1,
+          });
+        }
       }
     }
     this.registry.set('fallbackVisuals', this.failed);

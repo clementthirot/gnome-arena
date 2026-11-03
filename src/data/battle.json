@@ -13,7 +13,7 @@
   "biome": "sable",
   "deployment": {
     "reserveShare": 0,
-    "reserveAt": 20,
+    "reserveAt": 10,
     "flankShare": 0
   },
   "armies": {
@@ -37,7 +37,7 @@
       2,
       5
     ],
-    "damageScale": 0.22,
+    "damageScale": 0.45,
     "knockbackDecay": 0.02,
     "separationStrength": 40,
     "wander": 6,
@@ -179,7 +179,7 @@
   "events": {
     "perMinute": 3,
     "endRamp": 5.5,
-    "firstAt": 12,
+    "firstAt": 5,
     "intervalJitter": [
       0.6,
       1.4
@@ -191,10 +191,10 @@
     "pointMargin": 0.1
   },
   "ending": {
-    "shrinkStart": 45,
-    "shrinkEnd": 75,
+    "shrinkStart": 23,
+    "shrinkEnd": 39,
     "minScale": 0.25,
-    "zoneDamage": 0.12,
-    "hardCap": 80
+    "zoneDamage": 0.2,
+    "hardCap": 48
   }
 }

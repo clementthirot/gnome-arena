@@ -5,7 +5,7 @@
     "label": "Gnome fantassin",
     "role": "melee",
     "visual": "gnome_melee",
-    "hp": 40,
+    "hp": 41,
     "damage": 6,
     "speed": 26,
     "radius": 5,

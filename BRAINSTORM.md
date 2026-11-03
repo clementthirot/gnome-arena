@@ -98,7 +98,7 @@ on dépose le PNG, `npm run sprites -- check` vérifie, `import` branche.
 | Mesure | Valeur |
 | --- | --- |
 | Durée moyenne d'un combat | 70 s (min 60, max 80) |
-| Combats entre 65 et 80 s | 92 % |
+| Combats entre 35 et 45 s (combat seul ; ~60 s avec intro et fin) | voir npm run bench |
 | Victoires | gnomes 52 % · gobelins 48 % |
 | Retournements (le perdant a été 20 % plus fort à un moment) | 10 % |
 | Fins en « héros seul contre 3 ennemis ou plus » | environ 50 % |

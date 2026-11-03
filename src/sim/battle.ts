@@ -541,6 +541,29 @@ export class Battle implements EffectHost {
     this.performAttack(u, target, attack, nx, ny, dist);
   }
 
+  /** Coup de poing (ou parfois coup de pied) : il part maintenant et touche après son temps d'armé. */
+  private meleeStrike(u: Unit, target: Unit, attack: AttackDef, nx: number, ny: number): void {
+    const m = this.tuning.melee;
+    const kick = this.rng.next() < m.kick.chance;
+    const windup = kick ? m.kick.windup : m.windup;
+    const damage = this.rollDamage(u, u.damage * attack.damage * (kick ? m.kick.damage : 1));
+    const knockback = attack.knockback * (kick ? m.kick.knockback : 1);
+    this.events.push({ type: 'attack', unit: u.index, target: target.index, kind: 'melee', move: kick ? 'kick' : 'punch', windup });
+    if (windup <= 0) {
+      this.applyDamage(target, damage, u, nx, ny, knockback);
+      return;
+    }
+    this.defer(windup, () => {
+      // Interrompu (mort, projeté, sonné) ou cible partie entre-temps : le coup tombe dans le vide.
+      if (u.state === 'dead' || u.z > 0 || u.stunTimer > 0 || target.state === 'dead' || target.z > 0) return;
+      const dx = target.x - u.x;
+      const dy = target.y - u.y;
+      const d = hypot(dx, dy) || 1;
+      if (d - u.radius - target.radius > attack.maxRange + m.reach) return;
+      this.applyDamage(target, damage, u, dx / d, dy / d, knockback);
+    });
+  }
+
   private chooseTarget(u: Unit, avoid = -1): Unit | undefined {
     const rules = this.data.battle.rules;
     this.releaseTarget(u);
@@ -673,12 +696,12 @@ export class Battle implements EffectHost {
   }
 
   private performAttack(u: Unit, target: Unit, attack: AttackDef, nx: number, ny: number, dist: number): void {
-    this.events.push({ type: 'attack', unit: u.index, target: target.index, kind: attack.kind });
-    const damage = this.rollDamage(u, u.damage * attack.damage);
     if (attack.kind === 'melee') {
-      this.applyDamage(target, damage, u, nx, ny, attack.knockback);
+      this.meleeStrike(u, target, attack, nx, ny);
       return;
     }
+    this.events.push({ type: 'attack', unit: u.index, target: target.index, kind: attack.kind });
+    const damage = this.rollDamage(u, u.damage * attack.damage);
     // Tir : on vise la position actuelle, avec dispersion. La cible peut avoir bougé entre-temps.
     const speed = attack.projectileSpeed ?? 150;
     const angle = this.rng.range(0, Math.PI * 2);

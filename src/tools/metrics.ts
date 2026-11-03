@@ -31,7 +31,7 @@ export interface BenchReport {
 
 /** Avance relative du futur perdant à partir de laquelle on parle de retournement (0.2 = 20 % plus fort). */
 export const COMEBACK_LEAD = 0.2;
-export const TARGET_WINDOW: [number, number] = [65, 80];
+export const TARGET_WINDOW: [number, number] = [35, 45];
 
 export function simulate(data: GameData, setup: BattleSetup): BattleSummary {
   const battle = new Battle(data, setup);
@@ -123,7 +123,7 @@ export function formatReport(r: BenchReport): string {
   return [
     `Combats simulés     : ${r.runs}`,
     `Durée moyenne       : ${r.avgDuration.toFixed(1)} s (min ${r.minDuration.toFixed(1)}, max ${r.maxDuration.toFixed(1)})`,
-    `Dans 65–80 s        : ${pct(r.inTargetWindow)}`,
+    `Dans ${TARGET_WINDOW[0]}–${TARGET_WINDOW[1]} s        : ${pct(r.inTargetWindow)}`,
     `Victoires           : gnomes ${pct(r.winRate.gnomes)} · gobelins ${pct(r.winRate.goblins)} · nuls ${pct(r.winRate.draw)}`,
     `Retournements       : ${pct(r.comebackRate)} (le perdant a été ${COMEBACK_LEAD * 100} % plus fort à un moment)`,
     `Héros seul contre 3+: ${pct(r.lastStandRate)}`,

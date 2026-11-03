@@ -457,6 +457,24 @@ const TuningSchema = z
         minImpact: z.number().min(0).default(60),
       })
       .default({}),
+    /** Corps à corps : le coup part, puis touche après un temps d'armé (calé sur l'image d'impact du sprite). */
+    melee: z
+      .object({
+        /** Délai entre le début du coup de poing et l'impact (s). */
+        windup: z.number().min(0).default(0.2),
+        /** Marge ajoutée à la portée au moment de l'impact : au-delà, la cible a esquivé. */
+        reach: z.number().min(0).default(3),
+        /** Coup de pied, de temps en temps à la place du coup de poing : plus lent, recul plus fort. */
+        kick: z
+          .object({
+            chance: fraction.default(0.2),
+            windup: z.number().min(0).default(0.3),
+            damage: positive.default(1.2),
+            knockback: positive.default(2.2),
+          })
+          .default({}),
+      })
+      .default({}),
     /** Unités projetées en l'air : elles ne combattent plus jusqu'à l'atterrissage. */
     airborne: z
       .object({

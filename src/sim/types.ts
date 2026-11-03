@@ -108,7 +108,8 @@ export interface Projectile {
 
 /** Événements émis pendant un tick, consommés par le rendu (animations) et les mesures. */
 export type BattleEvent =
-  | { type: 'attack'; unit: number; target: number; kind: 'melee' | 'ranged' }
+  /** Début d'une attaque ; au corps à corps, le coup touche windup secondes plus tard (événement hit). */
+  | { type: 'attack'; unit: number; target: number; kind: 'melee' | 'ranged'; move?: 'punch' | 'kick'; windup?: number }
   | { type: 'hit'; unit: number; source: number; damage: number; knockback: number }
   | { type: 'miss'; x: number; y: number; source: number }
   | { type: 'charge'; unit: number }

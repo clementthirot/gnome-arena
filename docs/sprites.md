@@ -65,6 +65,35 @@ Retouche dans Aseprite : vérifier que chaque cellule fait exactement la taille 
 `size` est la hauteur affichée en px monde (×4 à l'écran) : 16 pour une troupe, 24 à 32 pour un héros.
 Les briques d'animation (fente, flash, chute…) restent actives par-dessus ; on peut les couper par entrée avec `"bricks": { "death": "fade" }`.
 
+### Export PixelLab en 8 directions
+
+```bash
+npm run sprites -- pixellab "<dossier de l'export>" goblin_melee
+```
+
+Le dossier contient `metadata.json`, `rotations/<direction>.png` et `animations/<nom>/<direction>/frame_XXX.png`.
+La commande assemble `public/sprites/<clé>.png` (une ligne par direction : rotation fixe, puis les images
+de chaque animation) et `<clé>.directions.json`, puis lance `import`. L'entrée reçoit `"directions": 8` :
+le rendu choisit la ligne selon le déplacement, sinon selon la cible, au lieu du miroir gauche/droite.
+Noms reconnus : *punch, attack, slash…* → attack ; *kick* → kick (coup de pied, attaque secondaire) ;
+*taking punch, hurt…* → hurt (coup encaissé) ; *getting up* → getup (relevé après une projection) ;
+*walk, run* → walk ; *death, die* → death.
+Une animation absente retombe sur la rotation fixe (walk), sur le coup de poing (kick), ou sur les briques
+(death : chute). Pour une direction en double (« west-8062cc6e »), la première variante est prise.
+
+`--hit=attack:5,kick:3` indique l'image de chaque coup où il touche (rang dans l'animation, à partir de 0).
+Le rendu règle la cadence pour que cette image tombe pile au moment de l'impact simulé
+(`rules.tuning.melee.windup` et `kick.windup` dans battle.json). Sans `--hit`, l'image du milieu.
+`size` est calculé pour que le personnage ait la hauteur de sa silhouette ; `--scale=1.25` le grossit
+(mémorisé dans `<clé>.directions.json`, donc conservé par `import`).
+
+Plusieurs clés après le dossier partagent le même skin (une copie par clé, remplaçable seule plus tard) :
+
+```bash
+npm run sprites -- pixellab "<export gnome>" gnome_melee gnome_archer gnome_charger gnome_mage hero_bob hero_kevin hero_gertrude fan_gnome --scale=1.25
+npm run sprites -- pixellab "<export gobelin>" goblin_melee goblin_archer goblin_charger goblin_shaman hero_grok hero_snik hero_morva fan_goblin --scale=1.25
+```
+
 Accessoire :
 
 ```json

@@ -15,10 +15,22 @@
       #splitter { flex: 0 0 8px; cursor: col-resize; background: var(--line); }
       #splitter:hover, #splitter.dragging { background: var(--accent); }
       #right { flex: 1 1 auto; display: flex; flex-direction: column; background: #000; min-width: 240px; }
-      #previewBar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 8px; background: var(--panel); border-bottom: 2px solid var(--line); font-size: 13px; }
-      #previewBar button { padding: 6px 8px; font-size: 9px; }
-      #previewLabel { flex: 1 1 100%; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      #preview { flex: 1 1 auto; border: 0; width: 100%; background: #0e0c14; }
+      /* L'aperçu se regarde seulement : tout se pilote depuis la régie. */
+      #preview { flex: 1 1 auto; border: 0; width: 100%; background: #0e0c14; pointer-events: none; }
+      #previewControls { position: sticky; top: 0; z-index: 2; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 20px; background: var(--panel); border-bottom: 2px solid var(--line); }
+      #previewControls .tag { font: 10px "Press Start 2P", monospace; color: var(--accent); }
+      #previewLabel { flex: 1 1 200px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .spacer { flex: 1 1 auto; }
+      button.small { padding: 6px 8px; font-size: 9px; }
+      /* Réglages en accordéons */
+      details.group { border: 1px solid var(--line); border-radius: 6px; margin: 8px 0; background: #1b1727; }
+      details.group > summary { cursor: pointer; list-style: none; display: flex; gap: 8px; align-items: center; padding: 10px 12px; font-weight: 600; user-select: none; }
+      details.group > summary::-webkit-details-marker { display: none; }
+      details.group > summary::before { content: '▸'; color: var(--accent); transition: transform 0.15s; }
+      details.group[open] > summary::before { transform: rotate(90deg); }
+      details.group > summary .sum { margin-left: auto; font-weight: 400; color: var(--muted); font-size: 13px; }
+      details.group > .body { padding: 2px 12px 10px; }
+      details.group > .body .actions { display: flex; gap: 8px; margin-top: 6px; }
       header { padding: 16px 20px; border-bottom: 2px solid var(--line); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
       h1 { font: 16px "Press Start 2P", monospace; margin: 0; color: var(--accent); }
       h2 { font: 12px "Press Start 2P", monospace; margin: 0 0 12px; color: var(--accent); }
@@ -35,6 +47,9 @@
       button:disabled { opacity: 0.5; cursor: default; }
       input, select, textarea { background: #120f1a; color: var(--text); border: 1px solid var(--line); padding: 6px; border-radius: 4px; font: inherit; }
       input[type='number'] { width: 70px; }
+      label.slider { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(100px, 2fr) 64px; gap: 10px; }
+      label.slider input[type='range'] { width: 100%; accent-color: var(--accent); padding: 0; background: none; border: 0; }
+      label.slider output { text-align: right; font-variant-numeric: tabular-nums; color: var(--accent); }
       label { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin: 4px 0; }
       .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
       .muted { color: var(--muted); }
@@ -53,23 +68,23 @@
       <h1>RÉGIE</h1>
       <select id="arc"></select>
       <span id="arcInfo" class="muted"></span>
+      <span class="spacer"></span>
       <span class="muted">Largeur :</span>
-      <button data-ratio="0.666">2/3</button>
-      <button data-ratio="0.75">3/4</button>
-      <button data-ratio="0.8">4/5</button>
+      <button data-ratio="0.666" class="small">2/3</button>
+      <button data-ratio="0.75" class="small">3/4</button>
+      <button data-ratio="0.8" class="small">4/5</button>
     </header>
+    <div id="previewControls">
+      <span class="tag">APERÇU</span>
+      <span id="previewLabel">…</span>
+      <button id="replay">↻ Rejouer</button>
+      <button id="randomSeed">🎲 Seed aléatoire</button>
+    </div>
     <main id="app"></main>
     </div>
     <div id="splitter" title="Glisser pour redimensionner"></div>
     <div id="right">
-      <div id="previewBar">
-        <span id="previewLabel">Aperçu</span>
-        <button id="replay">↻ Rejouer</button>
-        <label><input type="checkbox" id="skipIntro" checked /> sans intro</label>
-        <select id="speed"><option value="1">x1</option><option value="2">x2</option><option value="4">x4</option></select>
-        <button id="openTab">Onglet</button>
-      </div>
-      <iframe id="preview" title="Aperçu de l'arène"></iframe>
+      <iframe id="preview" title="Aperçu de l'arène" tabindex="-1"></iframe>
     </div>
     </div>
     <script type="module" src="/src/regie/regie.ts"></script>

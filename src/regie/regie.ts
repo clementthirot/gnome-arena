@@ -26,8 +26,6 @@ let draftVote: { recipient: string; options: string[] } | undefined;
 
 const frame = document.getElementById('preview') as HTMLIFrameElement;
 const previewLabel = document.getElementById('previewLabel')!;
-const skipIntro = document.getElementById('skipIntro') as HTMLInputElement;
-const speedSelect = document.getElementById('speed') as HTMLSelectElement;
 
 interface PreviewTarget {
   episode: number;
@@ -39,12 +37,11 @@ interface PreviewTarget {
 }
 let previewTarget: PreviewTarget | undefined;
 
-function previewUrl(t: PreviewTarget, inTab = false): string {
+function previewUrl(t: PreviewTarget): string {
   const q = new URLSearchParams({ arc: arc!.id, ep: String(t.episode), seed: t.seed });
   if (t.draft) q.set('draft', JSON.stringify(t.draft));
   if (t.vote) q.set('vote', `${t.vote.recipient}:${t.vote.options.join(',')}`);
-  if (skipIntro.checked && !inTab) q.set('intro', '0');
-  if (!inTab) q.set('speed', speedSelect.value);
+  q.set('intro', '0');
   return `./?${q}`;
 }
 
@@ -68,9 +65,17 @@ function previewNext(delay = 600): void {
 }
 
 document.getElementById('replay')!.onclick = () => previewTarget && preview(previewTarget);
-skipIntro.onchange = () => previewTarget && preview(previewTarget);
-speedSelect.onchange = () => previewTarget && preview(previewTarget);
-document.getElementById('openTab')!.onclick = () => previewTarget && window.open(previewUrl(previewTarget, true), '_blank');
+// Nouvelle seed au hasard pour le prochain épisode (la sélection du scout est abandonnée).
+document.getElementById('randomSeed')!.onclick = () => {
+  if (!arc) return;
+  const n = arc.episodes.length + 1;
+  const seed = String(Math.floor(Math.random() * 1_000_000));
+  if (picked) {
+    picked = undefined;
+    render();
+  }
+  preview({ episode: n, seed, draft: readSettings?.(), label: `Épisode ${n} · seed ${seed} · brouillon` });
+};
 
 // Séparation régie / arène : glisser, ou boutons 2/3, 3/4, 4/5. Mémorisée dans ce navigateur.
 const root = document.documentElement;
@@ -137,6 +142,39 @@ function numberInput(value: number, step = 1, min = 0, max?: number): HTMLInputE
   i.value = String(value);
   return i;
 }
+
+/** Groupe repliable ; son état ouvert/fermé est mémorisé dans ce navigateur. */
+function group(id: string, title: string, open = false): { node: HTMLDetailsElement; body: HTMLElement; summary: HTMLElement } {
+  const node = el('details', { class: 'group' });
+  const summary = el('span', { class: 'sum' });
+  const body = el('div', { class: 'body' });
+  node.append(el('summary', {}, title, summary), body);
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(`regie.group.${id}`);
+  } catch {
+    // stockage indisponible
+  }
+  node.open = saved === null ? open : saved === '1';
+  node.addEventListener('toggle', () => {
+    try {
+      localStorage.setItem(`regie.group.${id}`, node.open ? '1' : '0');
+    } catch {
+      // stockage indisponible
+    }
+  });
+  return { node, body, summary };
+}
+
+/** Réglage au curseur, avec sa valeur affichée à côté. Une valeur hors bornes élargit le curseur. */
+function slider(text: string, value: number, step: number, min: number, max: number, format: (v: number) => string = String): { node: HTMLElement; input: HTMLInputElement } {
+  const input = el('input', { type: 'range', step: String(step), min: String(min), max: String(Math.max(max, value)) });
+  input.value = String(value);
+  const out = el('output', {}, format(value));
+  input.addEventListener('input', () => (out.textContent = format(Number(input.value))));
+  return { node: el('label', { class: 'slider' }, el('span', {}, text), input, out), input };
+}
+const percent = (v: number) => `${(v * 100).toFixed(v < 0.1 ? 1 : 0)} %`;
 
 // ------------------------------------------------------------ relais serveur
 
@@ -215,40 +253,85 @@ function voteForm(a: Arc, ep: Episode): HTMLElement {
 function settingsSection(a: Arc): HTMLElement {
   const s = el('section', {}, el('h2', {}, "RÉGLAGES DE L'ARC"));
   const cur: ArcSettings = a.settings;
+
+  const arena = group('arena', 'Arène', true);
   const biome = el('select');
   for (const b of data.biomes) biome.append(el('option', { value: b.id }, b.label));
   biome.value = cur.biome ?? a.biome ?? data.battle.biome;
-  s.append(el('label', {}, 'Biome', biome));
+  arena.body.append(el('label', {}, 'Biome', biome));
+  const syncArena = () => (arena.summary.textContent = data.biomes.find((b) => b.id === biome.value)?.label ?? biome.value);
+  s.append(arena.node);
 
-  // Effectifs : une valeur par type d'unité et par camp.
+  // Effectifs : un groupe par camp, le total en résumé.
   const armyInputs: { team: TeamId; unit: string; input: HTMLInputElement }[] = [];
+  const armySyncs: (() => void)[] = [];
   for (const team of ['gnomes', 'goblins'] as const) {
-    s.append(el('div', { class: team }, team === 'gnomes' ? 'Effectifs gnomes' : 'Effectifs gobelins'));
+    const g = group(`army.${team}`, team === 'gnomes' ? 'Effectifs gnomes' : 'Effectifs gobelins');
+    g.node.querySelector('summary')!.classList.add(team);
     const army = cur.armies?.[team] ?? data.battle.armies[team] ?? {};
+    const mine: HTMLInputElement[] = [];
     for (const unitId of Object.keys(data.battle.armies[team] ?? {})) {
-      const input = numberInput(army[unitId] ?? 0, 1, 0, 80);
+      const { node, input } = slider(data.units.find((u) => u.id === unitId)?.label ?? unitId, army[unitId] ?? 0, 1, 0, 60);
       armyInputs.push({ team, unit: unitId, input });
-      s.append(el('label', {}, data.units.find((u) => u.id === unitId)?.label ?? unitId, input));
+      mine.push(input);
+      g.body.append(node);
     }
+    armySyncs.push(() => (g.summary.textContent = `${mine.reduce((t, i) => t + Number(i.value), 0)} unités`));
+    s.append(g.node);
   }
 
-  s.append(el('div', {}, 'Incidents'));
-  const perMinute = numberInput(cur.eventsPerMinute ?? data.battle.events.perMinute, 0.5);
-  s.append(el('label', {}, 'Incidents par minute', perMinute));
+  const incidents = group('incidents', 'Incidents');
+  const perMinuteField = slider('Par minute', cur.eventsPerMinute ?? data.battle.events.perMinute, 0.5, 0, 10);
+  const perMinute = perMinuteField.input;
+  incidents.body.append(perMinuteField.node, el('div', { class: 'muted' }, 'Poids de chaque incident (0 = jamais)'));
   const weightInputs = data.events.map((e) => {
-    const input = numberInput(cur.eventWeights?.[e.id] ?? e.weight, 0.5);
-    s.append(el('label', {}, `${e.label} (poids)`, input));
+    const { node, input } = slider(e.label, cur.eventWeights?.[e.id] ?? e.weight, 0.5, 0, 10);
+    incidents.body.append(node);
     return { id: e.id, input };
   });
-
-  s.append(el('div', {}, 'Gags (probabilités 0 à 1)'));
-  const g = data.battle.gags;
-  const gagInputs = {
-    headClash: numberInput(cur.gagChances?.headClash ?? g.headClash.chance, 0.05, 0, 1),
-    victoryDance: numberInput(cur.gagChances?.victoryDance ?? g.victoryDance.chance, 0.01, 0, 1),
-    lostWeapon: numberInput(cur.gagChances?.lostWeapon ?? g.lostWeapon.chance, 0.005, 0, 1),
+  const allOff = button('Tout à 0', () => {
+    for (const { input } of weightInputs) {
+      input.value = '0';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
+  const defaults = button('Valeurs par défaut', () => {
+    weightInputs.forEach(({ id, input }) => {
+      input.value = String(data.events.find((e) => e.id === id)?.weight ?? 0);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+  allOff.classList.add('small');
+  defaults.classList.add('small');
+  incidents.body.append(el('div', { class: 'actions' }, allOff, defaults));
+  const syncIncidents = () => {
+    const active = weightInputs.filter(({ input }) => Number(input.value) > 0).length;
+    incidents.summary.textContent = `${perMinute.value} / min · ${active} actifs sur ${weightInputs.length}`;
   };
-  s.append(el('label', {}, 'Choc de têtes', gagInputs.headClash), el('label', {}, 'Danse de victoire', gagInputs.victoryDance), el('label', {}, 'Arme perdue', gagInputs.lostWeapon));
+  s.append(incidents.node);
+
+  const gagGroup = group('gags', 'Gags');
+  const g = data.battle.gags;
+  const gags = {
+    headClash: slider('Choc de têtes', cur.gagChances?.headClash ?? g.headClash.chance, 0.05, 0, 1, percent),
+    victoryDance: slider('Danse de victoire', cur.gagChances?.victoryDance ?? g.victoryDance.chance, 0.01, 0, 0.5, percent),
+    lostWeapon: slider('Arme perdue', cur.gagChances?.lostWeapon ?? g.lostWeapon.chance, 0.005, 0, 0.2, percent),
+  };
+  const gagInputs = { headClash: gags.headClash.input, victoryDance: gags.victoryDance.input, lostWeapon: gags.lostWeapon.input };
+  gagGroup.body.append(gags.headClash.node, gags.victoryDance.node, gags.lostWeapon.node);
+  const syncGags = () => (gagGroup.summary.textContent = Object.values(gagInputs).map((i) => percent(Number(i.value))).join(' · '));
+  s.append(gagGroup.node);
+
+  // Résumés des groupes repliés, tenus à jour pendant le réglage.
+  const syncAll = () => {
+    syncArena();
+    armySyncs.forEach((f) => f());
+    syncIncidents();
+    syncGags();
+  };
+  syncAll();
+  s.addEventListener('input', syncAll);
+  s.addEventListener('change', syncAll);
 
   readSettings = () => {
     const armies: NonNullable<ArcSettings['armies']> = {};

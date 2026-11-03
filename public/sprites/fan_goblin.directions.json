@@ -1,0 +1,26 @@
+{
+  "frameWidth": 48,
+  "frameHeight": 48,
+  "bodyHeight": 24,
+  "scale": 1.25,
+  "animations": {
+    "attack": {
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "fps": 14,
+      "hit": 5
+    },
+    "idle": {
+      "frames": [
+        0
+      ],
+      "fps": 1
+    }
+  }
+}

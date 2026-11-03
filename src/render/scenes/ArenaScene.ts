@@ -5,7 +5,7 @@ import type { GameData, HeroDef, TeamId } from '../../data/schema';
 import { Battle, opposingTeam, TEAMS } from '../../sim/battle';
 import { hashSeed } from '../../sim/rng';
 import type { BattleEvent, Unit } from '../../sim/types';
-import { Bricks, type BrickContext, type Particle, type UnitView } from '../animations';
+import { animKey, Bricks, directionOf, type BrickContext, type Particle, type UnitView } from '../animations';
 import { drawArenaBackground } from '../arenaArt';
 import { Director } from '../director';
 import { FxLayer } from '../fx';
@@ -14,7 +14,7 @@ import { Juice } from '../juice';
 import { sound } from '../audio';
 import { runningGagCanvas, Show } from '../show';
 import { closeCurtain } from '../curtain';
-import { asPlaceholder, bricksFor, effectVisual, manifest, resolveAsset } from '../manifest';
+import { asPlaceholder, bricksFor, DIRECTIONS, effectVisual, manifest, resolveAsset } from '../manifest';
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
 import { rand, seedRender, seedTick } from '../random';
 import { TEAM_COLORS, textStyle } from '../text';
@@ -70,6 +70,12 @@ interface Spectator {
   baseY: number;
   phase: number;
   side: 'gnomes' | 'goblins';
+  /** Animation jouée quand il exulte (coup de poing en l'air), si sa sheet en a une. */
+  cheerAnim?: string;
+  /** Image de repos à laquelle il revient après avoir exulté. */
+  restFrame?: number;
+  /** Teinte de base (variété de la foule), rétablie après un coup. */
+  tint?: number;
 }
 
 export class ArenaScene extends Phaser.Scene {
@@ -218,11 +224,13 @@ export class ArenaScene extends Phaser.Scene {
     // Clé absente du manifeste : on génère le placeholder de secours à la volée.
     if (!this.textures.exists(key) && entry.type === 'placeholder') this.textures.addCanvas(key, drawPlaceholder(entry));
     const sprite = this.add.sprite(u.x * SCALE, u.y * SCALE, this.textures.exists(key) ? key : '__MISSING');
-    if (this.anims.exists(`${key}_idle`)) sprite.play(`${key}_idle`);
     const baseScale = entry.type === 'placeholder' ? SCALE : (entry.size * SCALE) / entry.frameHeight;
     sprite.setScale(baseScale).setOrigin(0.5, 0.75);
-    sprite.setFlipX(u.facing < 0);
-    this.views.push({ sprite, bricks: bricksFor(entry), baseScale, offX: 0, offY: 0, squash: 1, facing: u.facing, spin: 0, airDeath: false, whirlUntil: 0 });
+    const directional = entry.type === 'spritesheet' && !!entry.directions && this.anims.exists(`${key}_idle_0`);
+    if (!directional) sprite.setFlipX(u.facing < 0);
+    const view: UnitView = { sprite, bricks: bricksFor(entry), baseScale, offX: 0, offY: 0, squash: 1, facing: u.facing, spin: 0, airDeath: false, whirlUntil: 0, dir: directional ? directionOf(u.facing, 0) : undefined };
+    if (this.anims.exists(animKey(view, 'idle'))) sprite.play(animKey(view, 'idle'));
+    this.views.push(view);
 
     if (u.hero) {
       const team = TEAM_COLORS[u.team];
@@ -258,8 +266,33 @@ export class ArenaScene extends Phaser.Scene {
       goblins: { body: ['#5a9a2c', '#7cc243', '#4a7a26'], hat: ['#7a4a26', '#5a3010', '#9a6a36'] },
     };
     let k = 0;
-    const place = (x: number, y: number, side: 'gnomes' | 'goblins') => {
+    const cfg = manifest.staging.crowd;
+    const failed = this.registry.get('fallbackVisuals') as Set<string> | undefined;
+    const fanSheet = (side: 'gnomes' | 'goblins') => {
+      const key = side === 'gnomes' ? 'fan_gnome' : 'fan_goblin';
+      const entry = manifest.assets[key];
+      const texture = `unit_${key}`;
+      if (!cfg.useSprites || entry?.type !== 'spritesheet' || failed?.has(key) || !this.textures.exists(texture)) return undefined;
+      const columns = this.textures.get(texture).source[0].width / entry.frameWidth;
+      return { entry, texture, columns };
+    };
+    const sheets = { gnomes: fanSheet('gnomes'), goblins: fanSheet('goblins') };
+    const place = (x: number, y: number, side: 'gnomes' | 'goblins', facing: 'south' | 'north' | 'east' | 'west') => {
       if (Show.logeContains(field, x, y)) return;
+      const sheet = sheets[side];
+      if (sheet) {
+        // Le supporter regarde l'arène ; sans 8 directions, première image retournée vers le centre.
+        const row = sheet.entry.directions ? DIRECTIONS.indexOf(facing) : 0;
+        const sprite = this.add.sprite(x * SCALE, y * SCALE, sheet.texture, row * sheet.columns);
+        sprite.setScale(((sheet.entry.size * SCALE) / sheet.entry.frameHeight) * cfg.scale).setOrigin(0.5, 0.75).setDepth(-900 + y);
+        if (!sheet.entry.directions) sprite.setFlipX(facing === 'west');
+        // Un peu de variété dans la foule : teintes légèrement différentes.
+        const shade = 0xff - Math.floor(rand() * 40);
+        const tint = (shade << 16) | (shade << 8) | shade;
+        sprite.setTint(tint);
+        this.spectators.push({ sprite, baseY: y * SCALE, phase: rand() * Math.PI * 2, side, tint, restFrame: row * sheet.columns, cheerAnim: sheet.entry.animations.attack ? `${sheet.texture}_attack${sheet.entry.directions ? `_${row}` : ''}` : undefined });
+        return;
+      }
       const pal = palettes[side];
       const key = `spect_${side}_${k % 9}`;
       if (!this.textures.exists(key)) {
@@ -272,14 +305,14 @@ export class ArenaScene extends Phaser.Scene {
     // Gobelins en haut (derrière leur armée), gnomes en bas, mélange sur les côtés.
     for (let row = 0; row < 3; row++) {
       for (let x = 8 + (row % 2) * 4; x < width - 4; x += 8 + Math.floor(rand() * 3)) {
-        place(x, field.y - 8 - row * 9, 'goblins');
-        place(x, field.y + field.height + 14 + row * 9, 'gnomes');
+        place(x, field.y - 8 - row * 9, 'goblins', 'south');
+        place(x, field.y + field.height + 14 + row * 9, 'gnomes', 'north');
       }
     }
     for (let y = field.y + 8; y < field.y + field.height; y += 10) {
       const side = y < field.y + field.height / 2 ? 'goblins' : 'gnomes';
-      place(7, y, side);
-      place(width - 7, y, side);
+      place(7, y, side, 'east');
+      place(width - 7, y, side, 'west');
     }
   }
 
@@ -532,9 +565,21 @@ export class ArenaScene extends Phaser.Scene {
           const u = units[e.unit];
           const t = units[e.target];
           const d = Math.hypot(t.x - u.x, t.y - u.y) || 1;
-          this.playOnce(this.views[e.unit], 'attack');
-          if (e.kind === 'melee') Bricks.attack(ctx, this.views[e.unit], (t.x - u.x) / d, (t.y - u.y) / d);
-          else Bricks.shoot(ctx, this.views[e.unit], (t.x - u.x) / d, (t.y - u.y) / d);
+          // Le coup part vers la cible, quelle que soit la direction de marche.
+          if (this.views[e.unit].dir !== undefined) this.views[e.unit].dir = directionOf(t.x - u.x, t.y - u.y);
+          if (e.kind === 'melee') {
+            const view = this.views[e.unit];
+            const windup = e.windup ?? 0;
+            this.playStrike(view, e.move === 'kick' ? 'kick' : 'attack', windup);
+            // La fente part avec le coup, au moment où il touche.
+            const lunge = () => view.sprite.active && Bricks.attack(ctx, view, (t.x - u.x) / d, (t.y - u.y) / d);
+            if (windup > 0) this.time.delayedCall((windup * 1000) / this.simRate(), lunge);
+            else lunge();
+          } else {
+            // Un skin en 8 directions n'a pas d'animation de tir : on ne joue pas un coup de poing à distance.
+            if (this.views[e.unit].dir === undefined) this.playOnce(this.views[e.unit], 'attack');
+            Bricks.shoot(ctx, this.views[e.unit], (t.x - u.x) / d, (t.y - u.y) / d);
+          }
           break;
         }
         case 'hit': {
@@ -542,6 +587,7 @@ export class ArenaScene extends Phaser.Scene {
           if (e.knockback > 100) this.juice.debris(u.x, u.y, 3);
           if (e.damage > 8) this.balanceKick = Math.min(1, this.balanceKick + 0.5);
           Bricks.hurt(ctx, this.views[e.unit], u.x, u.y - u.radius, e.knockback > 100);
+          if (u.state !== 'dead' && u.z <= 0) this.playReaction(this.views[e.unit], 'hurt');
           break;
         }
         case 'impact':
@@ -639,6 +685,7 @@ export class ArenaScene extends Phaser.Scene {
           if (loud) this.nextSplashAt = this.time.now + splash.gapMs;
           const word = loud ? { text: splash.words[Math.floor(rand() * splash.words.length)], color: splash.color } : undefined;
           Bricks.land(ctx, this.views[e.unit], e.x, e.y, e.impact, word);
+          if (!e.dead) this.playReaction(this.views[e.unit], 'getup');
           if (e.dead) {
             this.bloodPuddle(units[e.unit], e.x, e.y);
             // Le corps retourne au sol, sous les vivants.
@@ -700,8 +747,48 @@ export class ArenaScene extends Phaser.Scene {
 
   /** Joue une animation ponctuelle de la sprite sheet si le manifeste la fournit. */
   private playOnce(view: UnitView, name: 'attack' | 'death'): void {
-    const key = `${view.sprite.texture.key}_${name}`;
+    const key = animKey(view, name);
     if (this.anims.exists(key)) view.sprite.play(key);
+  }
+
+  /** Vitesse de la simulation par rapport au temps réel (accéléré, ralenti). */
+  private simRate(): number {
+    return Math.max(0.05, this.timeScale * this.slowmo);
+  }
+
+  /**
+   * Coup au corps à corps : l'image d'impact de l'animation tombe pile quand le coup touche.
+   * Sans animation de coup de pied, on rejoue le coup de poing.
+   */
+  private playStrike(view: UnitView, name: 'attack' | 'kick', windup: number): void {
+    const entry = manifest.assets[view.sprite.texture.key.replace(/^unit_/, '')];
+    const anims = entry?.type === 'spritesheet' ? entry.animations : undefined;
+    const move = name === 'kick' && anims?.kick && this.anims.exists(animKey(view, 'kick')) ? 'kick' : 'attack';
+    const anim = anims?.[move];
+    const key = animKey(view, move);
+    if (!anim || !this.anims.exists(key)) return;
+    const hit = anim.hit ?? Math.floor(anim.frames.length / 2);
+    // hit images avant l'impact : la cadence qui les fait tenir dans le temps d'armé.
+    const fps = windup > 0 && hit > 0 ? Phaser.Math.Clamp((hit / windup) * this.simRate(), 4, 40) : anim.fps;
+    view.sprite.play({ key, frameRate: fps });
+  }
+
+  /** Réaction (coup encaissé, relevé) : n'interrompt pas un coup en train de partir. */
+  private playReaction(view: UnitView, name: 'hurt' | 'getup'): void {
+    const key = animKey(view, name);
+    const current = view.sprite.anims.currentAnim?.key ?? '';
+    if (view.sprite.anims.isPlaying && /_(attack|kick)/.test(current)) return;
+    const anim = this.anims.get(key);
+    if (anim) view.sprite.play({ key, frameRate: anim.frameRate * this.simRate() });
+  }
+
+  /** En vol : pose figée du coup encaissé (sinon la pose fixe), dans la direction du regard. */
+  private holdAirPose(view: UnitView): void {
+    const hurt = this.anims.get(animKey(view, 'hurt')) ?? this.anims.get(animKey(view, 'idle'));
+    if (!hurt) return;
+    const frame = hurt.frames[Math.min(2, hurt.frames.length - 1)].textureFrame;
+    if (view.sprite.anims.isPlaying) view.sprite.anims.stop();
+    if (view.sprite.frame.name !== String(frame)) view.sprite.setFrame(frame);
   }
 
   /** Une flèche ratée près du bord file dans les gradins : un spectateur la prend. Purement visuel. */
@@ -744,15 +831,54 @@ export class ArenaScene extends Phaser.Scene {
     return true;
   }
 
-  /** Un spectateur prend un coup : il rougit, sursaute, et râle parfois. */
+  /** Un spectateur prend un coup : il est éjecté hors de l'écran, et les gradins se vident peu à peu. */
   private hurtSpectator(s: Spectator, shout: boolean): void {
     if (!s.sprite.visible) return;
+    if (s !== this.gagSpectator && manifest.staging.crowd.ejectOnHit) {
+      this.ejectSpectator(s, shout);
+      return;
+    }
     s.sprite.setTint(0xff6060);
-    this.time.delayedCall(250, () => s.sprite.clearTint());
+    this.time.delayedCall(250, () => (s.tint === undefined ? s.sprite.clearTint() : s.sprite.setTint(s.tint)));
     this.tweens.add({ targets: s.sprite, y: s.baseY - 5 * SCALE, duration: 110, yoyo: true });
     if (!shout) return;
     const ouch = this.add.text(s.sprite.x, s.baseY - 9 * SCALE, 'AÏE !', textStyle(22, '#ffffff')).setOrigin(0.5, 1).setDepth(9850);
     this.tweens.add({ targets: ouch, y: ouch.y - 30, alpha: 0, delay: 300, duration: 500, onComplete: () => ouch.destroy() });
+  }
+
+  private ejectSpectator(s: Spectator, shout: boolean): void {
+    this.spectators = this.spectators.filter((o) => o !== s);
+    const sprite = s.sprite;
+    this.tweens.killTweensOf(sprite);
+    if (sprite instanceof Phaser.GameObjects.Sprite) sprite.anims.stop();
+    sprite.setTint(0xff6060).setDepth(9400);
+    // Loin du centre de l'arène, vers le haut : il sort de l'écran par le bord le plus proche.
+    const f = this.battle.field;
+    const dx = sprite.x / SCALE - (f.x + f.width / 2);
+    const dy = s.baseY / SCALE - (f.y + f.height / 2);
+    const side = Math.abs(dx) / f.width > Math.abs(dy) / f.height;
+    const vx = (side ? Math.sign(dx) * (420 + rand() * 260) : (rand() - 0.5) * 300) * SCALE / 4;
+    const vy = (side ? -260 - rand() * 200 : dy < 0 ? -700 - rand() * 250 : -380 - rand() * 200) * SCALE / 4;
+    const spin = (rand() < 0.5 ? -1 : 1) * (540 + rand() * 540);
+    const x0 = sprite.x;
+    const y0 = sprite.y;
+    const gravity = 1400 * SCALE / 4;
+    const scale = sprite.scaleX;
+    const state = { t: 0 };
+    this.tweens.add({
+      targets: state,
+      t: 1.4,
+      duration: 1400,
+      onUpdate: () => {
+        sprite.setPosition(x0 + vx * state.t, y0 + vy * state.t + 0.5 * gravity * state.t * state.t);
+        sprite.setAngle(spin * state.t).setScale(scale * (1 + state.t * 0.6));
+      },
+      onComplete: () => sprite.destroy(),
+    });
+    if (shout) {
+      const ouch = this.add.text(x0, s.baseY - 9 * SCALE, 'AÏE !', textStyle(22, '#ffffff')).setOrigin(0.5, 1).setDepth(9850);
+      this.tweens.add({ targets: ouch, y: ouch.y - 30, alpha: 0, delay: 300, duration: 500, onComplete: () => ouch.destroy() });
+    }
   }
 
   /** Explosions et rayons qui débordent sur les gradins : les spectateurs à portée trinquent. */
@@ -939,13 +1065,31 @@ export class ArenaScene extends Phaser.Scene {
       const v = this.views[i];
       const x = (this.prev[i].x + (u.x - this.prev[i].x) * alpha + v.offX) * SCALE;
       const y = (this.prev[i].y + (u.y - this.prev[i].y) * alpha + v.offY) * SCALE;
-      const z = Math.max(0, this.prev[i].z + (u.z - this.prev[i].z) * alpha);
+      const flight = manifest.staging.flight;
+      // Hauteur affichée exagérée : le corps se détache franchement de son ombre.
+      const z = Math.max(0, this.prev[i].z + (u.z - this.prev[i].z) * alpha) * flight.heightScale;
       v.sprite.setPosition(Math.round(x), Math.round(y - z * SCALE));
       if (z > 0 || u.z > 0) {
-        // En l'air : ombre au sol qui rétrécit avec la hauteur, vrille, légère mise à l'échelle.
-        const shrink = Math.max(0.3, 1 - z / 160);
-        this.airGfx.fillStyle(0x000000, 0.35 * shrink).fillEllipse(x, y, u.radius * 2.4 * SCALE * shrink, u.radius * 1.1 * SCALE * shrink);
-        v.sprite.setAngle(v.sprite.angle + v.spin * dt);
+        // Pose de vol tant que la simulation le dit en l'air (pas sur l'image d'atterrissage interpolée, qui couperait le relevé).
+        if (u.state !== 'dead' && u.z > 0) this.holdAirPose(v);
+        // En l'air : l'ombre reste au sol et rétrécit avec la hauteur, le corps suit son arc.
+        const shrink = Math.max(0.3, 1 - z / 200);
+        this.airGfx.fillStyle(0x000000, flight.shadow * shrink).fillEllipse(x, y, u.radius * 2.4 * SCALE * shrink, u.radius * 1.1 * SCALE * shrink);
+        if (u.state === 'dead' && flight.koSpin) v.sprite.setAngle(v.sprite.angle + v.spin * dt);
+        else {
+          // Tête dans le sens du vol : penché en montant, à plat au sommet, plongeant en retombant.
+          const sx = u.vx;
+          const sy = u.vy - u.vz * flight.heightScale;
+          const travel = (Math.atan2(sx, -sy) * 180) / Math.PI;
+          // Les petits rebonds restent presque droits : l'inclinaison grandit avec la hauteur.
+          const target = Phaser.Math.Angle.WrapDegrees(travel * flight.tilt * Math.min(1, z / 25));
+          v.sprite.setAngle(v.sprite.angle + Phaser.Math.Angle.ShortestBetween(v.sprite.angle, target) * Math.min(1, dt * 14));
+        }
+        if (flight.trailMs > 0 && this.time.now >= (v.trailAt ?? 0)) {
+          // Pointillés de la trajectoire, qui s'effacent derrière le personnage.
+          v.trailAt = this.time.now + flight.trailMs;
+          this.particles.push({ x: x / SCALE, y: (y - z * SCALE) / SCALE - 2, vx: 0, vy: 0, life: 0.35, maxLife: 0.35, color: 0xfff4d6, size: 1 });
+        }
         const grow = 1 + Math.min(0.35, z / 300);
         v.sprite.setScale(v.baseScale * grow * (2 - v.squash), v.baseScale * grow * v.squash);
         v.sprite.setDepth(9500 + y * 0.001);
@@ -955,12 +1099,24 @@ export class ArenaScene extends Phaser.Scene {
       }
       if (u.state === 'dead') continue;
       v.facing = u.facing;
-      v.sprite.setFlipX(u.facing < 0);
       v.sprite.setDepth(y * 0.01);
       // Petit sautillement de marche, plus nerveux en fuite.
-      const moving = Math.hypot(u.vx, u.vy) > 4;
-      const anim = `${v.sprite.texture.key}_${moving ? 'walk' : 'idle'}`;
-      const busy = v.sprite.anims.isPlaying && v.sprite.anims.currentAnim?.key.endsWith('_attack');
+      const stunned = u.stunTimer > 0;
+      const moving = !stunned && Math.hypot(u.vx, u.vy) > 4;
+      // Un coup qui part va jusqu'au bout ; une réaction (coup encaissé, relevé) cède dès que l'unité repart.
+      const current = v.sprite.anims.currentAnim?.key ?? '';
+      const busy = v.sprite.anims.isPlaying && (/_(attack|kick)/.test(current) || (/_(hurt|getup)/.test(current) && !moving));
+      if (v.dir === undefined) v.sprite.setFlipX(u.facing < 0);
+      else if (!busy) {
+        // 8 directions : on regarde où l'on va, sinon sa cible, sinon son camp d'en face.
+        const t = u.target >= 0 ? units[u.target] : undefined;
+        if (moving) v.dir = directionOf(u.vx, u.vy);
+        else if (t && t.state !== 'dead') v.dir = directionOf(t.x - u.x, t.y - u.y);
+        else v.dir = directionOf(u.facing, 0);
+      }
+      const walk = animKey(v, 'walk');
+      // Sonné au sol : pas de marche sur place (le relevé, s'il joue, va jusqu'au bout).
+      const anim = moving && this.anims.exists(walk) ? walk : animKey(v, 'idle');
       if (!busy && v.sprite.anims.currentAnim?.key !== anim && this.anims.exists(anim)) v.sprite.play(anim);
       const celebrating = this.ending && this.battle.result?.winner === u.team;
       const hop = moving || celebrating ? Math.abs(Math.sin(this.time.now / (u.state === 'flee' || celebrating ? 50 : 90) + i)) * (celebrating ? 0.2 : 0.08) : 0;
@@ -1065,6 +1221,10 @@ export class ArenaScene extends Phaser.Scene {
     for (const s of this.spectators) {
       if (s.side !== side || rand() > share) continue;
       this.tweens.add({ targets: s.sprite, y: s.baseY - 3 * SCALE, duration: 120, yoyo: true, repeat: 1, delay: rand() * 200 });
+      if (s.cheerAnim && s.sprite instanceof Phaser.GameObjects.Sprite && this.anims.exists(s.cheerAnim)) {
+        const sprite = s.sprite;
+        sprite.play(s.cheerAnim).once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setFrame(s.restFrame ?? 0));
+      }
     }
   }
 

@@ -12,7 +12,7 @@ murs, cadence des incidents…) sont dans `src/data/battle.json` (`rules.tuning`
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173 — régie : http://localhost:5173/regie.html
+npm run dev          # http://localhost:5173 ouvre la régie ; l'arène seule : http://localhost:5173/?seed=1
 npm test             # déterminisme, données, mêlée vivante, durée, effets, arcs
 npm run bench        # mode accéléré sans rendu (100 seeds)
 npm run episode      # état de l'arc en cours
@@ -122,7 +122,7 @@ Les effets de zone peuvent se centrer sur le lanceur (`"at": "self"`, le tourbil
 - **Unités en l'air** : projetées par un météore, une charge ou un K.O. aérien, elles volent loin, ne combattent plus pendant le vol et restent étourdies à l'atterrissage. Les héros vaincus s'envolent toujours, les troupes de temps en temps (`rules.tuning.koLaunch`).
 - **Rebonds** : un gros recul fait sauter l'unité, qui rebondit au sol tant qu'elle retombe vite (`rules.tuning.bounce`).
 - **Supporters** : de temps en temps, des spectateurs sautent le muret et rejoignent un camp, ou le camp mené (jusqu'à 58 s).
-- **Fin maîtrisée** : un gaz toxique sort des conduits et resserre l'arène de 45 s à 75 s ; victoire aux PV restants à 80 s.
+- **Fin maîtrisée** : un gaz toxique sort des conduits et resserre l'arène de 23 s à 39 s ; victoire aux PV restants à 48 s (combat d'environ 40 s, une minute avec l'intro et la fin).
 
 ## Gags (moteur, rares, probabilité et plafond par combat dans `battle.json > gags`)
 

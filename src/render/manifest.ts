@@ -40,7 +40,15 @@ const PlaceholderSchema = PlaceholderShapeSchema.extend({
   bricks: BricksSchema.partial().optional(),
 });
 
-const AnimationSchema = z.object({ frames: z.array(z.number().int().min(0)).min(1), fps: z.number().positive() });
+/** Ordre des lignes d'une sheet en 8 directions (sens horaire depuis le bas de l'écran). */
+export const DIRECTIONS = ['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'] as const;
+
+const AnimationSchema = z.object({
+  frames: z.array(z.number().int().min(0)).min(1),
+  fps: z.number().positive(),
+  /** Attaques : rang (dans frames) de l'image où le coup touche, calée sur l'instant de l'impact. Défaut : milieu. */
+  hit: z.number().int().min(0).optional(),
+});
 
 const SpriteSheetSchema = z.object({
   type: z.literal('spritesheet'),
@@ -50,7 +58,20 @@ const SpriteSheetSchema = z.object({
   frameHeight: z.number().int().positive(),
   /** Taille d'affichage en px monde (hauteur). */
   size: z.number().positive(),
-  animations: z.object({ idle: AnimationSchema, walk: AnimationSchema.optional(), attack: AnimationSchema.optional(), death: AnimationSchema.optional() }),
+  /** 8 : une ligne par direction (ordre DIRECTIONS), les indices d'animation comptent dans la ligne. Sinon une seule ligne, retournée en miroir. */
+  directions: z.literal(8).optional(),
+  animations: z.object({
+    idle: AnimationSchema,
+    walk: AnimationSchema.optional(),
+    attack: AnimationSchema.optional(),
+    /** Attaque secondaire (coup de pied) ; à défaut, l'attaque principale est rejouée. */
+    kick: AnimationSchema.optional(),
+    /** Réaction à un coup encaissé. */
+    hurt: AnimationSchema.optional(),
+    /** Relevé après une projection. */
+    getup: AnimationSchema.optional(),
+    death: AnimationSchema.optional(),
+  }),
   bricks: BricksSchema.partial().optional(),
   /** Silhouette de secours si l'image ne charge pas ; sert aussi à générer une sheet de remplacement. */
   placeholder: PlaceholderShapeSchema.optional(),
@@ -121,6 +142,27 @@ const StagingSchema = z.object({
       .default({}),
   }),
   heroIntro: z.object({ enabled: z.boolean().default(true), duration: z.number().positive().default(2.8) }),
+  /** Projection : le personnage se détache de son ombre et suit son arc. Purement visuel. */
+  flight: z.object({
+    /** Hauteur affichée = hauteur simulée × ce facteur. */
+    heightScale: z.number().positive().default(1.7),
+    /** Part de l'angle de la trajectoire appliquée au corps (0 = droit, 1 = tête dans le sens du vol). */
+    tilt: z.number().min(0).max(1).default(0.75),
+    /** Les K.O. vrillent au lieu de suivre la trajectoire. */
+    koSpin: z.boolean().default(true),
+    /** Opacité de l'ombre au sol, au décollage. */
+    shadow: z.number().min(0).max(1).default(0.5),
+    /** Traînée en pointillés derrière le personnage (ms entre deux points, 0 = aucune). */
+    trailMs: z.number().min(0).default(45),
+  }).default({}),
+  /** Sprites des supporters dans les gradins (clés fan_* du manifeste), à la place des silhouettes dessinées. */
+  crowd: z.object({
+    useSprites: z.boolean().default(true),
+    /** Taille par rapport au supporter qui descend dans l'arène. */
+    scale: z.number().positive().default(0.8),
+    /** Un spectateur touché est éjecté hors de l'écran (sinon il rougit et sursaute). */
+    ejectOnHit: z.boolean().default(true),
+  }).default({}),
   /** Onomatopée de bande dessinée quand un K.O. aérien retombe. */
   koSplash: z.object({
     words: z.array(z.string()).min(1),
