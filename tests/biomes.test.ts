@@ -51,7 +51,7 @@ describe('unités spéciales et déploiement', () => {
   });
 
   it('par défaut, aucun mage et aucune réserve', () => {
-    expect(data.battle.armies.gnomes.gnome_mage).toBe(0);
+    expect(data.battle.armies.gnomes?.gnome_mage).toBe(0);
     expect(data.battle.deployment.reserveShare).toBe(0);
   });
 

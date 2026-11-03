@@ -1,7 +1,9 @@
 // Enregistrement automatique du canvas en vidéo, dans le navigateur (OBS reste la solution de repli).
 // La vidéo sort à la résolution interne du jeu : 1080 x 1920.
 
-const CANDIDATES = ['video/mp4;codecs=avc1.640028', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+// Avec le son, Chrome ne produit rien en mp4 + aac : le webm (vp9 + opus) passe d'abord.
+const WITH_AUDIO = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+const VIDEO_ONLY = ['video/mp4;codecs=avc1.640028', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
 
 export interface Recording {
   readonly mimeType: string;
@@ -9,14 +11,16 @@ export interface Recording {
   stop(): Promise<Blob>;
 }
 
-export function pickMimeType(): string | undefined {
-  return CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type));
+export function pickMimeType(withAudio = false): string | undefined {
+  return (withAudio ? WITH_AUDIO : VIDEO_ONLY).find((type) => MediaRecorder.isTypeSupported(type));
 }
 
-export function startRecording(canvas: HTMLCanvasElement, filename: string, fps = 60): Recording {
-  const mimeType = pickMimeType();
+/** audio : piste du son du jeu, mixée dans la vidéo. */
+export function startRecording(canvas: HTMLCanvasElement, filename: string, audio?: MediaStreamTrack, fps = 60): Recording {
+  const mimeType = pickMimeType(!!audio);
   if (!mimeType) throw new Error("Ce navigateur ne sait pas enregistrer de vidéo (MediaRecorder) : utiliser OBS.");
   const stream = canvas.captureStream(fps);
+  if (audio) stream.addTrack(audio);
   const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 12_000_000 });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => {

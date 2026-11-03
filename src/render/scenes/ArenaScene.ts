@@ -11,6 +11,7 @@ import { Director } from '../director';
 import { FxLayer } from '../fx';
 import { GasLayer } from '../gas';
 import { Juice } from '../juice';
+import { sound } from '../audio';
 import { runningGagCanvas, Show } from '../show';
 import { asPlaceholder, bricksFor, effectVisual, manifest, resolveAsset } from '../manifest';
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
@@ -295,6 +296,7 @@ export class ArenaScene extends Phaser.Scene {
     const kb = this.input.keyboard;
     // Pendant un enregistrement, aucune touche ne doit dérégler la vidéo.
     if (this.params.record) return;
+    kb?.on('keydown-M', () => sound.toggleMute());
     kb?.on('keydown-SPACE', () => (this.paused = !this.paused));
     kb?.on('keydown-R', () => this.restart(this.params.seed));
     kb?.on('keydown-N', () => this.scene.restart({ ...this.params, seed: nextSeed(this.params.seed), episode: undefined }));
@@ -320,6 +322,7 @@ export class ArenaScene extends Phaser.Scene {
     if (this.params.episode) {
       title.push(this.add.text(w / 2, h * 0.3, `ÉPISODE ${this.params.episode.number}`, textStyle(44, '#ffe14a')).setOrigin(0.5).setDepth(9951));
     }
+    sound.fanfare();
     // Le titre tombe du ciel et rebondit.
     gnomes.y = -200;
     goblins.y = -200;
@@ -340,6 +343,7 @@ export class ArenaScene extends Phaser.Scene {
     if (countMs) {
       ['3', '2', '1'].forEach((n, i) =>
         this.time.delayedCall(TITLE_MS + heroesMs + pronoMs + i * 550, () => {
+          sound.play('beep');
           const t = this.add.text(w / 2, h / 2, n, textStyle(160, '#ffffff')).setOrigin(0.5).setDepth(9952).setScale(2);
           this.tweens.add({ targets: t, scale: 0.9, duration: 260, ease: 'Back.easeOut' });
           this.tweens.add({ targets: t, alpha: 0, delay: 380, duration: 150, onComplete: () => t.destroy() });
@@ -354,6 +358,8 @@ export class ArenaScene extends Phaser.Scene {
     }
     this.time.delayedCall(goAt, () => {
       this.tweens.add({ targets: title, alpha: 0, duration: 200 });
+      sound.play('gong');
+      sound.startMusic();
       const go = this.add.text(w / 2, h / 2, 'COMBAT !', textStyle(110, '#ffe14a')).setOrigin(0.5).setDepth(9951).setScale(2.5).setAlpha(0);
       this.tweens.add({ targets: go, scale: 1, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
       this.tweens.add({ targets: [go, veil], alpha: 0, delay: 650, duration: 250, onComplete: () => go.destroy() });
@@ -507,6 +513,7 @@ export class ArenaScene extends Phaser.Scene {
     const units = this.battle.units;
     for (const e of events) {
       this.show.onEvent(e);
+      this.soundFor(e);
       if (e.type === 'death') this.lastVictim = e.unit;
       if (e.type === 'hit' && e.source >= 0 && units[e.source]?.hero && units[e.source].team === units[e.unit]?.team && e.source !== e.unit) {
         this.friendlyHits.set(e.source, (this.friendlyHits.get(e.source) ?? 0) + 1);
@@ -759,6 +766,50 @@ export class ArenaScene extends Phaser.Scene {
     this.juice.puddle(x, y, u.radius, !!u.hero);
   }
 
+  /** Bruitage d'un événement du combat. */
+  private soundFor(e: BattleEvent): void {
+    switch (e.type) {
+      case 'hit':
+        sound.play(e.knockback > 100 || e.damage > 8 ? 'heavy' : 'hit');
+        break;
+      case 'attack':
+        if (e.kind === 'ranged') sound.play('arrow');
+        break;
+      case 'effect':
+        if (e.radius >= manifest.staging.camera.bigImpactRadius) sound.play('explosion');
+        else if (e.radius >= 12) sound.play('heavy');
+        else if (e.visual === 'tomato_splat') sound.play('splat');
+        break;
+      case 'beamCharge':
+        sound.play('laserCharge');
+        break;
+      case 'beam':
+        if (e.width) sound.play('laser');
+        break;
+      case 'launch':
+        sound.play('whoosh');
+        break;
+      case 'land':
+      case 'bounce':
+        sound.play('land');
+        break;
+      case 'gag':
+        if (e.kind === 'headClash') sound.play('bonk');
+        break;
+      case 'incident':
+        sound.play('ooh');
+        break;
+      case 'death':
+        if (this.battle.units[e.unit].hero) {
+          sound.play('ooh');
+          sound.play('cheer');
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
   /** Arrêt sur image bref : la simulation marque une pause, l'image continue de vibrer. */
   private hitStop(): void {
     this.hitStopUntil = Math.max(this.hitStopUntil, this.time.now + manifest.staging.juice.hitStopMs);
@@ -788,6 +839,8 @@ export class ArenaScene extends Phaser.Scene {
     this.director.release(this.battle.time);
     const r = this.battle.result!;
     const cfg = manifest.staging.show;
+    sound.stopMusic();
+    sound.play('cheer');
     // Ralenti sur le dernier K.O., caméra sur la victime.
     this.slowmo = cfg.slowmo;
     const last = this.views[this.lastVictim]?.sprite;

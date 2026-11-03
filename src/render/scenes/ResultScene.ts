@@ -2,6 +2,7 @@
 // En mode enregistrement, pas de boutons : la carte de vote clôt la vidéo.
 import Phaser from 'phaser';
 import type { TeamId } from '../../data/schema';
+import { sound } from '../audio';
 import { manifest } from '../manifest';
 import { drawAccessory } from '../placeholders';
 import { TEAM_COLORS, textStyle } from '../text';
@@ -136,11 +137,13 @@ export class ResultScene extends Phaser.Scene {
         const spins = 10 + i * 4;
         const step = (n: number) => {
           if (n >= spins) {
+            sound.play('ding');
             icon.setTexture(key);
             this.tweens.add({ targets: icon, scale: { from: 13, to: 10 }, duration: 200, ease: 'Back.easeOut' });
             return;
           }
           icon.setTexture(reel[k++ % reel.length]);
+          sound.play('tick');
           this.time.delayedCall(50 + n * 12, () => step(n + 1));
         };
         this.time.delayedCall(1700 + i * 350, () => step(0));

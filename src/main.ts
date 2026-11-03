@@ -8,6 +8,7 @@
 import '@fontsource/press-start-2p';
 import Phaser from 'phaser';
 import { startRecording } from './capture/recorder';
+import { sound } from './render/audio';
 import { loadGameData, type GameData } from './data';
 import { arcHeroes, killsBefore, parseArc, upgradesBefore } from './data/arc';
 import { Battle } from './sim/battle';
@@ -28,6 +29,15 @@ async function main() {
   }
   const data = loadGameData();
   const arena = arenaParams(data);
+  if (arena.record) {
+    // Le son ne démarre qu'après un geste : on attend un clic pour lancer l'enregistrement.
+    await waitForClick('● ENREGISTRER L\'ÉPISODE');
+    sound.init();
+  } else {
+    const unlock = () => sound.init();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+  }
   const { width, height } = data.battle.arena;
   const game = new Phaser.Game({
     type: Phaser.AUTO,
@@ -54,7 +64,7 @@ async function main() {
       document.body.append(badge);
       let recording: ReturnType<typeof startRecording>;
       try {
-        recording = startRecording(game.canvas, name);
+        recording = startRecording(game.canvas, name, sound.track);
       } catch (e) {
         badge.textContent = `✗ ${(e as Error).message}`;
         return;
@@ -66,6 +76,21 @@ async function main() {
       });
     });
   }
+}
+
+/** Gros bouton plein écran ; se résout au clic (déverrouille le son du navigateur). */
+function waitForClick(label: string): Promise<void> {
+  return new Promise((resolve) => {
+    const button = document.createElement('button');
+    button.textContent = label;
+    button.style.cssText =
+      'position:fixed;inset:0;margin:auto;width:min(80vw,520px);height:120px;font:18px "Press Start 2P",monospace;color:#fff;background:#d83b3b;border:6px solid #000;cursor:pointer;z-index:20';
+    button.onclick = () => {
+      button.remove();
+      resolve();
+    };
+    document.body.append(button);
+  });
 }
 
 function arenaParams(data: GameData): ArenaParams {
