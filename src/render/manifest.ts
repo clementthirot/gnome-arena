@@ -140,15 +140,32 @@ const StagingSchema = z.object({
     puffLife: z.number().positive().default(3),
     banner: z.string().default('GAZ TOXIQUE !'),
   }),
-  /** Morts plus trash : gouttes et flaque sous les corps. */
+  /** Morts plus trash : gouttes et flaque sous les corps, qui sèche et vire au brun. */
   gore: z.object({
     enabled: z.boolean().default(true),
     color: color,
     dark: color,
+    /** Couleur de la flaque une fois sèche. */
+    dryColor: color.default('#6a4a2a'),
+    /** Durée du séchage (s). */
+    dryAfter: z.number().positive().default(8),
     /** Taille de la flaque, en multiple du rayon de l'unité. */
     puddle: z.number().positive().default(2.6),
     /** Gouttes projetées à chaque coup reçu. */
     dropsPerHit: z.number().int().min(0).default(2),
+  }),
+  /** Effets cartoon : arrêt sur image aux gros impacts, étoiles, sueur, débris et objets perdus. */
+  juice: z.object({
+    /** Arrêt sur image (ms) sur les gros impacts : météore, charge de héros. */
+    hitStopMs: z.number().min(0).default(100),
+    /** Plafond de particules à l'écran (débris compris). */
+    maxParticles: z.number().int().positive().default(400),
+    /** Plafond d'objets perdus et de flèches plantées qui restent au sol. */
+    maxLitter: z.number().int().min(0).default(60),
+    /** Probabilité qu'une unité vaincue perde son bonnet ou son casque. */
+    itemChance: z.number().min(0).max(1).default(0.35),
+    stars: z.boolean().default(true),
+    sweat: z.boolean().default(true),
   }),
   strayShots: z.object({
     /** Probabilité qu'une flèche ratée près du bord file dans les gradins. */

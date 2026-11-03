@@ -1016,7 +1016,17 @@
       "color": "#a01818",
       "dark": "#5a0a0a",
       "puddle": 1.1,
-      "dropsPerHit": 2
+      "dropsPerHit": 2,
+      "dryColor": "#6a4a2a",
+      "dryAfter": 8
+    },
+    "juice": {
+      "hitStopMs": 100,
+      "maxParticles": 400,
+      "maxLitter": 60,
+      "itemChance": 0.35,
+      "stars": true,
+      "sweat": true
     }
   }
 }

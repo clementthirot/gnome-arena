@@ -3,6 +3,7 @@
 import type Phaser from 'phaser';
 import type { FieldRect } from '../sim/types';
 import type { Staging } from './manifest';
+import { rand } from './random';
 
 interface Vent {
   x: number;
@@ -85,18 +86,18 @@ export class GasLayer {
       this.emitDebt += dt * this.config.ventRate * this.vents.length * (1 + (1 - zoneScale) * 2);
       while (this.emitDebt >= 1) {
         this.emitDebt -= 1;
-        const v = this.vents[Math.floor(Math.random() * this.vents.length)];
-        const speed = 25 + Math.random() * 35;
-        const side = (Math.random() - 0.5) * 30;
+        const v = this.vents[Math.floor(rand() * this.vents.length)];
+        const speed = 25 + rand() * 35;
+        const side = (rand() - 0.5) * 30;
         this.puffs.push({
           x: v.x + v.nx * 4,
           y: v.y + v.ny * 4,
           vx: v.nx * speed + (v.ny !== 0 ? side : 0),
           vy: v.ny * speed + (v.nx !== 0 ? side : 0),
-          r: 3 + Math.random() * 3,
+          r: 3 + rand() * 3,
           age: 0,
-          life: this.config.puffLife * (0.7 + Math.random() * 0.6),
-          tone: Math.random(),
+          life: this.config.puffLife * (0.7 + rand() * 0.6),
+          tone: rand(),
         });
       }
     }

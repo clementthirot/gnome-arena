@@ -4,6 +4,7 @@ import type Phaser from 'phaser';
 import type { BeamSegment, Projectile } from '../sim/types';
 import type { Particle } from './animations';
 import { effectVisual, type EffectVisual } from './manifest';
+import { rand } from './random';
 
 interface Lasting {
   visual: EffectVisual;
@@ -45,13 +46,13 @@ export class FxLayer {
     if (v.kind === 'bolt') this.burst(x, y, v, 10, 60);
     // Gros impact : plus de débris, qui volent plus loin.
     if (v.kind === 'ring' && radius >= 25) this.burst(x, y, v, 40, 150);
-    this.lasting.push({ visual: v, x, y, radius: r, age: 0, life: v.duration, seed: Math.random() * 1000 });
+    this.lasting.push({ visual: v, x, y, radius: r, age: 0, life: v.duration, seed: rand() * 1000 });
     if (v.decal) this.lasting.push({ visual: effectVisual(v.decal), x, y, radius: r * 0.75, age: 0, life: effectVisual(v.decal).duration, seed: 0 });
   }
 
   beam(key: string, fromX: number, fromY: number, toX: number, toY: number, width?: number): void {
     const v = effectVisual(key);
-    this.lasting.push({ visual: v, x: fromX, y: fromY, toX, toY, width, radius: 0, age: 0, life: Math.max(0.15, v.duration), seed: Math.random() * 1000 });
+    this.lasting.push({ visual: v, x: fromX, y: fromY, toX, toY, width, radius: 0, age: 0, life: Math.max(0.15, v.duration), seed: rand() * 1000 });
     // Étincelles au point de rebond.
     if (width) this.burst(toX, toY, v, 10, 70);
   }
@@ -59,7 +60,7 @@ export class FxLayer {
   /** Le rayon se dessine le long de sa trajectoire pendant sa charge, puis frappe. */
   beamCharge(key: string, segments: BeamSegment[], width: number, duration: number): void {
     const v = effectVisual(key);
-    this.lasting.push({ visual: v, x: segments[0].fromX, y: segments[0].fromY, radius: 0, width, charge: segments, age: 0, life: duration, seed: Math.random() * 1000 });
+    this.lasting.push({ visual: v, x: segments[0].fromX, y: segments[0].fromY, radius: 0, width, charge: segments, age: 0, life: duration, seed: rand() * 1000 });
   }
 
   /** Avertissement avant un incident : ombre qui grossit et contour qui clignote. */
@@ -70,9 +71,9 @@ export class FxLayer {
   private burst(x: number, y: number, v: EffectVisual, count: number, speed: number): void {
     const colors = [hex(v.color), hex(v.accent ?? v.color)];
     for (let i = 0; i < count; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const s = speed * (0.4 + Math.random() * 0.6);
-      this.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - speed * 0.3, life: 0.45, maxLife: 0.45, color: colors[i % 2], size: Math.random() < 0.4 ? 2 : 1 });
+      const a = rand() * Math.PI * 2;
+      const s = speed * (0.4 + rand() * 0.6);
+      this.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - speed * 0.3, life: 0.45, maxLife: 0.45, color: colors[i % 2], size: rand() < 0.4 ? 2 : 1 });
     }
   }
 
@@ -221,14 +222,14 @@ export class FxLayer {
         if (v.size >= 10) {
           g.fillStyle(accent, 0.25).fillCircle(x, y, r * 1.8);
           for (let i = 0; i < 3; i++) {
-            this.particles.push({ x: p.x + (Math.random() - 0.5) * v.size * 0.6, y: p.y - lift + (Math.random() - 0.5) * v.size * 0.6, vx: (Math.random() - 0.5) * 30, vy: -40 - Math.random() * 40, life: 0.5, maxLife: 0.5, color: i % 2 ? color : accent, size: 2 });
+            this.particles.push({ x: p.x + (rand() - 0.5) * v.size * 0.6, y: p.y - lift + (rand() - 0.5) * v.size * 0.6, vx: (rand() - 0.5) * 30, vy: -40 - rand() * 40, life: 0.5, maxLife: 0.5, color: i % 2 ? color : accent, size: 2 });
           }
         }
         // Ombre au sol pour lire la cloche.
         if (p.arc > 0) this.ground.fillStyle(0x000000, 0.25).fillEllipse(x, p.y * S, r * 2, r);
         g.fillStyle(color, 1).fillCircle(x, y, r);
         g.fillStyle(accent, 1).fillRect(x - r * 0.5, y - r * 0.6, Math.max(S, r * 0.5), Math.max(S, r * 0.5));
-        if (Math.random() < 0.5) this.particles.push({ x: p.x, y: p.y - lift, vx: 0, vy: -10, life: 0.25, maxLife: 0.25, color: accent, size: 1 });
+        if (rand() < 0.5) this.particles.push({ x: p.x, y: p.y - lift, vx: 0, vy: -10, life: 0.25, maxLife: 0.25, color: accent, size: 1 });
         break;
       }
       default:

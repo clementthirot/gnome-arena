@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import type { Bricks as BrickSet } from './manifest';
 import { FONT } from './text';
+import { rand } from './random';
 
 /** Ce qu'une brique a le droit de manipuler : des décalages visuels, jamais la position simulée. */
 export interface UnitView {
@@ -43,8 +44,8 @@ export interface BrickContext {
 
 function burst(ctx: BrickContext, x: number, y: number, count: number, colors: number[], speed: number, life = 0.45) {
   for (let i = 0; i < count; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const v = speed * (0.4 + Math.random() * 0.6);
+    const a = rand() * Math.PI * 2;
+    const v = speed * (0.4 + rand() * 0.6);
     ctx.particles.push({
       x,
       y,
@@ -53,7 +54,7 @@ function burst(ctx: BrickContext, x: number, y: number, count: number, colors: n
       life,
       maxLife: life,
       color: colors[i % colors.length],
-      size: Math.random() < 0.3 ? 2 : 1,
+      size: rand() < 0.3 ? 2 : 1,
     });
   }
 }
@@ -148,7 +149,7 @@ export const Bricks = {
       .text(x * ctx.scale, y * ctx.scale - 20, word.text, { fontFamily: FONT, fontSize: '40px', color: word.color, stroke: '#000000', strokeThickness: 10 })
       .setOrigin(0.5)
       .setDepth(9850)
-      .setAngle(Math.random() * 24 - 12)
+      .setAngle(rand() * 24 - 12)
       .setScale(0.2);
     ctx.scene.tweens.add({ targets: t, scale: 1.15, duration: 160, ease: 'Back.easeOut' });
     ctx.scene.tweens.add({ targets: t, alpha: 0, y: t.y - 30, delay: 650, duration: 350, onComplete: () => t.destroy() });

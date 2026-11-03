@@ -147,29 +147,79 @@ Faut-il des héros plus fragiles, garder ces fins comme signature, ou chercher u
 
 ## 6. Prochaines directives
 
-> À remplir à la fin du brainstorm. Une ligne suffit par point ; « — » si rien à dire.
-
-**Priorité du prochain lot** (une ou deux choses au plus) :
-- 
-
-**Décision sur la place des héros** (§ 4.1) :
-- 
-
-**Réponses aux questions ouvertes** (§ 4.2) :
-- Édition des briques :
-- Héros perdant qui reçoit l'upgrade :
-- Comptage des votes :
-- Effectifs :
-- Fin d'arc :
-
-**Contenu à ajouter** (upgrades, incidents, héros ; nom, idée, défaut loufoque) :
-- 
-
-**Son et identité visuelle** :
-- 
-
-**Ce qu'il ne faut surtout pas changer** :
-- 
-
-**Critères de réussite du prochain lot** :
-- 
+Décisions tranchées
+• Place des héros : PV inchangés. Le scout pénalise une seed dont le type de fin est le même qu'à l'épisode précédent.
+• Édition des briques : interface de régie pour les fréquences des incidents et des gags ; unités, sprites, upgrades et effets restent en JSON et dans le code.
+• Héros qui reçoit l'upgrade : choisi par Clément dans la régie (le script propose le moins équipé).
+• Comptage des votes : saisie manuelle ou export de commentaires ; API des plateformes plus tard.
+• Effectifs : réglables dans la régie.
+• Fin d'arc : décidée par Clément, selon l'intérêt des combats et l'audience ; l'alerte des 80 % reste indicative.
+• Biome de l'arène : choisi dans la régie.
+Juice cartoon (rendu uniquement)
+• Vol en cloche avec hauteur simulée, rotation, ombre au sol qui rétrécit en montant.
+• Squash and stretch au décollage et à l'atterrissage, nuage de poussière, rebonds décroissants.
+• Hit stop d'environ 0,1 s et tremblement d'écran sur les gros impacts (météore, charge de héros).
+• Flash blanc à l'impact, étoiles au-dessus des étourdis, anticipation avant charge et chute de météore.
+• Bulles d'émotion (« ! », goutte de sueur) sur les peureux qui fuient.
+Débris et objets perdus
+• Débris d'impact éphémères (dents, mottes de terre) projetés en cloche.
+• Objets perdus qui restent au sol (bonnets, casques, flèches plantées).
+• Hasard tiré de la seed, nombre de débris plafonné.
+Sang
+• Remplacé par des marques cartoon (étoiles, suie, boue), ou flaque qui sèche et vire au brun, fondue dans le sol avec un tramage pixel.
+Public
+• Le public lance des objets (petite bombe, tomate, chaussure) comme incident aléatoire, avec ombre d'annonce.
+• Les supporters qui sautent dans l'arène quittent visiblement leur place : la tribune se vide à cet endroit, saut en cloche par-dessus le muret.
+• Rayons, flèches et explosions continuent de toucher le public.
+• Trébuchement : un projectile du public (tomate, caillou) étourdit brièvement l'unité touchée, qui titube avec des étoiles ou tombe face contre terre puis se relève. Réutilise l'état « étourdi » existant.
+• Idée pour plus tard : l'empereur qui descend dans l'arène lors d'épisodes spéciaux.
+Slapstick (rare et réglable en JSON : probabilité + plafond par combat)
+• Choc de têtes : deux chargeurs qui se percutent restent tous deux assommés.
+• Effet bowling : règle permanente du moteur, pas un gag rare. Toute unité projetée qui retombe sur d'autres les repousse et les étourdit brièvement, avec peu ou pas de dégâts pour ne pas fausser l'équilibrage (à vérifier au bench).
+• Victoire prématurée : danse après un K.O., interrompue par un coup. Très rare (1 à 2 fois par combat au plus), seulement pour une unité un peu à l'écart après un duel, pour rester lisible.
+• Arme perdue : l'arme s'envole, l'unité court la ramasser. Rare et courte, pour ne pas rallonger les combats.
+• Plus tard : trébucher sur les objets perdus au sol.
+Intro et fin d'épisode
+• Intro : fanfare, titre qui tombe avec rebond, « Épisode N », héros, « 3, 2, 1, COMBAT ! ».
+• Fin sans arrêt brutal : ralenti sur le dernier K.O., annonce du vainqueur pendant que l'arène continue de vivre, animations terminées proprement.
+• Célébration : bannières aux couleurs du vainqueur, confettis, public qui saute.
+• Carte d'upgrade : portrait du héros bénéficiaire, 3 upgrades qui défilent façon machine à sous, numéros 1-2-3 très lisibles.
+Barre de rapport de force
+• Une seule barre en haut de l'écran, partagée entre les couleurs des deux camps, qui se déplace selon les PV restants de chaque camp (la même mesure que la victoire à 80 s).
+• Mouvement fluide, tremblement et éclat à la jonction lors d'un gros coup, flash quand un héros tombe.
+Unités spéciales symétriques (paramétrables)
+• Nouveau rôle « lanceur de sorts » : mêmes fonctions et mêmes stats dans les deux camps, seuls le skin, les animations et le nom changent (mage gnome, sorcier gobelin).
+• Sorts composés des effets existants (onde de choc qui disperse la mêlée, ralentissement, projection…), définis en JSON.
+• Effectif par camp réglable dans battle.json, 0 par défaut, pour tester sans toucher à l'équilibrage actuel.
+• Option de test : arrivées par vagues et unités qui contournent par les flancs, pour casser le paquet central.
+Engagement et feuilleton
+• Running gag : un spectateur reconnaissable (chapeau ridicule), présent à chaque épisode, qui finit toujours touché.
+• Répliques des héros en bulles, selon leur personnalité (Kevin : « Pas moi ! » ; Bob : cri de guerre).
+• Rivalités : carton « DUEL » quand deux héros rivaux se croisent (ex. Bob contre Grok).
+• Annonces de commentateur sur les séries : « TRIPLE K.O. ! », « BOB EST EN FEU ! ».
+• Prono en début de vidéo : « Qui va gagner ? Dis-le en commentaire ! ».
+• Stats cumulées sur la carte de fin (K.O. de chaque héros depuis le début de l'arc, meilleur raté de l'épisode).
+• Arènes différentes par arc (forêt, neige où l'on glisse, volcan).
+L'empereur de l'arène
+• Un personnage sur un trône dans une loge des tribunes, façon César, visible du début à la fin, qui ne combat jamais.
+• Il lance le combat (geste, « Que le massacre commence ! »), porte les annonces de commentateur en bulles, et réagit aux moments forts.
+• À la fin : pouce levé vers le vainqueur, célébration, puis il présente la roulette des upgrades.
+Mode régie
+• Panneau avant le combat : épisode suivant proposé, upgrades des héros chargées depuis l'arc, corrections à la main.
+• Choix de la seed parmi les résultats du scout, du héros bénéficiaire et des 3 options de vote.
+• Boutons « aperçu » et « enregistrer » ; sauvegarde dans les fichiers d'arc via un petit relais du serveur Vite.
+Réglages supplémentaires de la régie : fréquences des incidents et des gags, effectif par camp, biome de l'arène, bouton de fin d'arc.
+Son
+• Jingle d'intro, bruitages de coups et d'explosions, cris du public, petite boucle musicale.
+Ce qu'il ne faut pas changer : le déterminisme, l'équilibrage actuel, les données en JSON.
+Critères de réussite
+[ ] Un épisode complet, de l'intro au vote, s'enregistre sans image figée ni animation en boucle.
+[ ] Même seed = même vidéo, débris compris.
+[ ] Les héros restent repérables malgré les débris.
+[ ] Préparer un épisode depuis la régie prend moins de 2 minutes.
+Questions ouvertes
+[ ] Édition des briques : fichiers JSON seuls, ou petite interface visuelle ?
+[ ] Comment choisir le héros perdant qui reçoit l'upgrade : vote aussi, ou rotation ?
+[ ] Outil de comptage des votes multi-plateformes : outil existant ou script maison ?
+[ ] Combien de troupes par camp pour que les héros restent lisibles ?
+[ ] Critères de fin d'arc : nombre d'épisodes, ou niveau de puissance atteint ?

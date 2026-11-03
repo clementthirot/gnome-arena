@@ -3,14 +3,17 @@
 import Phaser from 'phaser';
 import type { GameData, HeroDef, TeamId } from '../../data/schema';
 import { Battle, opposingTeam, TEAMS } from '../../sim/battle';
+import { hashSeed } from '../../sim/rng';
 import type { BattleEvent, Unit } from '../../sim/types';
 import { Bricks, type BrickContext, type Particle, type UnitView } from '../animations';
 import { drawArenaBackground } from '../arenaArt';
 import { Director } from '../director';
 import { FxLayer } from '../fx';
 import { GasLayer } from '../gas';
+import { Juice } from '../juice';
 import { asPlaceholder, bricksFor, effectVisual, manifest, resolveAsset } from '../manifest';
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
+import { rand, seedRender, seedTick } from '../random';
 import { TEAM_COLORS, textStyle } from '../text';
 import type { ResultData } from './ResultScene';
 
@@ -71,6 +74,9 @@ export class ArenaScene extends Phaser.Scene {
   /** Ombres des unités en l'air. */
   private airGfx!: Phaser.GameObjects.Graphics;
   private gas!: GasLayer;
+  private juice!: Juice;
+  /** Arrêt sur image en cours (horloge de la scène, ms). */
+  private hitStopUntil = 0;
   private particles: Particle[] = [];
   private spectators: Spectator[] = [];
   private fx!: Phaser.GameObjects.Graphics;
@@ -111,6 +117,8 @@ export class ArenaScene extends Phaser.Scene {
   create(): void {
     const { data, seed } = this.params;
     this.battle = new Battle(data, { seed, upgrades: this.params.upgrades, heroes: this.params.heroes });
+    seedRender(hashSeed(`${seed}:rendu`));
+    seedTick(0);
     const { width, height } = data.battle.arena;
     const field = this.battle.field;
 
@@ -122,6 +130,7 @@ export class ArenaScene extends Phaser.Scene {
     this.zoneGfx = this.add.graphics().setDepth(-500);
     const groundFx = this.add.graphics().setDepth(-450);
     this.airGfx = this.add.graphics().setDepth(-440);
+    this.juice = new Juice(this, this.particles, SCALE, manifest.staging.juice, manifest.staging.gore);
     this.gas = new GasLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-430), field, manifest.staging.gas, SCALE);
     for (const u of this.battle.units) this.createUnitView(u);
     this.prev = this.battle.units.map((u) => ({ x: u.x, y: u.y, z: u.z }));
@@ -206,11 +215,11 @@ export class ArenaScene extends Phaser.Scene {
       }
       k++;
       const sprite = this.add.image(x * SCALE, y * SCALE, key).setScale(SCALE).setOrigin(0.5, 1).setDepth(-900 + y);
-      this.spectators.push({ sprite, baseY: y * SCALE, phase: Math.random() * Math.PI * 2, side });
+      this.spectators.push({ sprite, baseY: y * SCALE, phase: rand() * Math.PI * 2, side });
     };
     // Gobelins en haut (derrière leur armée), gnomes en bas, mélange sur les côtés.
     for (let row = 0; row < 3; row++) {
-      for (let x = 8 + (row % 2) * 4; x < width - 4; x += 8 + Math.floor(Math.random() * 3)) {
+      for (let x = 8 + (row % 2) * 4; x < width - 4; x += 8 + Math.floor(rand() * 3)) {
         place(x, field.y - 8 - row * 9, 'goblins');
         place(x, field.y + field.height + 14 + row * 9, 'gnomes');
       }
@@ -359,7 +368,7 @@ export class ArenaScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     const dtMs = this.battle.dt * 1000;
     if (this.running && !this.paused) {
-      this.accumulator += Math.min(delta, 100) * this.timeScale;
+      if (this.time.now >= this.hitStopUntil) this.accumulator += Math.min(delta, 100) * this.timeScale;
       let steps = 0;
       while (this.accumulator >= dtMs && steps < MAX_STEPS_PER_FRAME && !this.battle.result) {
         for (let i = 0; i < this.battle.units.length; i++) {
@@ -368,6 +377,7 @@ export class ArenaScene extends Phaser.Scene {
           this.prev[i].z = this.battle.units[i].z;
         }
         this.battle.step();
+        seedTick(this.battle.tick);
         this.handleEvents(this.battle.events);
         this.accumulator -= dtMs;
         steps++;
@@ -382,6 +392,7 @@ export class ArenaScene extends Phaser.Scene {
     this.animateCrowd(this.time.now / 1000);
     this.updateHud();
     this.watchLastStand();
+    this.juice.drawStatus(this.battle.units, this.views, this.time.now);
     this.director.update(this.battle.time);
     this.routeCameras();
   }
@@ -423,18 +434,27 @@ export class ArenaScene extends Phaser.Scene {
         }
         case 'hit': {
           const u = units[e.unit];
+          if (e.knockback > 100) this.juice.debris(u.x, u.y, 3);
           Bricks.hurt(ctx, this.views[e.unit], u.x, u.y - u.radius, e.knockback > 100);
           break;
         }
         case 'impact':
           Bricks.impact(ctx, this.views[e.unit], e.x, e.y);
           if (units[e.unit].hero) {
+            this.hitStop();
             const s = this.views[e.unit].sprite;
             this.director.request('heroCharge', () => s, this.battle.time);
           }
           break;
-        case 'miss':
-          this.strayShot(e.x, e.y, units[e.source]);
+        case 'miss': {
+          const shooter = units[e.source];
+          if (!this.strayShot(e.x, e.y, shooter) && shooter) this.juice.plantArrow(e.x, e.y, e.x - shooter.x, e.y - shooter.y);
+          break;
+        }
+        case 'charge':
+          // Anticipation : le chargeur se ramasse avant de bondir.
+          this.views[e.unit].squash = 0.7;
+          this.tweens.add({ targets: this.views[e.unit], squash: 1, duration: 200, ease: 'Back.easeOut' });
           break;
         case 'panic':
           Bricks.panic(ctx, this.views[e.unit]);
@@ -447,6 +467,8 @@ export class ArenaScene extends Phaser.Scene {
           this.playOnce(view, 'death');
           Bricks.death(ctx, view, u.x, u.y, !!u.hero, u.z > 0);
           if (u.z <= 0) this.bloodPuddle(u, u.x, u.y);
+          this.juice.debris(u.x, u.y, u.hero ? 8 : 4);
+          this.juice.dropItem(u, u.x, u.y);
           this.cheer(opposingTeam(u.team), u.hero ? 1 : 0.15);
           if (u.hero) {
             const victim = view.sprite;
@@ -472,15 +494,17 @@ export class ArenaScene extends Phaser.Scene {
           this.addReinforcement(units[e.unit]);
           break;
         case 'launch':
+          this.views[e.unit].squash = 1.35;
+          this.tweens.add({ targets: this.views[e.unit], squash: 1, duration: 260, ease: 'Quad.easeOut' });
           // Vrille en vol : plus rapide pour un K.O.
-          this.views[e.unit].spin = (Math.random() < 0.5 ? -1 : 1) * (units[e.unit].state === 'dead' ? 900 : 480);
+          this.views[e.unit].spin = (rand() < 0.5 ? -1 : 1) * (units[e.unit].state === 'dead' ? 900 : 480);
           break;
         case 'land': {
           const splash = manifest.staging.koSplash;
           // Onomatopée réservée aux vraies grosses chutes, et pas plus d'une à la fois.
           const loud = e.dead && e.impact >= splash.minImpact && this.time.now >= this.nextSplashAt;
           if (loud) this.nextSplashAt = this.time.now + splash.gapMs;
-          const word = loud ? { text: splash.words[Math.floor(Math.random() * splash.words.length)], color: splash.color } : undefined;
+          const word = loud ? { text: splash.words[Math.floor(rand() * splash.words.length)], color: splash.color } : undefined;
           Bricks.land(ctx, this.views[e.unit], e.x, e.y, e.impact, word);
           if (e.dead) {
             this.bloodPuddle(units[e.unit], e.x, e.y);
@@ -511,6 +535,7 @@ export class ArenaScene extends Phaser.Scene {
           if (e.radius >= manifest.staging.camera.bigImpactRadius) {
             this.cameras.main.shake(320, 0.014);
             this.cameras.main.flash(140, 255, 236, 200);
+            this.hitStop();
             this.cheer('gnomes', 0.6);
             this.cheer('goblins', 0.6);
             const at = { x: e.x * SCALE, y: e.y * SCALE };
@@ -547,11 +572,11 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   /** Une flèche ratée près du bord file dans les gradins : un spectateur la prend. Purement visuel. */
-  private strayShot(x: number, y: number, shooter: Unit | undefined): void {
+  private strayShot(x: number, y: number, shooter: Unit | undefined): boolean {
     const cfg = manifest.staging.strayShots;
     const f = this.battle.field;
     const edge = Math.min(x - f.x, f.x + f.width - x, y - f.y, f.y + f.height - y);
-    if (!shooter || edge > cfg.edgeDistance || Math.random() > cfg.chance) return;
+    if (!shooter || edge > cfg.edgeDistance || rand() > cfg.chance) return false;
     const dx = x - shooter.x;
     const dy = y - shooter.y;
     const l = Math.hypot(dx, dy) || 1;
@@ -570,7 +595,7 @@ export class ArenaScene extends Phaser.Scene {
         best = s;
       }
     }
-    if (!best || bestScore > 40) return;
+    if (!best || bestScore > 40) return false;
     const target = best;
     const arrow = this.add.rectangle(x * SCALE, y * SCALE, 5 * SCALE, SCALE, 0xf4f0e0).setRotation(Math.atan2(dy, dx)).setDepth(9000);
     this.tweens.add({
@@ -583,6 +608,7 @@ export class ArenaScene extends Phaser.Scene {
         this.hurtSpectator(target, true);
       },
     });
+    return true;
   }
 
   /** Un spectateur prend un coup : il rougit, sursaute, et râle parfois. */
@@ -611,20 +637,12 @@ export class ArenaScene extends Phaser.Scene {
 
   /** Flaque de sang qui s'étale sous le corps. */
   private bloodPuddle(u: Unit, x: number, y: number): void {
-    const gore = manifest.staging.gore;
-    if (!gore.enabled) return;
-    const r = u.radius * gore.puddle * (0.8 + Math.random() * 0.4);
-    const color = parseInt(gore.color.slice(1), 16);
-    const dark = parseInt(gore.dark.slice(1), 16);
-    const pool = this.add.ellipse(x * SCALE, (y + 1) * SCALE, r * 2 * SCALE, r * 1.1 * SCALE, dark, 0.7).setDepth(-420).setScale(0.1);
-    const core = this.add.ellipse(x * SCALE, (y + 1) * SCALE, r * 1.2 * SCALE, r * 0.6 * SCALE, color, 0.75).setDepth(-419).setScale(0.1);
-    this.tweens.add({ targets: [pool, core], scale: 1, duration: 900, ease: 'Quad.easeOut' });
-    // Quelques éclaboussures autour.
-    for (let i = 0; i < 2; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const d = r * (1.1 + Math.random() * 0.5);
-      this.add.ellipse((x + Math.cos(a) * d) * SCALE, (y + 1 + Math.sin(a) * d * 0.55) * SCALE, 1.2 * SCALE, 0.8 * SCALE, color, 0.75).setDepth(-419);
-    }
+    this.juice.puddle(x, y, u.radius, !!u.hero);
+  }
+
+  /** Arrêt sur image bref : la simulation marque une pause, l'image continue de vibrer. */
+  private hitStop(): void {
+    this.hitStopUntil = Math.max(this.hitStopUntil, this.time.now + manifest.staging.juice.hitStopMs);
   }
 
   /** Un supporter saute dans l'arène : il apparaît, et sa place dans les gradins se vide. */
@@ -684,7 +702,7 @@ export class ArenaScene extends Phaser.Scene {
         this.airGfx.fillStyle(0x000000, 0.35 * shrink).fillEllipse(x, y, u.radius * 2.4 * SCALE * shrink, u.radius * 1.1 * SCALE * shrink);
         v.sprite.setAngle(v.sprite.angle + v.spin * dt);
         const grow = 1 + Math.min(0.35, z / 300);
-        v.sprite.setScale(v.baseScale * grow);
+        v.sprite.setScale(v.baseScale * grow * (2 - v.squash), v.baseScale * grow * v.squash);
         v.sprite.setDepth(9500 + y * 0.001);
         const hud = this.heroHud.get(i);
         if (hud && u.state !== 'dead') this.drawHeroHud(u, v, hud);
@@ -798,8 +816,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private cheer(side: 'gnomes' | 'goblins', share: number): void {
     for (const s of this.spectators) {
-      if (s.side !== side || Math.random() > share) continue;
-      this.tweens.add({ targets: s.sprite, y: s.baseY - 3 * SCALE, duration: 120, yoyo: true, repeat: 1, delay: Math.random() * 200 });
+      if (s.side !== side || rand() > share) continue;
+      this.tweens.add({ targets: s.sprite, y: s.baseY - 3 * SCALE, duration: 120, yoyo: true, repeat: 1, delay: rand() * 200 });
     }
   }
 

@@ -36,6 +36,16 @@ describe('déterminisme', () => {
   });
 });
 
+describe('même seed = même vidéo', () => {
+  it('le rendu ne tire jamais au hasard hors de random.ts (tiré de la seed)', () => {
+    const root = join(import.meta.dirname, '../src/render');
+    const files = [...readdirSync(root).map((f) => join(root, f)), ...readdirSync(join(root, 'scenes')).map((f) => join(root, 'scenes', f))];
+    for (const file of files.filter((f) => f.endsWith('.ts') && !f.endsWith('random.ts'))) {
+      expect(readFileSync(file, 'utf8'), file).not.toMatch(/Math.random/);
+    }
+  });
+});
+
 describe('déterminisme entre moteurs JS', () => {
   // La précision de ces fonctions dépend du moteur (Node, Chrome, Safari...) : une seed
   // mesurée en ligne de commande donnerait un autre combat dans le navigateur.
