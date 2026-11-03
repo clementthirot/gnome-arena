@@ -1,5 +1,13 @@
 // Types publics du moteur : ce que le rendu et les outils ont le droit de lire.
-import type { AttackDef, EffectDef, EquipmentDef, PersonalityDef, RoleDef, TeamId } from '../data/schema';
+import type { AttackDef, EffectDef, EquipmentDef, PersonalityDef, RoleDef, SpecialDef, TeamId } from '../data/schema';
+
+/** Capacité utilisable : attaque spéciale d'une upgrade ou sort du rôle. */
+export interface Ability {
+  readonly id: string;
+  /** Nom court affiché au lancement (« LASER ! »). */
+  readonly short: string;
+  readonly special?: SpecialDef;
+}
 
 /** Les 5 états de la machine à états d'une entité. */
 export type UnitState = 'choose' | 'approach' | 'attack' | 'flee' | 'dead';
@@ -20,6 +28,8 @@ export interface Unit {
   readonly speed: number;
   /** Upgrades portées (héros). */
   readonly equipment: readonly EquipmentDef[];
+  /** Attaques spéciales des upgrades, puis sort du rôle. */
+  readonly abilities: readonly Ability[];
 
   x: number;
   y: number;
@@ -52,6 +62,8 @@ export interface Unit {
   /** Gag en cours : danse de victoire ou course après son arme. */
   gag: 'none' | 'dance' | 'fetch';
   gagTimer: number;
+  /** Passage par un flanc avant d'engager (contournement). */
+  waypoint: { x: number; y: number } | null;
   /** Où est tombée l'arme perdue. */
   gagX: number;
   gagY: number;
@@ -105,7 +117,7 @@ export type BattleEvent =
   | { type: 'rush'; unit: number }
   | { type: 'death'; unit: number; killer: number }
   | { type: 'zone'; scale: number }
-  | { type: 'special'; unit: number; equipment: string; misfire: boolean }
+  | { type: 'special'; unit: number; ability: string; misfire: boolean }
   | { type: 'effect'; visual: string; x: number; y: number; radius: number; source: number }
   | { type: 'beam'; visual: string; fromX: number; fromY: number; toX: number; toY: number; width?: number }
   | { type: 'launch'; unit: number }

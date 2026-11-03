@@ -35,7 +35,10 @@ const upIndex = args.indexOf('--up');
 const upgrades = upIndex >= 0
   ? Object.fromEntries(args[upIndex + 1].split(',').map((part) => { const [hero, items] = part.split(':'); return [hero, items.split('+')]; }))
   : undefined;
-const summaries = Array.from({ length: runs }, (_, i) => simulate(data, { seed: from + i, upgrades }));
+// --biome neige : mesure un autre biome.
+const biomeIndex = args.indexOf('--biome');
+const biome = biomeIndex >= 0 ? args[biomeIndex + 1] : undefined;
+const summaries = Array.from({ length: runs }, (_, i) => simulate(data, { seed: from + i, upgrades, biome }));
 const elapsed = (performance.now() - started) / 1000;
 
 console.log(formatReport(aggregate(summaries)));

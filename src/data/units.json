@@ -132,5 +132,37 @@
       "reckless": 3,
       "steady": 1
     }
+  },
+  {
+    "id": "gnome_mage",
+    "team": "gnomes",
+    "label": "Mage gnome",
+    "role": "caster",
+    "visual": "gnome_mage",
+    "hp": 26,
+    "damage": 6,
+    "speed": 25,
+    "radius": 5,
+    "mass": 0.8,
+    "personalities": {
+      "steady": 3,
+      "coward": 2
+    }
+  },
+  {
+    "id": "goblin_shaman",
+    "team": "goblins",
+    "label": "Sorcier gobelin",
+    "role": "caster",
+    "visual": "goblin_shaman",
+    "hp": 26,
+    "damage": 6,
+    "speed": 25,
+    "radius": 5,
+    "mass": 0.8,
+    "personalities": {
+      "steady": 3,
+      "coward": 2
+    }
   }
 ]

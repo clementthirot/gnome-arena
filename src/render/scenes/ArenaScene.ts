@@ -44,6 +44,8 @@ export interface ArenaParams {
     /** K.O. cumulés de chaque héros (par nom) avant cet épisode. */
     arcKills?: Record<string, number>;
   };
+  /** Biome de l'arène (sinon celui de battle.json). */
+  biome?: string;
   /** Enregistrement : pas d'interaction, la fin de l'écran de vote clôt la vidéo. */
   record?: boolean;
 }
@@ -142,14 +144,14 @@ export class ArenaScene extends Phaser.Scene {
 
   create(): void {
     const { data, seed } = this.params;
-    this.battle = new Battle(data, { seed, upgrades: this.params.upgrades, heroes: this.params.heroes });
+    this.battle = new Battle(data, { seed, upgrades: this.params.upgrades, heroes: this.params.heroes, biome: this.params.biome });
     seedRender(hashSeed(`${seed}:rendu`));
     seedTick(0);
     const { width, height } = data.battle.arena;
     const field = this.battle.field;
 
-    const bgKey = 'arena_bg';
-    if (!this.textures.exists(bgKey)) this.textures.addCanvas(bgKey, drawArenaBackground(width, height, field));
+    const bgKey = `arena_bg_${this.battle.biome.id}`;
+    if (!this.textures.exists(bgKey)) this.textures.addCanvas(bgKey, drawArenaBackground(width, height, field, this.battle.biome));
     this.add.image(0, 0, bgKey).setOrigin(0).setScale(SCALE).setDepth(-1000);
     this.createCrowd();
 
@@ -468,6 +470,7 @@ export class ArenaScene extends Phaser.Scene {
     const alpha = Math.min(1, this.accumulator / dtMs);
     this.drawUnits(alpha, this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale : 0);
     this.drawZone();
+    this.ambience(Math.min(delta, 100) / 1000);
     this.gas.update(this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale : 0, this.battle.zone, this.battle.zoneScale);
     this.drawEffects(delta / 1000);
     this.animateCrowd(this.time.now / 1000);
@@ -635,7 +638,7 @@ export class ArenaScene extends Phaser.Scene {
           break;
         case 'special': {
           const u = units[e.unit];
-          const eq = u.equipment.find((x) => x.id === e.equipment);
+          const eq = u.abilities.find((x) => x.id === e.ability);
           if (e.misfire) {
             this.popup(u, 'OUPS !', '#ff8080', 32);
             const s = this.views[e.unit].sprite;
@@ -1030,6 +1033,20 @@ export class ArenaScene extends Phaser.Scene {
     g.fillStyle(0xffffff, 0.25).fillRect(x, y, bw, 5);
     g.fillStyle(0xffffff, 0.6 + 0.4 * this.balanceKick).fillRect(split - 3, y - 7, 6, bh + 14);
     if (this.balanceFlash > 0) g.fillStyle(0xffffff, this.balanceFlash * 0.7).fillRect(x, y, bw, bh);
+  }
+
+  /** Particules d'ambiance du biome : feuilles, neige, braises. */
+  private ambience(dt: number): void {
+    const kind = this.battle.biome.ambient;
+    if (kind === 'none' || dt <= 0 || this.particles.length > manifest.staging.juice.maxParticles - 20) return;
+    const f = this.battle.field;
+    const rate = kind === 'snow' ? 14 : kind === 'embers' ? 8 : 4;
+    if (rand() > rate * dt) return;
+    const colors = kind === 'snow' ? [0xffffff, 0xe8f0ff] : kind === 'embers' ? [0xff6a2a, 0xffb347] : [0x8ac84a, 0xc8a83a, 0x6a9a2a];
+    const x = f.x + rand() * f.width;
+    const y = kind === 'embers' ? f.y + f.height - rand() * 20 : f.y - 10;
+    // Les braises montent, la neige et les feuilles tombent doucement.
+    this.particles.push({ x, y, vx: (rand() - 0.5) * 20, vy: kind === 'embers' ? -60 - rand() * 30 : -150, life: 3.5, maxLife: 3.5, color: colors[Math.floor(rand() * colors.length)], size: kind === 'leaves' ? 2 : 1 });
   }
 
   /** Onomatopée de bande dessinée, posée dans l'arène. */

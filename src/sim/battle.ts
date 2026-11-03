@@ -1,6 +1,6 @@
 // Moteur de combat : boucle à pas fixe, sans aucune dépendance au rendu.
 // Même données + même seed = même combat, tick pour tick.
-import type { ArenaEventDef, AttackDef, EffectDef, EquipmentDef, GameData, HeroDef, TeamId, Tuning, UnitDef } from '../data/schema';
+import type { ArenaEventDef, AttackDef, BiomeDef, EffectDef, EquipmentDef, GameData, HeroDef, TeamId, Tuning, UnitDef } from '../data/schema';
 import type { EffectContext as Ctx } from './effects';
 import { runEffects, type EffectContext, type EffectHost } from './effects';
 import { cos, hypot, nthRoot, sin } from './detmath';
@@ -14,6 +14,8 @@ export interface BattleSetup {
   seed: string | number;
   /** Héros engagés ; par défaut, tous les héros actifs des données. */
   heroes?: readonly HeroDef[];
+  /** Biome de l'arène (par défaut celui de battle.json). */
+  biome?: string;
   /** Upgrades gagnées en cours d'arc, par identifiant de héros (s'ajoutent à heroes[].upgrades). */
   upgrades?: Readonly<Record<string, readonly string[]>>;
 }
@@ -61,6 +63,7 @@ export class Battle implements EffectHost {
   private readonly deferred: { at: number; run: () => void }[] = [];
   /** Réglages fins (rules.tuning). */
   readonly tuning: Tuning;
+  readonly biome: BiomeDef;
   private readonly grid = new SpatialGrid<Unit>(16);
   private readonly attackers: number[] = [];
   private readonly wanderAngle: number[] = [];
@@ -85,8 +88,9 @@ export class Battle implements EffectHost {
     this.seed = hashSeed(setup.seed);
     this.rng = new Rng(this.seed);
     this.tuning = data.battle.rules.tuning;
+    this.biome = data.biomes.find((b) => b.id === (setup.biome ?? data.battle.biome)) ?? data.biomes[0];
     // knockbackDecay est par seconde ; on en déduit la part conservée à chaque tick.
-    this.decayPerTick = nthRoot(data.battle.rules.knockbackDecay, data.battle.tickRate);
+    this.decayPerTick = nthRoot(this.biome.physics.knockbackDecay ?? data.battle.rules.knockbackDecay, data.battle.tickRate);
     this.airDecayPerTick = nthRoot(this.tuning.airborne.airDecay, data.battle.tickRate);
     this.field = { ...data.battle.arena.field };
     this.zone = { ...this.field };
@@ -126,6 +130,22 @@ export class Battle implements EffectHost {
     const front = team === 'gnomes' ? f.y + f.height * 0.64 : f.y + f.height * 0.36;
     const back = team === 'gnomes' ? 1 : -1;
     // Un rang ne dépasse pas la largeur du terrain : au-delà, on ouvre un rang de plus derrière.
+    // Réserve : une part des troupes entre plus tard par l'arrière.
+    const dep = this.data.battle.deployment;
+    if (dep.reserveShare > 0) {
+      const troops = rows.map((r) => r.filter((e) => !e.hero));
+      const total = troops.reduce((n, r) => n + r.length, 0);
+      let reserve = Math.round(total * dep.reserveShare);
+      for (let d = rows.length - 1; d >= 0 && reserve > 0; d--) {
+        while (reserve > 0) {
+          const idx = rows[d].findIndex((e) => !e.hero);
+          if (idx < 0) break;
+          const [entry] = rows[d].splice(idx, 1);
+          reserve--;
+          this.defer(dep.reserveAt, () => this.enterFromBack(team, entry.def));
+        }
+      }
+    }
     const perLine = Math.max(4, Math.floor(f.width / 14));
     let offset = 0;
     rows.forEach((row) => {
@@ -142,6 +162,11 @@ export class Battle implements EffectHost {
           const x = f.x + ((i + 0.5) / line.length) * f.width + this.rng.range(-4, 4);
           const y = front + back * (offset + (i % 2) * 5) + this.rng.range(-3, 3);
           this.createUnit(team, entry.def, x, y, entry.hero);
+          // Contournement : quelques fantassins du premier rang passent par un flanc.
+          if (dep.flankShare > 0 && offset === 0 && !entry.hero && this.rng.chance(dep.flankShare)) {
+            const u = this.units[this.units.length - 1];
+            u.waypoint = { x: x < f.x + f.width / 2 ? f.x + 14 : f.x + f.width - 14, y: f.y + f.height / 2 };
+          }
         });
         offset += 13;
       }
@@ -171,8 +196,13 @@ export class Battle implements EffectHost {
       mass: def.mass * (s?.mass ?? 1) * gear('mass'),
       maxHp,
       damage: def.damage * (s?.damage ?? 1) * gear('damage'),
-      speed: def.speed * (s?.speed ?? 1) * personality.speedFactor * gear('speed'),
+      speed: def.speed * (s?.speed ?? 1) * personality.speedFactor * gear('speed') * this.biome.physics.speedFactor,
       equipment,
+      // Les upgrades d'abord (même ordre qu'avant), puis le sort éventuel du rôle.
+      abilities: [
+        ...equipment.map((e) => ({ id: e.id, short: e.short, special: e.special })),
+        ...(role.spell ? [{ id: `${role.id}_sort`, short: role.spell.label, special: role.spell }] : []),
+      ],
       x,
       y,
       vx: 0,
@@ -195,12 +225,13 @@ export class Battle implements EffectHost {
       vz: 0,
       stunTimer: 0,
       gag: 'none',
+      waypoint: null,
       gagTimer: 0,
       gagX: 0,
       gagY: 0,
       blockedTime: 0,
       lastGap: Infinity,
-      specialCooldowns: equipment.map(() => this.rng.range(...this.tuning.specialStartCooldown)),
+      specialCooldowns: [...equipment, ...(role.spell ? [role.spell] : [])].map(() => this.rng.range(...this.tuning.specialStartCooldown)),
       slowUntil: 0,
       slowFactor: 1,
       kills: 0,
@@ -299,6 +330,7 @@ export class Battle implements EffectHost {
   private think(u: Unit): void {
     this.tickTimers(u);
     if (this.updateGag(u)) return;
+    if (this.followWaypoint(u)) return;
     if (this.updateMorale(u)) return;
     const target = this.pickTarget(u);
     if (!target) {
@@ -342,6 +374,24 @@ export class Battle implements EffectHost {
     }
     u.vx = (dx / d) * u.speed * 1.2;
     u.vy = (dy / d) * u.speed * 1.2;
+    if (Math.abs(dx) > 1) u.facing = dx > 0 ? 1 : -1;
+    return true;
+  }
+
+  /** Contournement par un flanc : on rejoint le point de passage avant de chercher une cible. */
+  private followWaypoint(u: Unit): boolean {
+    const w = u.waypoint;
+    if (!w) return false;
+    const dx = w.x - u.x;
+    const dy = w.y - u.y;
+    const d = hypot(dx, dy);
+    if (d < 10 || this.time > 15) {
+      u.waypoint = null;
+      return false;
+    }
+    u.vx = (dx / d) * u.speed;
+    u.vy = (dy / d) * u.speed;
+    u.state = 'approach';
     if (Math.abs(dx) > 1) u.facing = dx > 0 ? 1 : -1;
     return true;
   }
@@ -947,11 +997,11 @@ export class Battle implements EffectHost {
 
   // ---------------------------------------------------------------- équipements et effets
 
-  /** Attaque spéciale d'un équipement, avec son éventuel raté. Renvoie vrai si elle a été utilisée. */
+  /** Attaque spéciale d'une upgrade ou sort du rôle, avec son éventuel raté. Renvoie vrai si elle a été utilisée. */
   private trySpecial(u: Unit, target: Unit, gap: number): boolean {
-    for (let i = 0; i < u.equipment.length; i++) {
-      const eq = u.equipment[i];
-      const sp = eq.special;
+    for (let i = 0; i < u.abilities.length; i++) {
+      const ability = u.abilities[i];
+      const sp = ability.special;
       if (!sp || u.specialCooldowns[i] > 0 || gap < sp.minRange || gap > sp.maxRange) continue;
       u.specialCooldowns[i] = sp.cooldown * this.rng.range(...this.tuning.cooldownJitter);
       const ctx: EffectContext = { source: u, team: u.team, x: target.x, y: target.y, target, fromX: u.x, fromY: u.y };
@@ -971,7 +1021,7 @@ export class Battle implements EffectHost {
           Object.assign(ctx, { x: u.x + cos(a) * d, y: u.y + sin(a) * d, target: undefined });
         }
       }
-      this.events.push({ type: 'special', unit: u.index, equipment: eq.id, misfire });
+      this.events.push({ type: 'special', unit: u.index, ability: ability.id, misfire });
       runEffects(this, sp.effects, ctx);
       return true;
     }
@@ -1005,6 +1055,18 @@ export class Battle implements EffectHost {
     this.deferred.length = 0;
     this.deferred.push(...keep);
     for (const d of due) d.run();
+  }
+
+  /** Seconde vague : une troupe de réserve entre par son côté du terrain. */
+  private enterFromBack(team: TeamId, def: UnitDef): void {
+    if (this.result) return;
+    const f = this.field;
+    const fromBottom = team === 'gnomes';
+    const x = f.x + 10 + this.rng.next() * (f.width - 20);
+    const y = fromBottom ? f.y + f.height - def.radius - 1 : f.y + def.radius + 1;
+    this.createUnit(team, def, x, y);
+    const u = this.units[this.units.length - 1];
+    this.events.push({ type: 'spawn', unit: u.index });
   }
 
   /** @internal EffectHost — des supporters sautent le muret et rejoignent leur camp. */
@@ -1114,7 +1176,8 @@ export class Battle implements EffectHost {
     if (this.time >= this.nextIncidentAt) {
       const eligible = this.data.events.filter((e) => e.from <= this.time && (e.until === undefined || this.time < e.until));
       if (eligible.length > 0) {
-        const weights = Object.fromEntries(eligible.map((e) => [e.id, e.weight]));
+        const boost = this.biome.physics.eventWeights;
+        const weights = Object.fromEntries(eligible.map((e) => [e.id, e.weight * (boost[e.id] ?? 1)]).filter(([, w]) => (w as number) > 0));
         const picked = this.rng.weighted(weights);
         const def = eligible.find((e) => e.id === picked)!;
         const target = this.incidentPoint(def);

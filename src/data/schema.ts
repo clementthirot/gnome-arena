@@ -52,6 +52,8 @@ export const RoleSchema = z.object({
   /** Distance (bord à bord) que l'unité cherche à garder avec sa cible ; elle recule en deçà. 0 = colle. */
   keepDistance: z.number().min(0).default(0),
   charge: ChargeSchema.optional(),
+  /** Sort du rôle (lanceur de sorts) : mêmes briques que les attaques spéciales des upgrades. */
+  spell: z.lazy(() => SpecialSchema.extend({ label: z.string() })).optional(),
 });
 export type RoleDef = z.infer<typeof RoleSchema>;
 
@@ -257,6 +259,19 @@ export const EffectSchema: z.ZodType<EffectDef, z.ZodTypeDef, unknown> = z.lazy(
   ]),
 ) as z.ZodType<EffectDef, z.ZodTypeDef, unknown>;
 
+// ------------------------------------------------------------------ capacités
+
+/** Attaque spéciale (upgrade) ou sort (rôle) : une portée, une recharge, des effets. */
+const SpecialSchema = z.object({
+  minRange: z.number().min(0).default(0),
+  maxRange: positive,
+  cooldown: positive,
+  effects: z.array(EffectSchema).min(1),
+  /** Défaut de l'upgrade : le tir part vers un allié, sur soi ou au hasard. */
+  misfire: z.object({ chance: fraction, mode: z.enum(['ally', 'self', 'random']) }).optional(),
+});
+export type SpecialDef = z.infer<typeof SpecialSchema>;
+
 // ------------------------------------------------------------------ équipements
 
 export const EquipmentSchema = z.object({
@@ -275,18 +290,7 @@ export const EquipmentSchema = z.object({
     })
     .default({}),
   /** Attaque spéciale utilisée quand la cible est à portée et la recharge prête. */
-  special: z
-    .object({
-      minRange: z.number().min(0).default(0),
-      maxRange: positive,
-      cooldown: positive,
-      effects: z.array(EffectSchema).min(1),
-      /** Défaut de l'upgrade : le tir part vers un allié, sur soi ou au hasard. */
-      misfire: z
-        .object({ chance: fraction, mode: z.enum(['ally', 'self', 'random']) })
-        .optional(),
-    })
-    .optional(),
+  special: z.lazy(() => SpecialSchema).optional(),
 });
 export type EquipmentDef = z.infer<typeof EquipmentSchema>;
 
@@ -485,6 +489,39 @@ const TuningSchema = z
   .default({});
 export type Tuning = z.infer<typeof TuningSchema>;
 
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+/** Biome de l'arène : décor, ambiance, et quelques règles physiques (neige glissante…). */
+export const BiomeSchema = z.object({
+  id,
+  label: z.string(),
+  palette: z.object({
+    ground: hexColor,
+    speckles: z.array(hexColor).min(1),
+    pebble: hexColor,
+    pebbleLight: hexColor,
+    line: hexColor,
+    wall: hexColor,
+    wallDark: hexColor,
+    stands: z.tuple([hexColor, hexColor]),
+    standsLine: hexColor,
+    backdrop: hexColor,
+  }),
+  /** Particules d'ambiance (rendu uniquement). */
+  ambient: z.enum(['none', 'leaves', 'snow', 'embers']).default('none'),
+  physics: z
+    .object({
+      /** Remplace rules.knockbackDecay : plus haut = plus glissant. */
+      knockbackDecay: fraction.optional(),
+      /** Multiplicateur de vitesse de toutes les unités. */
+      speedFactor: positive.default(1),
+      /** Multiplicateurs de poids des incidents (par identifiant). */
+      eventWeights: z.record(id, z.number().min(0)).default({}),
+    })
+    .default({}),
+});
+export type BiomeDef = z.infer<typeof BiomeSchema>;
+
 export const BattleConfigSchema = z.object({
   tickRate: z.number().int().positive(),
   arena: z.object({
@@ -493,6 +530,18 @@ export const BattleConfigSchema = z.object({
     /** Terrain de combat (le reste est occupé par le public). */
     field: z.object({ x: z.number(), y: z.number(), width: positive, height: positive }),
   }),
+  /** Biome par défaut (un arc ou la régie peuvent en choisir un autre). */
+  biome: id.default('sable'),
+  /** Déploiement : renforts en seconde vague, troupes qui contournent par les flancs (0 = désactivé). */
+  deployment: z
+    .object({
+      /** Part des troupes gardées en réserve, qui entrent par l'arrière à reserveAt. */
+      reserveShare: fraction.default(0),
+      reserveAt: positive.default(20),
+      /** Part des fantassins du premier rang qui passent par un flanc avant d'engager. */
+      flankShare: fraction.default(0),
+    })
+    .default({}),
   /** Composition de chaque armée : identifiant d'unité -> nombre. Les héros actifs s'y ajoutent. */
   armies: z.record(TeamId, z.record(id, z.number().int().min(0))),
   rules: z.object({
@@ -601,6 +650,7 @@ export const GameDataSchema = z
   .object({
     roles: z.array(RoleSchema),
     equipment: z.array(EquipmentSchema),
+    biomes: z.array(BiomeSchema).min(1),
     events: z.array(ArenaEventSchema),
     personalities: z.array(PersonalitySchema),
     units: z.array(UnitSchema),
@@ -634,6 +684,7 @@ export const GameDataSchema = z
         if (!personalities.has(p)) issue(['units', i, 'personalities'], `personnalité inconnue : ${p}`);
       }
     });
+    if (!data.biomes.some((b) => b.id === data.battle.biome)) issue(['battle', 'biome'], `biome inconnu : ${data.battle.biome}`);
     const equipment = new Set(data.equipment.map((e) => e.id));
     data.heroes.forEach((h, i) => {
       if (h.rival && !data.heroes.some((o) => o.id === h.rival)) issue(['heroes', i, 'rival'], `rival inconnu : ${h.rival}`);

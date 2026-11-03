@@ -1,0 +1,42 @@
+[
+  {
+    "id": "sable",
+    "label": "Arène de sable",
+    "palette": {
+      "ground": "#c8a46c", "speckles": ["#bf9a62", "#d2b07a", "#b8925a"], "pebble": "#9c8058", "pebbleLight": "#e0c590",
+      "line": "#b89660", "wall": "#7b6a58", "wallDark": "#5b4d40", "stands": ["#463e55", "#3f384d"], "standsLine": "#2b2635", "backdrop": "#3a3346"
+    },
+    "ambient": "none",
+    "physics": {}
+  },
+  {
+    "id": "foret",
+    "label": "Clairière de la forêt",
+    "palette": {
+      "ground": "#6aa84a", "speckles": ["#5a9a3a", "#7ab85a", "#4a8a2a"], "pebble": "#4a6a2a", "pebbleLight": "#a8d878",
+      "line": "#5a8a3a", "wall": "#6a4a2a", "wallDark": "#4a3018", "stands": ["#3a4a2a", "#34442a"], "standsLine": "#22301a", "backdrop": "#2a3a22"
+    },
+    "ambient": "leaves",
+    "physics": { "eventWeights": { "mud": 2 } }
+  },
+  {
+    "id": "neige",
+    "label": "Arène gelée",
+    "palette": {
+      "ground": "#e8f0f8", "speckles": ["#d8e4f0", "#f8fcff", "#c8d8e8"], "pebble": "#a8bcd0", "pebbleLight": "#ffffff",
+      "line": "#c0d4e8", "wall": "#8a9aae", "wallDark": "#6a7a8e", "stands": ["#3a4658", "#344050"], "standsLine": "#222c3a", "backdrop": "#2a3444"
+    },
+    "ambient": "snow",
+    "physics": { "knockbackDecay": 0.12, "speedFactor": 0.95 }
+  },
+  {
+    "id": "volcan",
+    "label": "Cratère du volcan",
+    "palette": {
+      "ground": "#4a3a3a", "speckles": ["#3a2a2a", "#5a4444", "#6a2a1a"], "pebble": "#2a1a1a", "pebbleLight": "#ff6a2a",
+      "line": "#8a2a1a", "wall": "#2a2226", "wallDark": "#1a1416", "stands": ["#3a2a2e", "#342428"], "standsLine": "#1a1214", "backdrop": "#241a1c"
+    },
+    "ambient": "embers",
+    "physics": { "eventWeights": { "fireball": 2.5, "meteor": 1.5 } }
+  }
+]

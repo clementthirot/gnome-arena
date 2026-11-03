@@ -31,7 +31,7 @@ const PlaceholderShapeSchema = z.object({
   size: z.number().int().min(6).max(48),
   color,
   accent: color,
-  mark: z.enum(['none', 'bow', 'helmet']),
+  mark: z.enum(['none', 'bow', 'helmet', 'staff']),
   outline: color.optional(),
 });
 

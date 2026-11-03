@@ -32,6 +32,8 @@ export const ArcSchema = z.object({
   /** Héros engagés dans l'arc (les autres sont mis de côté). */
   heroes: z.array(id).min(2),
   status: z.enum(['open', 'closed']).default('open'),
+  /** Biome de l'arène pour tout l'arc. */
+  biome: id.optional(),
   episodes: z.array(EpisodeSchema).default([]),
 });
 export type Arc = z.infer<typeof ArcSchema>;

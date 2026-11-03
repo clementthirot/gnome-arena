@@ -10,16 +10,24 @@
       "height": 350
     }
   },
+  "biome": "sable",
+  "deployment": {
+    "reserveShare": 0,
+    "reserveAt": 20,
+    "flankShare": 0
+  },
   "armies": {
     "gnomes": {
       "gnome_melee": 24,
       "gnome_archer": 14,
-      "gnome_charger": 9
+      "gnome_charger": 9,
+      "gnome_mage": 0
     },
     "goblins": {
       "goblin_melee": 24,
       "goblin_archer": 14,
-      "goblin_charger": 9
+      "goblin_charger": 9,
+      "goblin_shaman": 0
     }
   },
   "rules": {

@@ -79,6 +79,7 @@ function arenaParams(data: GameData): ArenaParams {
       speed: record ? 1 : speed,
       record,
       upgrades: parseUpgrades(params.get('up')),
+      biome: params.get('biome') ?? undefined,
     };
   }
   const raw = Object.entries(arcFiles).find(([path]) => path.endsWith(`/${arcId}.json`))?.[1];
@@ -94,6 +95,7 @@ function arenaParams(data: GameData): ArenaParams {
     speed: record ? 1 : speed,
     record,
     heroes: arcHeroes(arc, data),
+    biome: params.get('biome') ?? arc.biome,
     upgrades: upgradesBefore(arc, number),
     episode: {
       number,
@@ -119,7 +121,7 @@ function arenaParams(data: GameData): ArenaParams {
 function warnIfEpisodeDiverged(arena: ArenaParams): void {
   const expected = arena.episode?.expected;
   if (!expected) return;
-  const result = new Battle(arena.data, { seed: arena.seed, heroes: arena.heroes, upgrades: arena.upgrades }).runToEnd();
+  const result = new Battle(arena.data, { seed: arena.seed, heroes: arena.heroes, upgrades: arena.upgrades, biome: arena.biome }).runToEnd();
   if (result.winner === expected.winner && Math.abs(result.duration - expected.duration) < 0.2) return;
   const message = `⚠ L'épisode ne se rejoue plus comme prévu (${expected.winner} en ${expected.duration} s attendu, ${result.winner} en ${result.duration.toFixed(1)} s obtenu) : une donnée a changé depuis sa planification.`;
   console.warn(message);

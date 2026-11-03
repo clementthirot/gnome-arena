@@ -1,5 +1,6 @@
 // Point d'entrée des données : assemble les JSON et les valide avant tout usage.
 import battle from './battle.json';
+import biomes from './biomes.json';
 import equipment from './equipment.json';
 import events from './events.json';
 import heroes from './heroes.json';
@@ -20,7 +21,7 @@ export function parseGameData(raw: unknown): GameData {
   return result.data;
 }
 
-export const rawGameData = { roles, personalities, units, heroes, equipment, events, battle };
+export const rawGameData = { roles, personalities, units, heroes, equipment, events, biomes, battle };
 
 export function loadGameData(): GameData {
   return parseGameData(structuredClone(rawGameData));

@@ -744,6 +744,110 @@
         "accent": "#c08040",
         "mark": "none"
       }
+    },
+    "gnome_mage": {
+      "type": "spritesheet",
+      "url": "sprites/generated/gnome_mage.png",
+      "frameWidth": 20,
+      "frameHeight": 20,
+      "size": 20,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "gnome",
+        "size": 12,
+        "color": "#5b8def",
+        "accent": "#8a3ad8",
+        "mark": "staff"
+      }
+    },
+    "goblin_shaman": {
+      "type": "spritesheet",
+      "url": "sprites/generated/goblin_shaman.png",
+      "frameWidth": 20,
+      "frameHeight": 20,
+      "size": 20,
+      "animations": {
+        "idle": {
+          "frames": [
+            0,
+            1
+          ],
+          "fps": 4
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 14
+        },
+        "death": {
+          "frames": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "fps": 10
+        }
+      },
+      "bricks": {
+        "death": "stay"
+      },
+      "placeholder": {
+        "body": "goblin",
+        "size": 12,
+        "color": "#7cc243",
+        "accent": "#8a3ad8",
+        "mark": "staff"
+      }
     }
   },
   "accessories": {
@@ -989,6 +1093,19 @@
       "color": "#202024",
       "accent": "#ffb347",
       "size": 5
+    },
+    "magic_orb": {
+      "kind": "ball",
+      "color": "#b060ff",
+      "accent": "#ffffff",
+      "size": 4
+    },
+    "magic_ring": {
+      "kind": "ring",
+      "color": "#b060ff",
+      "accent": "#e8c8ff",
+      "size": 2,
+      "duration": 0.45
     }
   },
   "staging": {

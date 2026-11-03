@@ -10,7 +10,7 @@ export interface PlaceholderShape {
   size: number;
   color: string;
   accent: string;
-  mark: 'none' | 'bow' | 'helmet';
+  mark: 'none' | 'bow' | 'helmet' | 'staff';
   outline?: string;
 }
 
@@ -75,6 +75,15 @@ export function placeholderPixels(entry: PlaceholderShape): PixelGrid {
     if (entry.mark === 'helmet') {
       for (let y = top; y < top + Math.max(2, Math.round(n * 0.18)); y++) for (let x = 0; x < n; x++) if (grid[y][x]) set(x, y, HELMET);
     }
+  }
+
+  if (entry.mark === 'staff') {
+    // Bâton à droite, surmonté d'un orbe.
+    const x = n - 2;
+    for (let y = Math.round(n * 0.25); y < n; y++) set(x, y, BOW);
+    set(x, Math.round(n * 0.18), '#e8c8ff');
+    set(x - 1, Math.round(n * 0.25), '#b060ff');
+    set(x, Math.round(n * 0.25) - 1, '#b060ff');
   }
 
   if (entry.mark === 'bow') {

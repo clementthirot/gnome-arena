@@ -42,7 +42,7 @@ function saveArc(arc: Arc) {
 }
 
 /** Configuration d'un combat pour l'épisode n de l'arc. */
-const setupFor = (arc: Arc, n: number, seed: string) => ({ seed, heroes: arcHeroes(arc, data), upgrades: upgradesBefore(arc, n) });
+const setupFor = (arc: Arc, n: number, seed: string) => ({ seed, heroes: arcHeroes(arc, data), upgrades: upgradesBefore(arc, n), biome: arc.biome });
 
 const label = (id: string) => data.equipment.find((e) => e.id === id)?.short ?? id;
 const heroName = (id: string) => data.heroes.find((h) => h.id === id)?.name ?? id;
