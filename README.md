@@ -12,7 +12,7 @@ murs, cadence des incidents…) sont dans `src/data/battle.json` (`rules.tuning`
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
+npm run dev          # http://localhost:5173 — régie : http://localhost:5173/regie.html
 npm test             # déterminisme, données, mêlée vivante, durée, effets, arcs
 npm run bench        # mode accéléré sans rendu (100 seeds)
 npm run episode      # état de l'arc en cours
@@ -25,15 +25,33 @@ npm run sprites      # vérifie les sprite sheets de public/sprites
 | --- | --- |
 | `?seed=53` | rejoue exactement le combat 53 |
 | `?arc=arc1&ep=3` | épisode 3 de l'arc : sa seed, ses héros, leurs upgrades, et la carte de vote en fin |
-| `?record=1` | enregistre la vidéo 1080 × 1920 et la télécharge à la fin de l'écran de vote |
+| `?record=1` | un clic lance l'enregistrement (vidéo 1080 × 1920 avec le son, webm), téléchargé à la fin de l'écran de vote |
+| `?biome=neige` | biome de l'arène : `sable`, `foret`, `neige` (glissante), `volcan` |
 | `?up=bob:magic_sword+grenades,snik:laser_goggles` | équipe des héros à la main (essais) |
 | `?speed=4` | affichage accéléré |
 | `?mode=bench&runs=100&from=1` | mode accéléré dans un Web Worker, avec liens « voir » et « enregistrer » vers les meilleures seeds |
 
-Pendant un combat : `Espace` pause, `1` `2` `4` `8` vitesse, `R` rejouer, `N` seed suivante.
+Pendant un combat : `Espace` pause, `1` `2` `4` `8` vitesse, `R` rejouer, `N` seed suivante, `M` couper le son
+(le son démarre au premier clic ou à la première touche, règle des navigateurs).
 Pendant un enregistrement, garder l'onglet visible : un onglet caché n'affiche plus d'images.
 
-## Boucle d'un épisode
+## Régie
+
+`http://localhost:5173/regie.html` (serveur de dev lancé) prépare un épisode sans ligne de commande :
+
+1. **Prochain épisode** : lancer le scout (Web Worker), cliquer une seed dans le tableau. Les seeds qui
+   finissent comme l'épisode précédent (retournement, héros seul contre tous, écrasement…) sont pénalisées.
+2. Choisir le héros du camp perdant qui recevra l'upgrade (le moins équipé est proposé) et les 3 options.
+3. **Aperçu** ouvre le combat ; **Figer l'épisode** l'écrit dans l'arc et ouvre la page d'enregistrement.
+4. Après publication, saisir les voix ou coller un export de commentaires, puis valider.
+5. **Réglages de l'arc** : biome, effectifs par camp, incidents par minute et poids de chaque incident,
+   probabilités des gags. Ils s'appliquent au prochain épisode ; chaque épisode figé garde sa copie, donc les
+   épisodes publiés restent rejouables à l'identique.
+6. **Fin d'arc** : clore l'arc, en créer un nouveau (héros, biome).
+
+Les fichiers d'arc sont lus et écrits par un petit relais du serveur Vite (`vite.config.ts`), qui les valide avant d'écrire.
+
+## Boucle d'un épisode en ligne de commande
 
 ```bash
 npm run episode -- scout                 # 1. simule 100 seeds avec l'état actuel des héros, classe les plus spectaculaires
@@ -56,6 +74,7 @@ partir des votes précédents, donc chaque épisode publié reste rejouable à l
 npm run bench -- --runs 200 --from 1 --top 10
 npm run bench -- --set battle.rules.damageScale=0.3 --set units.gnome_archer.damage=9
 npm run bench -- --up grok:laser_goggles          # poids d'une upgrade sur le rapport de force
+npm run bench -- --biome neige                    # un autre biome
 ```
 
 `--set` teste un réglage sans modifier les JSON (les éléments de tableau sont désignés par leur `id`).
@@ -102,7 +121,34 @@ Les effets de zone peuvent se centrer sur le lanceur (`"at": "self"`, le tourbil
 - **Supporters** : de temps en temps, des spectateurs sautent le muret et rejoignent un camp, ou le camp mené (jusqu'à 58 s).
 - **Fin maîtrisée** : un gaz toxique sort des conduits et resserre l'arène de 45 s à 75 s ; victoire aux PV restants à 80 s.
 
+## Gags (moteur, rares, probabilité et plafond par combat dans `battle.json > gags`)
+
+- **Bowling** (permanent) : une unité qui retombe repousse et étourdit ceux sur qui elle tombe.
+- **Choc de têtes** : deux chargeurs qui se percutent restent assommés (« BONK ! »).
+- **Victoire prématurée** : une unité à l'écart danse après un K.O., jusqu'au prochain coup.
+- **Arme perdue** : l'arme s'envole, l'unité court la ramasser.
+- **Le public lance** des tomates, des chaussures et des bombes (incidents d'arène, effet `stun`).
+
+## Unités spéciales et déploiement (0 par défaut)
+
+- Rôle **lanceur de sorts** symétrique (mage gnome, sorcier gobelin) : le sort est une liste d'effets en JSON.
+- `battle.json > deployment` : réserve qui entre en seconde vague, troupes qui contournent par les flancs.
+  Option de test : activées ensemble (30 %), elles déséquilibrent (65/35), parce que la réserve retient d'abord les tireurs.
+- `src/data/biomes.json` : décor, ambiance (feuilles, neige, braises), glisse, poids des incidents.
+
 ## Mise en scène (rendu uniquement, réglable dans `manifest.staging`)
+
+- **Même seed = même vidéo** : le hasard du rendu (débris, objets perdus, gags visuels) est tiré de la seed (`render/random.ts`).
+- **Intro** : fanfare, titre qui tombe en rebondissant, « Épisode N », héros, prono « Qui va gagner ? », 3-2-1 COMBAT.
+- **Empereur** dans sa loge : lance le combat, porte les annonces du commentateur (premier sang, triple K.O.,
+  héros en feu, retournement), pouce levé vers le vainqueur, présente la roulette des upgrades.
+- **Répliques des héros** en bulles selon leur personnalité (`heroes.json > quotes`), carton **DUEL** entre rivaux (`rival`).
+- **Juice** : arrêt sur image aux gros impacts, étirement au décollage, étoiles au-dessus des étourdis, sueur des fuyards,
+  débris (dents, mottes), bonnets et casques perdus, flèches plantées, flaques qui sèchent et virent au brun.
+- **Barre de rapport de force** en haut de l'écran (PV restants de chaque camp).
+- **Fin** : ralenti sur le dernier K.O., l'arène continue de vivre, bannières, confettis, spectateur récurrent au chapeau jaune
+  qui finit toujours touché ; carte de vote avec portrait, rouleaux façon machine à sous, K.O. cumulés de l'arc, raté de l'épisode.
+- **Son** synthétisé (WebAudio) : jingle, compte à rebours, boucle musicale, coups, explosions, laser, public.
 
 - **Présentation des héros** avant « COMBAT ! » : nom, surnom, upgrades portées.
 - **Caméra** : zoom bref sur un héros qui tombe, un duel de héros gagné, un tir raté, et suivi continu d'un héros seul contre trois ennemis ou plus. L'interface reste fixe (seconde caméra). Les charges de héros sont désactivées par défaut (`triggers.heroCharge`).

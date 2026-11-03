@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Régie — Gnomes vs Gobelins</title>
+    <style>
+      :root { --bg: #16131f; --panel: #221d30; --line: #3a3350; --text: #ece6f8; --muted: #a098b0; --gnome: #7fb0ff; --goblin: #9be05a; --accent: #ffe14a; --danger: #ff7a7a; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+      header { padding: 16px 20px; border-bottom: 2px solid var(--line); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+      h1 { font: 16px "Press Start 2P", monospace; margin: 0; color: var(--accent); }
+      h2 { font: 12px "Press Start 2P", monospace; margin: 0 0 12px; color: var(--accent); }
+      main { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+      section { background: var(--panel); border: 2px solid var(--line); border-radius: 8px; padding: 16px; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+      tbody tr.pick { cursor: pointer; }
+      tbody tr.pick:hover { background: #2e2740; }
+      tbody tr.selected { background: #3d3555; outline: 2px solid var(--accent); }
+      button { font: 11px "Press Start 2P", monospace; padding: 10px 12px; background: #3d6cc4; color: #fff; border: 3px solid #000; cursor: pointer; }
+      button.danger { background: #a02030; }
+      button.ok { background: #3f9e4a; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      input, select, textarea { background: #120f1a; color: var(--text); border: 1px solid var(--line); padding: 6px; border-radius: 4px; font: inherit; }
+      input[type='number'] { width: 70px; }
+      label { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin: 4px 0; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+      .muted { color: var(--muted); }
+      .gnomes { color: var(--gnome); }
+      .goblins { color: var(--goblin); }
+      .msg { padding: 8px; border-radius: 4px; margin-top: 8px; }
+      .msg.err { background: #4a1a22; color: var(--danger); }
+      .msg.okmsg { background: #1a3a22; color: var(--goblin); }
+      .wide { grid-column: 1 / -1; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>RÉGIE</h1>
+      <select id="arc"></select>
+      <span id="arcInfo" class="muted"></span>
+    </header>
+    <main id="app"></main>
+    <script type="module" src="/src/regie/regie.ts"></script>
+  </body>
+</html>

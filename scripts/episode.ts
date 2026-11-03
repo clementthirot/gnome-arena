@@ -13,9 +13,9 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadGameData } from '../src/data';
-import { arcHeroes, countVotes, parseArc, upgradesBefore, voteWinner, type Arc, type Episode } from '../src/data/arc';
+import { arcHeroes, countVotes, episodeSetup, parseArc, upgradesBefore, voteWinner, type Arc, type Episode } from '../src/data/arc';
 import { opposingTeam } from '../src/sim';
-import { aggregate, simulate, spectacleScore, WINNER_LABEL, type BattleSummary } from '../src/tools/metrics';
+import { aggregate, END_LABEL, endType, scoutScore, simulate, WINNER_LABEL, type BattleSummary } from '../src/tools/metrics';
 
 const ARCS_DIR = join(import.meta.dirname, '../src/data/arcs');
 const [command = 'status', ...args] = process.argv.slice(2);
@@ -42,7 +42,11 @@ function saveArc(arc: Arc) {
 }
 
 /** Configuration d'un combat pour l'épisode n de l'arc. */
-const setupFor = (arc: Arc, n: number, seed: string) => ({ seed, heroes: arcHeroes(arc, data), upgrades: upgradesBefore(arc, n), biome: arc.biome });
+/** Simule l'épisode n avec les réglages de l'arc. */
+const run = (arc: Arc, n: number, seed: string): BattleSummary => {
+  const e = episodeSetup(arc, n, seed, data);
+  return simulate(e.data, e.setup);
+};
 
 const label = (id: string) => data.equipment.find((e) => e.id === id)?.short ?? id;
 const heroName = (id: string) => data.heroes.find((h) => h.id === id)?.name ?? id;
@@ -65,12 +69,12 @@ function status() {
       : `vote en attente (${heroName(ep.recipient)} : ${ep.options.map((o, i) => `${i + 1} ${label(o)}`).join(', ')})`;
     console.log(`\n  Ép. ${ep.number} · seed ${ep.seed} · ${WINNER_LABEL[ep.winner]} en ${ep.duration.toFixed(1)} s · ${vote}`);
     // Un épisode publié doit se rejouer à l'identique : sinon, une donnée a changé depuis.
-    const replay = simulate(data, setupFor(arc, ep.number, ep.seed));
+    const replay = run(arc, ep.number, ep.seed);
     if (replay.winner !== ep.winner || Math.abs(replay.duration - ep.duration) >= 0.2) {
       console.log(`    ⚠ ne se rejoue plus pareil : ${WINNER_LABEL[replay.winner]} en ${replay.duration.toFixed(1)} s (une donnée a changé depuis la planification)`);
     }
   }
-  const report = aggregate(Array.from({ length: 60 }, (_, i) => simulate(data, setupFor(arc, n, String(90_000 + i)))));
+  const report = aggregate(Array.from({ length: 60 }, (_, i) => run(arc, n, String(90_000 + i))));
   const top = Math.max(report.winRate.gnomes, report.winRate.goblins);
   console.log(
     `\nRapport de force pour l'épisode ${n} (60 seeds) : gnomes ${(report.winRate.gnomes * 100).toFixed(0)} % · gobelins ${(report.winRate.goblins * 100).toFixed(0)} % · retournements ${(report.comebackRate * 100).toFixed(0)} %`,
@@ -85,12 +89,11 @@ function scout() {
   const n = nextNumber(arc);
   const runs = Number(opt('runs') ?? 100);
   const from = Number(opt('from') ?? n * 1000);
-  const list: BattleSummary[] = Array.from({ length: runs }, (_, i) => simulate(data, setupFor(arc, n, String(from + i))));
-  console.log(`Épisode ${n} : ${runs} seeds simulées (${from} à ${from + runs - 1})\n`);
-  for (const s of [...list].sort((a, b) => spectacleScore(b) - spectacleScore(a)).slice(0, Number(opt('top') ?? 8))) {
-    console.log(
-      `  seed ${String(s.seed).padEnd(6)} ${WINNER_LABEL[s.winner].padEnd(9)} ${s.duration.toFixed(1)} s · perdant +${(s.loserMaxLead * 100).toFixed(0)} %${s.lastStand ? ' · héros seul contre tous' : ''}`,
-    );
+  const list: BattleSummary[] = Array.from({ length: runs }, (_, i) => run(arc, n, String(from + i)));
+  const previous = arc.episodes.at(-1)?.endType;
+  console.log(`Épisode ${n} : ${runs} seeds simulées (${from} à ${from + runs - 1})${previous ? ` · fin précédente : ${END_LABEL[previous]} (pénalisée)` : ''}\n`);
+  for (const s of [...list].sort((a, b) => scoutScore(b, previous) - scoutScore(a, previous)).slice(0, Number(opt('top') ?? 8))) {
+    console.log(`  seed ${String(s.seed).padEnd(6)} ${WINNER_LABEL[s.winner].padEnd(9)} ${s.duration.toFixed(1)} s · ${END_LABEL[endType(s)]} · perdant +${(s.loserMaxLead * 100).toFixed(0)} %`);
   }
   console.log(`\nRevoir : http://localhost:5173/?arc=${arc.id}&ep=${n}&seed=<seed>  (ajouter &record=1 pour enregistrer)`);
 }
@@ -113,7 +116,8 @@ function plan() {
   const seed = opt('seed');
   if (!seed) throw new Error('--seed requis (voir npm run episode -- scout)');
   const n = nextNumber(arc);
-  const summary = simulate(data, setupFor(arc, n, seed));
+  const { settings } = episodeSetup(arc, n, seed, data);
+  const summary = run(arc, n, seed);
   if (summary.winner === 'draw') throw new Error(`seed ${seed} : égalité, choisir une autre seed`);
   const recipient = opt('recipient') ?? suggestRecipient(arc, n, summary);
   if (!recipient) throw new Error('aucun héros dans le camp perdant');
@@ -131,6 +135,8 @@ function plan() {
     votes: null,
     upgrade: null,
     heroKills: summary.heroKills,
+    endType: endType(summary),
+    settings,
   });
   saveArc(parseArc(arc, data));
   console.log(`Épisode ${n} figé : seed ${seed}, victoire des ${WINNER_LABEL[summary.winner]} en ${summary.duration.toFixed(1)} s.`);

@@ -94,6 +94,22 @@ export function aggregate(summaries: readonly BattleSummary[]): BenchReport {
   };
 }
 
+/** Type de fin : retournement, héros seul contre tous, fin aux points, écrasement, ou combat serré. */
+export function endType(s: BattleSummary): 'lastStand' | 'comeback' | 'timeout' | 'blowout' | 'close' {
+  if (s.reason === 'timeout') return 'timeout';
+  if (s.comeback) return 'comeback';
+  if (s.lastStand) return 'lastStand';
+  if (s.survivors >= 10) return 'blowout';
+  return 'close';
+}
+
+export const END_LABEL = { lastStand: 'héros seul contre tous', comeback: 'retournement', timeout: 'aux points', blowout: 'écrasement', close: 'serré' } as const;
+
+/** Score du scout : spectacle, divisé par deux si la fin ressemble à celle de l'épisode précédent. */
+export function scoutScore(s: BattleSummary, previous?: string): number {
+  return spectacleScore(s) * (previous && endType(s) === previous ? 0.5 : 1);
+}
+
 /** Note de spectacle : sert à repérer les seeds à rejouer (retournement, héros seul contre tous). */
 export function spectacleScore(s: BattleSummary): number {
   const inWindow = s.duration >= TARGET_WINDOW[0] && s.duration <= TARGET_WINDOW[1] + 0.05 ? 1 : 0;

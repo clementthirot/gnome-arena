@@ -10,7 +10,7 @@ import Phaser from 'phaser';
 import { startRecording } from './capture/recorder';
 import { sound } from './render/audio';
 import { loadGameData, type GameData } from './data';
-import { arcHeroes, killsBefore, parseArc, upgradesBefore } from './data/arc';
+import { episodeSetup, killsBefore, parseArc } from './data/arc';
 import { Battle } from './sim/battle';
 import type { ArenaParams } from './render/scenes/ArenaScene';
 import { ArenaScene } from './render/scenes/ArenaScene';
@@ -19,7 +19,19 @@ import { ResultScene } from './render/scenes/ResultScene';
 import { startBenchPage } from './tools/benchPage';
 
 const params = new URLSearchParams(location.search);
-const arcFiles = import.meta.glob('./data/arcs/*.json', { eager: true, import: 'default' });
+// En production, les arcs sont embarqués ; en développement, la régie les sert à jour (sans recharger la page).
+const arcFiles = import.meta.glob('./data/arcs/*.json', { import: 'default' });
+
+async function loadArc(id: string): Promise<unknown> {
+  try {
+    const res = await fetch('./__regie/arcs');
+    if (res.ok) return ((await res.json()) as { id: string }[]).find((a) => a.id === id);
+  } catch {
+    // pas de régie (build de production)
+  }
+  const loader = Object.entries(arcFiles).find(([path]) => path.endsWith(`/${id}.json`))?.[1];
+  return loader ? loader() : undefined;
+}
 
 async function main() {
   await document.fonts.load('16px "Press Start 2P"');
@@ -28,7 +40,7 @@ async function main() {
     return;
   }
   const data = loadGameData();
-  const arena = arenaParams(data);
+  const arena = await arenaParams(data);
   if (arena.record) {
     // Le son ne démarre qu'après un geste : on attend un clic pour lancer l'enregistrement.
     await waitForClick('● ENREGISTRER L\'ÉPISODE');
@@ -93,7 +105,7 @@ function waitForClick(label: string): Promise<void> {
   });
 }
 
-function arenaParams(data: GameData): ArenaParams {
+async function arenaParams(data: GameData): Promise<ArenaParams> {
   const speed = Number(params.get('speed') ?? 1) || 1;
   const record = params.get('record') === '1';
   const arcId = params.get('arc');
@@ -107,21 +119,24 @@ function arenaParams(data: GameData): ArenaParams {
       biome: params.get('biome') ?? undefined,
     };
   }
-  const raw = Object.entries(arcFiles).find(([path]) => path.endsWith(`/${arcId}.json`))?.[1];
+  const raw = await loadArc(arcId);
   if (!raw) throw new Error(`arc introuvable : ${arcId}`);
   const arc = parseArc(raw, data);
   const number = Number(params.get('ep') ?? arc.episodes.length + 1);
   const ep = arc.episodes.find((e) => e.number === number);
   const hero = ep && data.heroes.find((h) => h.id === ep.recipient);
   const team = hero && data.units.find((u) => u.id === hero.base)?.team;
+  const seed = params.get('seed') ?? ep?.seed ?? String(Math.floor(Math.random() * 100000));
+  // Réglages de la régie (copie figée avec l'épisode, sinon réglages courants de l'arc).
+  const episode = episodeSetup(arc, number, seed, data);
   return {
-    data,
-    seed: params.get('seed') ?? ep?.seed ?? String(Math.floor(Math.random() * 100000)),
+    data: episode.data,
+    seed,
     speed: record ? 1 : speed,
     record,
-    heroes: arcHeroes(arc, data),
-    biome: params.get('biome') ?? arc.biome,
-    upgrades: upgradesBefore(arc, number),
+    heroes: episode.setup.heroes,
+    biome: params.get('biome') ?? episode.setup.biome,
+    upgrades: episode.setup.upgrades,
     episode: {
       number,
       arcKills: Object.fromEntries(Object.entries(killsBefore(arc, number)).map(([id, k]) => [data.heroes.find((h) => h.id === id)?.name ?? id, k])),

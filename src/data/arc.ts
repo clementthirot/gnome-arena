@@ -5,6 +5,25 @@ import type { GameData } from './schema';
 import { TeamId } from './schema';
 
 const id = z.string().regex(/^[a-z0-9_-]+$/);
+const fraction = z.number().min(0).max(1);
+
+/**
+ * Réglages de la régie pour un arc : biome, effectifs, fréquence des incidents et des gags.
+ * Chaque épisode figé en garde une copie, pour rester rejouable même si l'arc change ensuite.
+ */
+export const ArcSettingsSchema = z.object({
+  biome: id.optional(),
+  armies: z.record(TeamId, z.record(id, z.number().int().min(0))).optional(),
+  eventsPerMinute: z.number().min(0).optional(),
+  /** Poids des incidents (0 = désactivé). */
+  eventWeights: z.record(id, z.number().min(0)).optional(),
+  gagChances: z.object({ headClash: fraction, victoryDance: fraction, lostWeapon: fraction }).partial().optional(),
+});
+export type ArcSettings = z.infer<typeof ArcSettingsSchema>;
+
+/** Type de fin d'un combat : le scout évite d'enchaîner deux fois le même. */
+export const EndType = z.enum(['lastStand', 'comeback', 'timeout', 'blowout', 'close']);
+export type EndType = z.infer<typeof EndType>;
 
 export const EpisodeSchema = z.object({
   number: z.number().int().positive(),
@@ -23,6 +42,9 @@ export const EpisodeSchema = z.object({
   publishedAt: z.string().optional(),
   /** K.O. de chaque héros dans ce combat (statistiques cumulées de l'arc). */
   heroKills: z.record(z.string(), z.number().int().min(0)).optional(),
+  endType: EndType.optional(),
+  /** Réglages au moment où l'épisode a été figé. */
+  settings: ArcSettingsSchema.optional(),
 });
 export type Episode = z.infer<typeof EpisodeSchema>;
 
@@ -32,8 +54,10 @@ export const ArcSchema = z.object({
   /** Héros engagés dans l'arc (les autres sont mis de côté). */
   heroes: z.array(id).min(2),
   status: z.enum(['open', 'closed']).default('open'),
-  /** Biome de l'arène pour tout l'arc. */
+  /** Biome de l'arène pour tout l'arc (ancien emplacement ; settings.biome prime). */
   biome: id.optional(),
+  /** Réglages courants de la régie, appliqués au prochain épisode. */
+  settings: ArcSettingsSchema.default({}),
   episodes: z.array(EpisodeSchema).default([]),
 });
 export type Arc = z.infer<typeof ArcSchema>;
@@ -48,6 +72,18 @@ export function parseArc(raw: unknown, data: GameData): Arc {
   const equipment = new Set(data.equipment.map((e) => e.id));
   const problems: string[] = [];
   for (const h of arc.heroes) if (!heroIds.has(h)) problems.push(`héros inconnu : ${h}`);
+  const checkSettings = (s: ArcSettings | undefined, where: string) => {
+    if (!s) return;
+    if (s.biome && !data.biomes.some((b) => b.id === s.biome)) problems.push(`${where} : biome inconnu ${s.biome}`);
+    for (const [team, army] of Object.entries(s.armies ?? {}))
+      for (const unitId of Object.keys(army)) {
+        const unit = data.units.find((u) => u.id === unitId);
+        if (!unit || unit.team !== team) problems.push(`${where} : unité ${unitId} invalide pour ${team}`);
+      }
+    for (const ev of Object.keys(s.eventWeights ?? {})) if (!data.events.some((e) => e.id === ev)) problems.push(`${where} : incident inconnu ${ev}`);
+  };
+  checkSettings(arc.settings, 'réglages');
+  arc.episodes.forEach((ep) => checkSettings(ep.settings, `épisode ${ep.number}`));
   arc.episodes.forEach((ep, i) => {
     if (ep.number !== i + 1) problems.push(`épisode ${i + 1} numéroté ${ep.number}`);
     if (!arc.heroes.includes(ep.recipient)) problems.push(`épisode ${ep.number} : ${ep.recipient} n'est pas dans l'arc`);
@@ -80,6 +116,40 @@ export function killsBefore(arc: Arc, episodeNumber: number): Record<string, num
     for (const [hero, k] of Object.entries(ep.heroKills)) out[hero] = (out[hero] ?? 0) + k;
   }
   return out;
+}
+
+/** Réglages qui s'appliquent à l'épisode n : sa copie s'il est figé, sinon les réglages courants de l'arc. */
+export function settingsFor(arc: Arc, episodeNumber: number): ArcSettings {
+  const ep = arc.episodes.find((e) => e.number === episodeNumber);
+  return ep?.settings ?? { ...arc.settings, biome: arc.settings.biome ?? arc.biome };
+}
+
+/** Données de jeu avec les réglages de la régie appliqués (copie ; l'original n'est pas modifié). */
+export function withSettings(data: GameData, s: ArcSettings): GameData {
+  const d = structuredClone(data);
+  if (s.biome) d.battle.biome = s.biome;
+  if (s.armies) d.battle.armies = { ...d.battle.armies, ...s.armies };
+  if (s.eventsPerMinute !== undefined) d.battle.events.perMinute = s.eventsPerMinute;
+  if (s.eventWeights) {
+    d.events = d.events
+      .map((e) => (s.eventWeights![e.id] === undefined ? e : { ...e, weight: s.eventWeights![e.id] }))
+      .filter((e) => e.weight > 0);
+  }
+  const g = s.gagChances ?? {};
+  if (g.headClash !== undefined) d.battle.gags.headClash.chance = g.headClash;
+  if (g.victoryDance !== undefined) d.battle.gags.victoryDance.chance = g.victoryDance;
+  if (g.lostWeapon !== undefined) d.battle.gags.lostWeapon.chance = g.lostWeapon;
+  return d;
+}
+
+/** Tout ce qu'il faut pour simuler l'épisode n d'un arc. */
+export function episodeSetup(arc: Arc, n: number, seed: string, data: GameData) {
+  const settings = settingsFor(arc, n);
+  return {
+    data: withSettings(data, settings),
+    setup: { seed, heroes: arcHeroes(arc, data), upgrades: upgradesBefore(arc, n), biome: settings.biome },
+    settings,
+  };
 }
 
 /** Héros de l'arc, avec leur définition (pour lancer un combat). */

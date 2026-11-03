@@ -223,3 +223,31 @@ Questions ouvertes
 [ ] Outil de comptage des votes multi-plateformes : outil existant ou script maison ?
 [ ] Combien de troupes par camp pour que les héros restent lisibles ?
 [ ] Critères de fin d'arc : nombre d'épisodes, ou niveau de puissance atteint ?
+
+---
+
+## 7. Suivi des directives (3 novembre 2026)
+
+Fait :
+- Régie (`/regie.html`) : scout dans le navigateur avec pénalité du type de fin, choix du héros et des 3 options,
+  aperçu, épisode figé, saisie ou import du vote, réglages de l'arc (biome, effectifs, fréquences des incidents
+  et des gags), clôture et création d'arc. Chaque épisode garde une copie de ses réglages.
+- Juice cartoon : arrêt sur image, étirement au décollage, ramassé avant la charge, étoiles des étourdis,
+  sueur des fuyards ; débris et objets perdus plafonnés ; flaques qui sèchent et virent au brun, tramées.
+- Public : tomates, chaussures, bombes (étourdissement) ; supporters qui quittent leur place ; coups perdus.
+- Slapstick : bowling (permanent, sans dégâts), choc de têtes, danse de victoire interrompue, arme perdue.
+- Intro (fanfare, titre qui rebondit, héros, prono, 3-2-1) et fin (ralenti, épilogue, célébration,
+  machine à sous, stats cumulées de l'arc, raté de l'épisode).
+- Barre de rapport de force, empereur, commentateur, répliques, DUEL entre rivaux, spectateur récurrent.
+- Lanceur de sorts symétrique (0 par défaut), vagues et flancs (option), biomes sable / forêt / neige / volcan.
+- Son synthétisé, embarqué dans la vidéo (webm).
+- Même seed = même vidéo : le hasard du rendu est tiré de la seed et réamorcé à chaque tick.
+
+Pas encore fait :
+- Trébucher sur les objets perdus au sol ; l'empereur qui descend dans l'arène (épisodes spéciaux).
+- Comptage des votes via les API des plateformes.
+- Vagues + flancs activés ensemble déséquilibrent (65/35) : à revoir avant de s'en servir.
+
+À vérifier de ton côté :
+- Un enregistrement complet de bout en bout (le téléchargement final n'a pas été lancé pendant le développement).
+- La vidéo sort en webm (le mp4 avec son ne fonctionne pas dans Chrome) : à convertir si une plateforme le refuse.
