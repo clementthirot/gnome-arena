@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import type { TeamId } from '../../data/schema';
 import { sound } from '../audio';
+import { openCurtain } from '../curtain';
 import { manifest } from '../manifest';
 import { drawAccessory } from '../placeholders';
 import { TEAM_COLORS, textStyle } from '../text';
@@ -18,6 +19,8 @@ export interface ResultData {
   /** Meilleur raté de l'épisode : héros et nombre d'alliés touchés. */
   friendlyFire?: [number, number];
   friendlyFireName?: string;
+  /** Arrivée depuis le rideau de la roulette : il se rouvre sur l'écran. */
+  curtain?: boolean;
 }
 
 /** Durée d'affichage de l'écran de fin avant la fin d'un enregistrement (ms). */
@@ -76,6 +79,7 @@ export class ResultScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
     if (vote) this.voteCard(vote, 1000);
+    if (r.curtain) openCurtain(this, 250, 450);
 
     if (r.params.record) {
       this.time.delayedCall(RESULT_HOLD_MS, () => this.game.events.emit('episode-finished'));

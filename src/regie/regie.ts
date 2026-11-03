@@ -17,6 +17,92 @@ let arc: Arc | undefined;
 let scoutRows: ScoutRow[] = [];
 let picked: ScoutRow | undefined;
 let worker: Worker | undefined;
+/** Lecture des réglages tels qu'ils sont dans le formulaire (même non enregistrés). */
+let readSettings: (() => ArcSettings) | undefined;
+/** Carte de vote en cours de préparation (héros et options choisis). */
+let draftVote: { recipient: string; options: string[] } | undefined;
+
+// ------------------------------------------------------------ aperçu de l'arène (colonne de droite)
+
+const frame = document.getElementById('preview') as HTMLIFrameElement;
+const previewLabel = document.getElementById('previewLabel')!;
+const skipIntro = document.getElementById('skipIntro') as HTMLInputElement;
+const speedSelect = document.getElementById('speed') as HTMLSelectElement;
+
+interface PreviewTarget {
+  episode: number;
+  seed: string;
+  /** Réglages et vote en brouillon : seulement pour un épisode pas encore figé. */
+  draft?: ArcSettings;
+  vote?: { recipient: string; options: string[] };
+  label: string;
+}
+let previewTarget: PreviewTarget | undefined;
+
+function previewUrl(t: PreviewTarget, inTab = false): string {
+  const q = new URLSearchParams({ arc: arc!.id, ep: String(t.episode), seed: t.seed });
+  if (t.draft) q.set('draft', JSON.stringify(t.draft));
+  if (t.vote) q.set('vote', `${t.vote.recipient}:${t.vote.options.join(',')}`);
+  if (skipIntro.checked && !inTab) q.set('intro', '0');
+  if (!inTab) q.set('speed', speedSelect.value);
+  return `./?${q}`;
+}
+
+function preview(t: PreviewTarget): void {
+  if (!arc) return;
+  previewTarget = t;
+  previewLabel.textContent = t.label;
+  frame.src = previewUrl(t);
+}
+
+let previewTimer: number | undefined;
+/** Aperçu du prochain épisode avec l'état courant du formulaire, après une courte pause de saisie. */
+function previewNext(delay = 600): void {
+  window.clearTimeout(previewTimer);
+  previewTimer = window.setTimeout(() => {
+    if (!arc) return;
+    const n = arc.episodes.length + 1;
+    const seed = picked ? String(picked.seed) : (previewTarget?.episode === n ? previewTarget.seed : String(n * 1000));
+    preview({ episode: n, seed, draft: readSettings?.(), vote: picked ? draftVote : undefined, label: `Épisode ${n} · seed ${seed} · brouillon` });
+  }, delay);
+}
+
+document.getElementById('replay')!.onclick = () => previewTarget && preview(previewTarget);
+skipIntro.onchange = () => previewTarget && preview(previewTarget);
+speedSelect.onchange = () => previewTarget && preview(previewTarget);
+document.getElementById('openTab')!.onclick = () => previewTarget && window.open(previewUrl(previewTarget, true), '_blank');
+
+// Séparation régie / arène : glisser, ou boutons 2/3, 3/4, 4/5. Mémorisée dans ce navigateur.
+const root = document.documentElement;
+function setRatio(r: number): void {
+  const ratio = Math.min(0.85, Math.max(0.35, r));
+  root.style.setProperty('--left', `${(ratio * 100).toFixed(1)}%`);
+  try {
+    localStorage.setItem('regie.ratio', String(ratio));
+  } catch {
+    // stockage indisponible : on garde la valeur pour cette visite
+  }
+}
+try {
+  const saved = Number(localStorage.getItem('regie.ratio'));
+  if (saved) setRatio(saved);
+} catch {
+  // stockage indisponible
+}
+document.querySelectorAll<HTMLButtonElement>('button[data-ratio]').forEach((b) => (b.onclick = () => setRatio(Number(b.dataset.ratio))));
+const splitter = document.getElementById('splitter')!;
+splitter.onpointerdown = (e) => {
+  splitter.setPointerCapture(e.pointerId);
+  splitter.classList.add('dragging');
+  // L'iframe avalerait les mouvements de la souris pendant le glissement.
+  frame.style.pointerEvents = 'none';
+  splitter.onpointermove = (m) => setRatio(m.clientX / window.innerWidth);
+  splitter.onpointerup = () => {
+    splitter.classList.remove('dragging');
+    frame.style.pointerEvents = '';
+    splitter.onpointermove = null;
+  };
+};
 
 const heroName = (id: string) => data.heroes.find((h) => h.id === id)?.name ?? id;
 const heroTeam = (id: string): TeamId | undefined => data.units.find((u) => u.id === data.heroes.find((h) => h.id === id)?.base)?.team;
@@ -95,8 +181,7 @@ function arcSection(a: Arc): HTMLElement {
     const block = el('div', { class: 'row' }, el('span', {}, line));
     if (ep.upgrade) block.append(el('span', { class: 'muted' }, `→ ${heroName(ep.recipient)} reçoit ${eqLabel(ep.upgrade)}`));
     else block.append(voteForm(a, ep));
-    const preview = button('Revoir', () => window.open(`./?arc=${a.id}&ep=${ep.number}`, '_blank'));
-    block.append(preview);
+    block.append(button('Revoir', () => preview({ episode: ep.number, seed: ep.seed, label: `Épisode ${ep.number} · seed ${ep.seed} · figé` })));
     s.append(block);
   }
   if (!a.episodes.length) s.append(el('p', { class: 'muted' }, 'Aucun épisode pour l’instant.'));
@@ -165,20 +250,28 @@ function settingsSection(a: Arc): HTMLElement {
   };
   s.append(el('label', {}, 'Choc de têtes', gagInputs.headClash), el('label', {}, 'Danse de victoire', gagInputs.victoryDance), el('label', {}, 'Arme perdue', gagInputs.lostWeapon));
 
+  readSettings = () => {
+    const armies: NonNullable<ArcSettings['armies']> = {};
+    for (const { team, unit, input } of armyInputs) (armies[team] ??= {})[unit] = Math.max(0, Math.round(Number(input.value) || 0));
+    const clamp = (i: HTMLInputElement) => Math.min(1, Math.max(0, Number(i.value) || 0));
+    return {
+      biome: biome.value,
+      armies,
+      eventsPerMinute: Math.max(0, Number(perMinute.value) || 0),
+      eventWeights: Object.fromEntries(weightInputs.map(({ id, input }) => [id, Math.max(0, Number(input.value) || 0)])),
+      gagChances: { headClash: clamp(gagInputs.headClash), victoryDance: clamp(gagInputs.victoryDance), lostWeapon: clamp(gagInputs.lostWeapon) },
+    };
+  };
+  // Chaque modification relance l'aperçu de droite avec les réglages en brouillon.
+  s.addEventListener('input', () => previewNext());
+  s.addEventListener('change', () => previewNext());
   s.append(
+    el('p', { class: 'muted' }, "L'aperçu de droite suit le formulaire ; « Enregistrer » applique les réglages au prochain épisode."),
     button(
       'Enregistrer les réglages',
       async () => {
-        const armies: NonNullable<ArcSettings['armies']> = {};
-        for (const { team, unit, input } of armyInputs) (armies[team] ??= {})[unit] = Math.max(0, Math.round(Number(input.value) || 0));
         const next = structuredClone(a);
-        next.settings = {
-          biome: biome.value,
-          armies,
-          eventsPerMinute: Number(perMinute.value),
-          eventWeights: Object.fromEntries(weightInputs.map(({ id, input }) => [id, Math.max(0, Number(input.value) || 0)])),
-          gagChances: { headClash: Number(gagInputs.headClash.value), victoryDance: Number(gagInputs.victoryDance.value), lostWeapon: Number(gagInputs.lostWeapon.value) },
-        };
+        next.settings = readSettings!();
         await saveArc(next, s, 'Réglages enregistrés : ils s’appliquent au prochain épisode.');
       },
       'ok',
@@ -224,6 +317,7 @@ function nextSection(a: Arc): HTMLElement {
       tr.onclick = () => {
         picked = r;
         render();
+        previewNext(0);
       };
       tbody.append(tr);
     }
@@ -254,8 +348,17 @@ function planForm(a: Arc, n: number, row: ScoutRow): HTMLElement {
       sel.value = free.some((e) => e.id === keep) ? keep : (free[i]?.id ?? '');
     });
   };
-  recipient.onchange = fillOptions;
+  const syncVote = () => {
+    draftVote = { recipient: recipient.value, options: optionSelects.map((s) => s.value) };
+  };
+  recipient.onchange = () => {
+    fillOptions();
+    syncVote();
+    previewNext();
+  };
+  optionSelects.forEach((sel) => (sel.onchange = () => (syncVote(), previewNext())));
   fillOptions();
+  syncVote();
 
   box.append(
     el('div', { class: 'row' }, el('strong', {}, `Seed ${row.seed}`), el('span', { class: row.winner }, `victoire des ${WINNER_LABEL[row.winner]} en ${row.duration.toFixed(1)} s`)),
@@ -264,7 +367,7 @@ function planForm(a: Arc, n: number, row: ScoutRow): HTMLElement {
   );
   const actions = el('div', { class: 'row' });
   actions.append(
-    button('Aperçu', () => window.open(`./?arc=${a.id}&ep=${n}&seed=${row.seed}`, '_blank')),
+    button('Aperçu', () => previewNext(0)),
     button(
       "Figer l'épisode",
       async () => {
@@ -374,13 +477,16 @@ arcSelect.onchange = () => {
   arc = arcs.find((a) => a.id === arcSelect.value);
   scoutRows = [];
   picked = undefined;
+  draftVote = undefined;
   render();
+  previewNext(0);
 };
 
 fetchArcs()
   .then(() => {
     arc = arcs.find((a) => a.status === 'open') ?? arcs[0];
     render();
+    previewNext(0);
   })
   .catch((e) => {
     app.append(el('section', {}, el('p', { class: 'msg err' }, (e as Error).message)));

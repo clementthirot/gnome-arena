@@ -256,12 +256,15 @@ export class Show {
   }
 
   /** Fin : pouce levé vers le vainqueur, puis la roulette des upgrades. */
-  victory(winner: TeamId | 'draw'): void {
+  victory(winner: TeamId | 'draw', onRoulette?: () => void): void {
     if (winner === 'draw') {
       this.emperorSays(this.cfg.lines.draw, 1800, 'down');
       return;
     }
     this.emperorSays(this.cfg.lines.victory.replace('{team}', TEAM_COLORS[winner].label), 1700, 'up');
-    this.scene.time.delayedCall(1900, () => this.emperorSays(this.cfg.lines.roulette, 1500, 'raise'));
+    this.scene.time.delayedCall(this.cfg.rouletteCall * 1000, () => {
+      this.emperorSays(this.cfg.lines.roulette, 1800, 'raise');
+      onRoulette?.();
+    });
   }
 }

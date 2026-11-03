@@ -13,6 +13,7 @@ import { GasLayer } from '../gas';
 import { Juice } from '../juice';
 import { sound } from '../audio';
 import { runningGagCanvas, Show } from '../show';
+import { closeCurtain } from '../curtain';
 import { asPlaceholder, bricksFor, effectVisual, manifest, resolveAsset } from '../manifest';
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
 import { rand, seedRender, seedTick } from '../random';
@@ -45,6 +46,8 @@ export interface ArenaParams {
     /** K.O. cumulés de chaque héros (par nom) avant cet épisode. */
     arcKills?: Record<string, number>;
   };
+  /** Passe l'intro (aperçus rapides de la régie). */
+  skipIntro?: boolean;
   /** Biome de l'arène (sinon celui de battle.json). */
   biome?: string;
   /** Enregistrement : pas d'interaction, la fin de l'écran de vote clôt la vidéo. */
@@ -187,7 +190,11 @@ export class ArenaScene extends Phaser.Scene {
     this.uiCam = this.cameras.add(0, 0, w, h);
     this.director = new Director(this.cameras.main, manifest.staging.camera, w, h);
     this.bindInput();
-    this.playIntro();
+    if (this.params.skipIntro) {
+      this.running = true;
+      this.show.start();
+      sound.startMusic();
+    } else this.playIntro();
     this.routeCameras();
   }
 
@@ -850,7 +857,8 @@ export class ArenaScene extends Phaser.Scene {
       this.director.release(this.battle.time);
       const label = r.winner === 'draw' ? 'ÉGALITÉ !' : `VICTOIRE DES ${TEAM_COLORS[r.winner].label} !`;
       this.banner(label, r.winner === 'draw' ? '#ffffff' : TEAM_COLORS[r.winner].main, 2200);
-      this.show.victory(r.winner);
+      // L'empereur annonce la roulette ; roulement de tambour jusqu'au rideau.
+      this.show.victory(r.winner, () => sound.drumroll(Math.max(0.5, cfg.finale - 1.2 - cfg.rouletteCall)));
       if (r.winner !== 'draw') this.celebrate(r.winner);
       this.finalGag();
     });
@@ -866,7 +874,11 @@ export class ArenaScene extends Phaser.Scene {
     };
     result.friendlyFire = [...this.friendlyHits.entries()].sort((a, b) => b[1] - a[1])[0];
     if (result.friendlyFire) result.friendlyFireName = this.battle.units[result.friendlyFire[0]].hero!.name;
-    this.time.delayedCall(cfg.finale * 1000, () => this.scene.start('result', result));
+    // Transition vers la roulette : le rideau se ferme, l'écran de vote s'ouvre derrière.
+    this.time.delayedCall(cfg.finale * 1000, () => {
+      sound.play('gong');
+      closeCurtain(this, cfg.curtain * 1000, () => this.scene.start('result', { ...result, curtain: true }));
+    });
   }
 
   /** Bannières aux couleurs du vainqueur, confettis, public qui saute, vainqueurs qui sautillent. */

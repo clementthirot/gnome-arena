@@ -178,6 +178,19 @@ export class Sound {
     }
   }
 
+  /** Roulement de tambour (attente de la roulette) : coups de caisse claire de plus en plus serrés. */
+  drumroll(duration: number): void {
+    if (!this.ready || this.muted) return;
+    let at = 0;
+    let gap = 0.09;
+    while (at < duration) {
+      this.burst(0.05, 0.16 + (at / duration) * 0.12, 'bandpass', 2200, 1200, at);
+      at += gap;
+      gap = Math.max(0.035, gap * 0.96);
+    }
+    this.tone('triangle', 180, 120, 0.4, 0.25, duration);
+  }
+
   /** Fanfare d'intro : quelques notes carrées, façon 16 bits. */
   fanfare(): void {
     if (!this.ready || this.muted) return;

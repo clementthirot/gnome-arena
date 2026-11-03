@@ -1194,9 +1194,11 @@
         "duration": 1.5
       },
       "countdown": true,
-      "finale": 4.5,
+      "finale": 5.6,
       "slowmo": 0.35,
-      "runningGag": true
+      "runningGag": true,
+      "rouletteCall": 1.9,
+      "curtain": 0.7
     }
   }
 }

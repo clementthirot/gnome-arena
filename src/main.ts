@@ -5,6 +5,9 @@
 //   ?up=bob:magic_sword+grenades,snik:laser_goggles   équipe des héros à la main (essais)
 //   ?speed=2            accélère l'affichage (touches 1, 2, 4, 8 en cours de combat)
 //   ?mode=bench         mode accéléré sans rendu (Web Worker) : durée moyenne, victoires, retournements
+//   ?intro=0            passe l'intro (aperçus rapides de la régie)
+//   ?draft=<json>       réglages d'arc en brouillon, pour un épisode pas encore figé (aperçu de la régie)
+//   ?vote=kevin:laser_goggles,magic_sword,grenades   carte de vote en brouillon (aperçu de la régie)
 import '@fontsource/press-start-2p';
 import Phaser from 'phaser';
 import { startRecording } from './capture/recorder';
@@ -115,16 +118,22 @@ async function arenaParams(data: GameData): Promise<ArenaParams> {
       seed: params.get('seed') ?? String(Math.floor(Math.random() * 100000)),
       speed: record ? 1 : speed,
       record,
+      skipIntro: params.get('intro') === '0' && !record,
       upgrades: parseUpgrades(params.get('up')),
       biome: params.get('biome') ?? undefined,
     };
   }
   const raw = await loadArc(arcId);
   if (!raw) throw new Error(`arc introuvable : ${arcId}`);
-  const arc = parseArc(raw, data);
+  let arc = parseArc(raw, data);
   const number = Number(params.get('ep') ?? arc.episodes.length + 1);
   const ep = arc.episodes.find((e) => e.number === number);
-  const hero = ep && data.heroes.find((h) => h.id === ep.recipient);
+  // Aperçu de la régie : réglages et vote pas encore enregistrés (seulement pour un épisode non figé).
+  const draft = params.get('draft');
+  if (draft && !ep) arc = parseArc({ ...arc, settings: JSON.parse(draft) }, data);
+  const draftVote = !ep ? params.get('vote')?.split(':') : undefined;
+  const voteSource = ep ?? (draftVote && draftVote[1] ? { recipient: draftVote[0], options: draftVote[1].split(',').filter(Boolean) } : undefined);
+  const hero = voteSource && data.heroes.find((h) => h.id === voteSource.recipient);
   const team = hero && data.units.find((u) => u.id === hero.base)?.team;
   const seed = params.get('seed') ?? ep?.seed ?? String(Math.floor(Math.random() * 100000));
   // Réglages de la régie (copie figée avec l'épisode, sinon réglages courants de l'arc).
@@ -134,6 +143,7 @@ async function arenaParams(data: GameData): Promise<ArenaParams> {
     seed,
     speed: record ? 1 : speed,
     record,
+    skipIntro: params.get('intro') === '0' && !record,
     heroes: episode.setup.heroes,
     biome: params.get('biome') ?? episode.setup.biome,
     upgrades: episode.setup.upgrades,
@@ -142,14 +152,14 @@ async function arenaParams(data: GameData): Promise<ArenaParams> {
       arcKills: Object.fromEntries(Object.entries(killsBefore(arc, number)).map(([id, k]) => [data.heroes.find((h) => h.id === id)?.name ?? id, k])),
       expected: ep && params.get('seed') === null ? { winner: ep.winner, duration: ep.duration } : undefined,
       vote:
-        ep && hero && team
+        voteSource && hero && team
           ? {
               recipient: hero.name,
               team,
               portrait: `unit_${hero.visual}`,
-              options: ep.options.map((o) => {
-                const eq = data.equipment.find((e) => e.id === o)!;
-                return { label: eq.label, visual: eq.visual };
+              options: voteSource.options.flatMap((o) => {
+                const eq = data.equipment.find((e) => e.id === o);
+                return eq ? [{ label: eq.label, visual: eq.visual }] : [];
               }),
             }
           : undefined,

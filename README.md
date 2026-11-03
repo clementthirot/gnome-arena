@@ -37,7 +37,10 @@ Pendant un enregistrement, garder l'onglet visible : un onglet caché n'affiche 
 
 ## Régie
 
-`http://localhost:5173/regie.html` (serveur de dev lancé) prépare un épisode sans ligne de commande :
+`http://localhost:5173/regie.html` (serveur de dev lancé) prépare un épisode sans ligne de commande, avec l'arène toujours visible à droite
+(séparation à glisser, ou boutons 2/3, 3/4, 4/5). L'aperçu suit le formulaire en direct : réglages, seed choisie,
+héros et options de vote, même avant d'enregistrer (case « sans intro » pour aller vite).
+
 
 1. **Prochain épisode** : lancer le scout (Web Worker), cliquer une seed dans le tableau. Les seeds qui
    finissent comme l'épisode précédent (retournement, héros seul contre tous, écrasement…) sont pénalisées.

@@ -7,11 +7,22 @@
     <style>
       :root { --bg: #16131f; --panel: #221d30; --line: #3a3350; --text: #ece6f8; --muted: #a098b0; --gnome: #7fb0ff; --goblin: #9be05a; --accent: #ffe14a; --danger: #ff7a7a; }
       * { box-sizing: border-box; }
-      body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+      html, body { height: 100%; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; overflow: hidden; }
+      /* Régie à gauche, arène toujours visible à droite ; la séparation se déplace. */
+      .split { display: flex; height: 100vh; }
+      #left { flex: 0 0 var(--left, 66.6%); overflow: auto; min-width: 320px; }
+      #splitter { flex: 0 0 8px; cursor: col-resize; background: var(--line); }
+      #splitter:hover, #splitter.dragging { background: var(--accent); }
+      #right { flex: 1 1 auto; display: flex; flex-direction: column; background: #000; min-width: 240px; }
+      #previewBar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 8px; background: var(--panel); border-bottom: 2px solid var(--line); font-size: 13px; }
+      #previewBar button { padding: 6px 8px; font-size: 9px; }
+      #previewLabel { flex: 1 1 100%; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #preview { flex: 1 1 auto; border: 0; width: 100%; background: #0e0c14; }
       header { padding: 16px 20px; border-bottom: 2px solid var(--line); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
       h1 { font: 16px "Press Start 2P", monospace; margin: 0; color: var(--accent); }
       h2 { font: 12px "Press Start 2P", monospace; margin: 0 0 12px; color: var(--accent); }
-      main { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+      main { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; padding: 16px; }
       section { background: var(--panel); border: 2px solid var(--line); border-radius: 8px; padding: 16px; }
       table { width: 100%; border-collapse: collapse; font-size: 14px; }
       th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
@@ -36,12 +47,31 @@
     </style>
   </head>
   <body>
+    <div class="split">
+    <div id="left">
     <header>
       <h1>RÉGIE</h1>
       <select id="arc"></select>
       <span id="arcInfo" class="muted"></span>
+      <span class="muted">Largeur :</span>
+      <button data-ratio="0.666">2/3</button>
+      <button data-ratio="0.75">3/4</button>
+      <button data-ratio="0.8">4/5</button>
     </header>
     <main id="app"></main>
+    </div>
+    <div id="splitter" title="Glisser pour redimensionner"></div>
+    <div id="right">
+      <div id="previewBar">
+        <span id="previewLabel">Aperçu</span>
+        <button id="replay">↻ Rejouer</button>
+        <label><input type="checkbox" id="skipIntro" checked /> sans intro</label>
+        <select id="speed"><option value="1">x1</option><option value="2">x2</option><option value="4">x4</option></select>
+        <button id="openTab">Onglet</button>
+      </div>
+      <iframe id="preview" title="Aperçu de l'arène"></iframe>
+    </div>
+    </div>
     <script type="module" src="/src/regie/regie.ts"></script>
   </body>
 </html>

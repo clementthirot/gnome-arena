@@ -181,7 +181,11 @@ const StagingSchema = z.object({
     prono: z.object({ title: z.string(), subtitle: z.string(), duration: z.number().positive().default(1.5) }),
     countdown: z.boolean().default(true),
     /** Durée de la fin (ralenti, annonce, célébration) avant l'écran de vote (s). */
-    finale: z.number().positive().default(4.5),
+    finale: z.number().positive().default(5),
+    /** Délai entre l'annonce du vainqueur et « Place à la roulette » (s). */
+    rouletteCall: z.number().positive().default(1.9),
+    /** Fermeture du rideau de la roulette (s). */
+    curtain: z.number().positive().default(0.7),
     /** Facteur de ralenti sur le dernier K.O. */
     slowmo: z.number().min(0.05).max(1).default(0.35),
     runningGag: z.boolean().default(true),
