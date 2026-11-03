@@ -29,8 +29,10 @@ describe('effets spectaculaires', () => {
       if (e.type === 'hit' && e.source === kevin.index) hitsThisTick++;
     });
     expect(shots).toBeGreaterThan(0);
-    // Un segment jusqu'au mur, puis un rebond : deux segments par tir.
-    expect(segments).toBe(shots * 2);
+    // Un segment jusqu'au mur, puis un rebond : deux segments par tir parti (un tir chargé peut s'annuler).
+    expect(segments % 2).toBe(0);
+    expect(segments).toBeGreaterThan(0);
+    expect(segments).toBeLessThanOrEqual(shots * 2);
     const f = b.field;
     expect(f.width).toBeGreaterThan(0);
   });

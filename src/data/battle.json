@@ -170,7 +170,7 @@
   },
   "events": {
     "perMinute": 3,
-    "endRamp": 4,
+    "endRamp": 5.5,
     "firstAt": 12,
     "intervalJitter": [
       0.6,
