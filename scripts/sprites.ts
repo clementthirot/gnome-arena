@@ -14,7 +14,7 @@
 //                       --scale grossit le personnage par rapport à sa silhouette ;
 //                       --hit donne, par attaque, l'image où le coup touche (rang dans l'animation)
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { accessoryPixels, placeholderPixels, type PlaceholderShape } from '../src/render/pixels';
 import { buildSheet, SHEET_FRAMES, SHEET_LAYOUT, sheetGrid } from '../src/render/spriteFrames';
 import { DIRECTIONS } from '../src/render/manifest';
@@ -129,11 +129,14 @@ function pixellab(folder: string | undefined, keys: string[], scale: number, hit
   const unknown = keys.filter((k) => !(k in manifest.assets));
   if (unknown.length) throw new Error(`« ${unknown.join(', ')} » : pas dans le manifeste (${Object.keys(manifest.assets).join(', ')})`);
   if (!(scale > 0)) throw new Error('--scale doit être un nombre positif');
-  const meta: Json = JSON.parse(readFileSync(join(folder, 'metadata.json'), 'utf8'));
-  const state = meta.states?.[0];
-  if (!state?.frames?.rotations) throw new Error('metadata.json sans rotations');
+  // Un export à plusieurs variantes n'a qu'un metadata.json, dans le dossier parent : on y prend la variante du dossier.
+  const variant = !existsSync(join(folder, 'metadata.json'));
+  const root = variant ? dirname(resolve(folder)) : folder;
+  const meta: Json = JSON.parse(readFileSync(join(root, 'metadata.json'), 'utf8'));
+  const state = variant ? meta.states?.find((st: Json) => st.folder === basename(resolve(folder))) : meta.states?.[0];
+  if (!state?.frames?.rotations) throw new Error(variant ? `variante « ${basename(resolve(folder))} » absente du metadata.json parent` : 'metadata.json sans rotations');
   // Les chemins du metadata.json sont relatifs à son dossier.
-  const load = (p: string) => decodePng(readFileSync(join(folder, p)));
+  const load = (p: string) => decodePng(readFileSync(join(root, p)));
 
   // Colonnes : 0 = rotation fixe (idle), puis les images de chaque animation reconnue.
   const rotations: Record<string, string> = state.frames.rotations;

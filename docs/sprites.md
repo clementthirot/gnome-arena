@@ -72,6 +72,8 @@ npm run sprites -- pixellab "<dossier de l'export>" goblin_melee
 ```
 
 Le dossier contient `metadata.json`, `rotations/<direction>.png` et `animations/<nom>/<direction>/frame_XXX.png`.
+Pour un export à plusieurs variantes (un seul `metadata.json` à la racine, un sous-dossier par variante),
+on passe le sous-dossier de la variante : la commande prend sa description dans le `metadata.json` parent.
 La commande assemble `public/sprites/<clé>.png` (une ligne par direction : rotation fixe, puis les images
 de chaque animation) et `<clé>.directions.json`, puis lance `import`. L'entrée reçoit `"directions": 8` :
 le rendu choisit la ligne selon le déplacement, sinon selon la cible, au lieu du miroir gauche/droite.
