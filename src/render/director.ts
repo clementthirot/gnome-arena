@@ -36,8 +36,8 @@ export class Director {
   ) {
     this.x = width / 2;
     this.y = height / 2;
-    // Un peu de marge à droite : une cible collée au bord peut être recadrée à gauche du rail des boutons.
-    cam.setBounds(0, 0, width + SAFE.right / 2, height);
+    // Bornée au monde : au-delà, il n'y a pas de décor (bord noir pendant les zooms).
+    cam.setBounds(0, 0, width, height);
   }
 
   /** Demande un plan rapproché. Ignoré pendant le temps de repos, sauf s'il est plus important que le plan en cours. */
@@ -53,6 +53,15 @@ export class Director {
   cinema(target: () => { x: number; y: number }, now: number, hold: number, zoom: number): void {
     if (!this.config.enabled) return;
     this.shot = { target, until: now + hold, priority: CINEMA, zoom };
+  }
+
+  /**
+   * Contrechamp bref (l'empereur qui tombe dans sa loge) : passe outre le temps de repos et les
+   * gros plans ordinaires, jamais un plan de cinéma ni un dernier carré.
+   */
+  cutaway(target: () => { x: number; y: number }, now: number, hold: number, zoom: number): void {
+    if (!this.config.enabled || (this.shot && this.shot.priority >= PRIORITY.lastStand)) return;
+    this.shot = { target, until: now + hold, priority: PRIORITY.lastStand - 0.5, zoom };
   }
 
   /** Retour immédiat au plan large (fin de combat, cartons). */

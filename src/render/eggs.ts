@@ -96,7 +96,7 @@ export class Eggs {
   private readonly eligible: Record<EggName, boolean>;
 
   /** `force` (`?eggs=1`) : tous les gags sont éligibles, pour les vérifier à l'image. */
-  constructor(private readonly seed: string, force = false) {
+  constructor(private readonly seed: string, readonly force = false) {
     const cfg = manifest.staging.easterEggs;
     const roll = (name: EggName, chance: number) => force || randAt(hashSeed(`${seed}:egg:${name}`), 17) < chance;
     this.eligible = { crowdBurst: roll('crowdBurst', cfg.crowdBurst.chance), wave: roll('wave', cfg.wave.chance), emperorFall: roll('emperorFall', cfg.emperorFall.chance) };
