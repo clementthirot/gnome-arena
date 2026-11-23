@@ -122,3 +122,32 @@ Accessoire :
 
 1. `npm run dev`, puis `?seed=1&up=bob:laser_goggles` pour voir un héros équipé.
 2. Une clé absente ou mal orthographiée affiche un placeholder et un avertissement dans la console.
+
+## Assets PixelLab du lot G (titre, accessoires, sols, effets)
+
+Générés avec l'outil MCP PixelLab `create_image_pixen` (1 génération par appel ; 20 générations au total, retouches comprises).
+Paramètres communs sauf mention : `outline: "single color black outline"`, `detail: "medium detail"`, `no_background: true`.
+Post-traitement (script du lot, reproductible à la main) : alpha seuillé à 128, recadrage sur la boîte englobante.
+Chaque clé a un repli dessiné par code : supprimer le fichier (ou l'entrée) suffit à revenir au dessin d'origine.
+
+| Fichier | Clé de manifeste | Taille gén. / seed | Prompt (résumé) | Notes |
+| --- | --- | --- | --- | --- |
+| sprites/arena/title.png | `art.title` | 256x128 / 7101 | game title logo text 'GNOMES VS GOBELINS', chunky bold blocky letters, GNOMES blue/red, VS yellow, GOBELINS green, fantasy arcade battle logo | Remplace « 50 GNOMES / vs / 50 GOBELINS » dans `drawOpeningTitle` (reveal.ts), donc aussi sur l'image de boucle de fin ; effectifs affichés dessous (« 50 contre 50 »). Repli : texte. |
+| sprites/arena/ground_<biome>.png (sable, foret, neige, volcan) | `art.grounds.<biome>` | 128x128 / 7301-7304 | seamless tileable top-down {desert sand / short grass / packed snow / volcanic ash rock} ground texture, low contrast, flat, no objects ; `no_background: false`, `view: "high top-down"`, `outline: "lineless"`, `detail: "low detail"` | Raccord rendu sans couture (fondu tramé avec la copie décalée d'une demi-tuile), contraste ramené vers la moyenne (x0,3 ; forêt x0,15), 16 couleurs. Répété sur le terrain par arenaArt.ts à la place des mouchetures. Repli : dessin par code. |
+| generated/acc_goggles.png | `accessories.acc_goggles` | 32x32 / 7211 | pair of round red glass goggles with black rims and black strap | Recadré sur la bande des verres (lignes 11-26). 1er essai (7201) inutilisable. |
+| generated/acc_sword.png | `acc_sword` | 32x32 / 7202 | short steel sword pointing up, brown leather hilt, gold crossguard | |
+| generated/acc_grenades.png | `acc_grenades` (size 4 -> 4,5) | 32x32 / 7203 | belt of three small round green grenades on a brown leather strap | |
+| generated/acc_glue.png | `acc_glue` | 32x32 / 7204 | small glass jar of bright lime green glue with grey metal lid | |
+| generated/acc_chicken.png | `acc_chicken` | 32x32 / 7205 | small white chicken with red comb and orange beak, facing right | |
+| generated/acc_pot.png | `acc_pot` (size 5 -> 6, ancre y -0,5 -> -0,38) | 32x32 / 7216 | empty grey iron cooking pot with two small handles, no face | Retourné verticalement (casque). 1er essai (7206) dessinait un visage. |
+| fx/explosion.png | `effects.explosion.sprite`, `effects.meteor_blast.sprite` | 64x64 / 7401 | cartoon explosion burst, orange yellow fireball with dark smoke puffs | |
+| fx/dust.png | `effects.dust.sprite` | 48x48 / 7404 | cartoon dust cloud puff, beige grey round puffs | |
+| fx/lightning.png | `effects.lightning.sprite`, `effects.storm_bolt.sprite` (anchor bottom) | 32x64 / 7403 | vertical zigzag lightning bolt, pale blue and white electric | |
+| fx/cream_splat.png | `effects.cream_splat.sprite` | 48x48 / 7415, `view: "high top-down"` | flat splash of white whipped cream on the ground, droplets, no pie crust | 1er essai (7405) dessinait une tarte entière. |
+| fx/impact.png | (non branché) | 48x48 / 7402 | comic hit impact star burst, white and yellow spiky flash | Livré pour un futur effet d'impact ; brancher via `"sprite": { "url": "sprites/fx/impact.png", "size": 12 }`. |
+
+Schéma (src/render/manifest.ts) : `art` (facultatif, `title` + `grounds`) et `effects.<clé>.sprite`
+(`url`, `size` px monde minimum — un gros rayon d'effet l'agrandit —, `anchor` `center` | `bottom`). L'image d'effet
+grossit de 0,6 à 1,1 fois sa taille en s'effaçant (durée = `duration` de l'effet, 250 ms minimum), par-dessus le dessin par code.
+Les accessoires restent orientés vers la droite (retournés quand le héros regarde à gauche) et servent aussi d'icônes
+dans la machine à sous.

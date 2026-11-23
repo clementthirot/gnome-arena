@@ -71,6 +71,15 @@ export function drawOpeningTitle(scene: Phaser.Scene, title: OpeningTitle, depth
   }
   if (title.stack) {
     const [a, vs, b] = title.stack;
+    // Logo PixelLab (manifeste art.title) à la place du texte, effectifs en dessous ; sinon repli texte.
+    if (scene.textures.exists('art_title')) {
+      const logo = scene.add.image(CX, 680, 'art_title').setDepth(depth + 1);
+      logo.setScale(Math.floor((SAFE.text.w * 0.8) / logo.width) || 1);
+      const [na, nb] = [a, b].map((s) => /\d+/.exec(s)?.[0]);
+      if (na && nb) items.push(scene.add.text(CX, 680 + logo.displayHeight / 2 + 50, `${na}  contre  ${nb}`, textStyle(44)).setOrigin(0.5).setDepth(depth + 1));
+      items.push(logo);
+      return items;
+    }
     items.push(
       scene.add.text(CX, 600, a, textStyle(76, TEAM_COLORS.gnomes.main)).setOrigin(0.5).setDepth(depth + 1),
       scene.add.text(CX, 705, vs, textStyle(44)).setOrigin(0.5).setDepth(depth + 1),

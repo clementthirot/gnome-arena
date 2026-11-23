@@ -146,6 +146,16 @@ const EffectVisualSchema = z.object({
   duration: z.number().positive().default(0.35),
   /** Trace laissée au sol après l'effet (clé d'un autre effet, en général une flaque) : cratère… */
   decal: z.string().optional(),
+  /** Image facultative (PixelLab) jouée par-dessus le dessin par code : grossit puis s'efface. */
+  sprite: z
+    .object({
+      url: z.string(),
+      /** Taille minimale en px monde (plus grand côté) ; un gros rayon d'effet l'agrandit. */
+      size: z.number().positive().default(16),
+      /** center : centrée sur l'impact ; bottom : posée sur l'impact (éclair qui tombe). */
+      anchor: z.enum(['center', 'bottom']).default('center'),
+    })
+    .optional(),
 });
 
 /** Mise en scène : caméra, présentation des héros, tirs perdus dans le public. */
@@ -362,6 +372,15 @@ const ManifestSchema = z.object({
   effects: z.record(z.string(), EffectVisualSchema),
   staging: StagingSchema,
   overlays: z.record(z.string(), OverlaySchema).default({}),
+  /** Illustrations PixelLab facultatives ; sans elles, titre en texte et sol dessiné par code. */
+  art: z
+    .object({
+      /** Logo du titre d'ouverture (remplace « GNOMES vs GOBELINS » en texte). */
+      title: z.string().optional(),
+      /** Tuile de sol répétée sur le terrain, par id de biome. */
+      grounds: z.record(z.string(), z.string()).default({}),
+    })
+    .default({}),
 });
 
 export type AccessoryEntry = z.infer<typeof AccessorySchema>;

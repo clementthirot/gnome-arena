@@ -11,7 +11,8 @@ function decorRandom(seed: number) {
   };
 }
 
-export function drawArenaBackground(width: number, height: number, field: FieldRect, biome: BiomeDef): HTMLCanvasElement {
+/** groundTile : tuile PixelLab facultative (manifeste art.grounds) répétée sur le terrain à la place des mouchetures. */
+export function drawArenaBackground(width: number, height: number, field: FieldRect, biome: BiomeDef, groundTile?: CanvasImageSource): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -39,31 +40,38 @@ export function drawArenaBackground(width: number, height: number, field: FieldR
     ctx.fillRect(x + 3, field.y + field.height, 1, wall);
   }
 
-  // Sol du terrain, avec mouchetures et quelques cailloux.
+  // Sol du terrain : tuile répétée si fournie, sinon mouchetures et quelques cailloux.
   ctx.fillStyle = p.ground;
   ctx.fillRect(field.x, field.y, field.width, field.height);
-  for (let i = 0; i < field.width * field.height * 0.08; i++) {
-    ctx.fillStyle = p.speckles[Math.floor(rnd() * p.speckles.length)];
-    ctx.fillRect(field.x + Math.floor(rnd() * field.width), field.y + Math.floor(rnd() * field.height), 1, 1);
-  }
-  for (let i = 0; i < 40; i++) {
-    const x = field.x + Math.floor(rnd() * (field.width - 2));
-    const y = field.y + Math.floor(rnd() * (field.height - 2));
-    ctx.fillStyle = p.pebble;
-    ctx.fillRect(x, y, 2, 1);
-    ctx.fillStyle = p.pebbleLight;
-    ctx.fillRect(x, y - 1, 1, 1);
-  }
-  // Volcan : fissures de lave ; neige : plaques de glace.
-  if (biome.ambient === 'embers' || biome.ambient === 'snow') {
-    ctx.fillStyle = biome.ambient === 'embers' ? '#ff6a2a' : '#c8e0f8';
-    for (let i = 0; i < 14; i++) {
-      let x = field.x + Math.floor(rnd() * field.width);
-      let y = field.y + Math.floor(rnd() * field.height);
-      for (let k = 0; k < 8; k++) {
-        ctx.fillRect(x, y, biome.ambient === 'snow' ? 3 : 1, 1);
-        x += Math.floor(rnd() * 3) - 1;
-        y += 1;
+  const pattern = groundTile && ctx.createPattern(groundTile, 'repeat');
+  if (pattern) {
+    pattern.setTransform?.(new DOMMatrix().translate(field.x, field.y));
+    ctx.fillStyle = pattern;
+    ctx.fillRect(field.x, field.y, field.width, field.height);
+  } else {
+    for (let i = 0; i < field.width * field.height * 0.08; i++) {
+      ctx.fillStyle = p.speckles[Math.floor(rnd() * p.speckles.length)];
+      ctx.fillRect(field.x + Math.floor(rnd() * field.width), field.y + Math.floor(rnd() * field.height), 1, 1);
+    }
+    for (let i = 0; i < 40; i++) {
+      const x = field.x + Math.floor(rnd() * (field.width - 2));
+      const y = field.y + Math.floor(rnd() * (field.height - 2));
+      ctx.fillStyle = p.pebble;
+      ctx.fillRect(x, y, 2, 1);
+      ctx.fillStyle = p.pebbleLight;
+      ctx.fillRect(x, y - 1, 1, 1);
+    }
+    // Volcan : fissures de lave ; neige : plaques de glace.
+    if (biome.ambient === 'embers' || biome.ambient === 'snow') {
+      ctx.fillStyle = biome.ambient === 'embers' ? '#ff6a2a' : '#c8e0f8';
+      for (let i = 0; i < 14; i++) {
+        let x = field.x + Math.floor(rnd() * field.width);
+        let y = field.y + Math.floor(rnd() * field.height);
+        for (let k = 0; k < 8; k++) {
+          ctx.fillRect(x, y, biome.ambient === 'snow' ? 3 : 1, 1);
+          x += Math.floor(rnd() * 3) - 1;
+          y += 1;
+        }
       }
     }
   }

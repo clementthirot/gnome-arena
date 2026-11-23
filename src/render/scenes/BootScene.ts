@@ -28,6 +28,10 @@ export class BootScene extends Phaser.Scene {
     for (const [key, entry] of Object.entries(manifest.overlays)) {
       if (entry.type === 'image') this.load.image(`ovl_img_${key}`, entry.url);
     }
+    // Illustrations PixelLab facultatives (titre, sols, effets) : repli sur le dessin par code.
+    if (manifest.art.title) this.load.image('art_title', manifest.art.title);
+    for (const [biome, url] of Object.entries(manifest.art.grounds)) this.load.image(`art_ground_${biome}`, url);
+    for (const [key, entry] of Object.entries(manifest.effects)) if (entry.sprite) this.load.image(`fx_img_${key}`, entry.sprite.url);
     // Cadre de la machine à sous : image facultative, sinon dessiné par slotMachine.ts.
     if (manifest.staging.reveal.slot.url) this.load.image('ui_slot_frame', manifest.staging.reveal.slot.url);
   }
