@@ -2,7 +2,8 @@
 //   ?seed=53            rejoue un combat précis
 //   ?arc=arc1&ep=3      épisode 3 de l'arc : seed, héros et upgrades de l'arc, carte de vote en fin
 //   ?record=1           enregistre la vidéo (1080 x 1920) et la télécharge à la fin de l'écran de vote
-//   ?up=bob:magic_sword+grenades,snik:laser_goggles   équipe des héros à la main (essais)
+//   ?up=bob:magic_sword+grenades,snik:laser_goggles   équipe des héros à la main (essais ; s'ajoute aux upgrades de l'arc)
+//   ?prev=kevin:laser_goggles:120,340,95   simule le vote de l'épisode précédent (révélation), avec ou sans arc
 //   ?speed=2            accélère l'affichage (touches 1, 2, 4, 8 en cours de combat)
 //   ?mode=bench         mode accéléré sans rendu (Web Worker) : durée moyenne, victoires, retournements
 //   ?intro=0            passe l'intro (aperçus rapides de la régie)
@@ -13,7 +14,7 @@ import Phaser from 'phaser';
 import { startRecording } from './capture/recorder';
 import { sound } from './render/audio';
 import { loadGameData, type GameData } from './data';
-import { episodeSetup, killsBefore, parseArc } from './data/arc';
+import { episodeSetup, killsBefore, normalizeUpgrades, parseArc, previousVote, type PreviousVote } from './data/arc';
 import { Battle } from './sim/battle';
 import type { ArenaParams } from './render/scenes/ArenaScene';
 import { ArenaScene } from './render/scenes/ArenaScene';
@@ -112,6 +113,8 @@ async function arenaParams(data: GameData): Promise<ArenaParams> {
   const speed = Number(params.get('speed') ?? 1) || 1;
   const record = params.get('record') === '1';
   const arcId = params.get('arc');
+  const manual = parseUpgrades(params.get('up'), data);
+  const prev = parsePreviousVote(params.get('prev'), data);
   if (!arcId) {
     return {
       data,
@@ -119,8 +122,10 @@ async function arenaParams(data: GameData): Promise<ArenaParams> {
       speed: record ? 1 : speed,
       record,
       skipIntro: params.get('intro') === '0' && !record,
-      upgrades: parseUpgrades(params.get('up')),
+      // Vote précédent simulé : le héros porte déjà l'upgrade gagnée.
+      upgrades: prev ? mergeUpgrades(manual, { [prev.recipient]: [prev.upgrade] }) : manual,
       biome: params.get('biome') ?? undefined,
+      episode: prev ? { number: Number(params.get('ep')) || 2, previousVote: prev } : undefined,
     };
   }
   const raw = await loadArc(arcId);
@@ -146,11 +151,12 @@ async function arenaParams(data: GameData): Promise<ArenaParams> {
     skipIntro: params.get('intro') === '0' && !record,
     heroes: episode.setup.heroes,
     biome: params.get('biome') ?? episode.setup.biome,
-    upgrades: episode.setup.upgrades,
+    upgrades: manual ? mergeUpgrades(episode.setup.upgrades, manual) : episode.setup.upgrades,
     episode: {
       number,
+      previousVote: prev ?? previousVote(arc, number, data),
       arcKills: Object.fromEntries(Object.entries(killsBefore(arc, number)).map(([id, k]) => [data.heroes.find((h) => h.id === id)?.name ?? id, k])),
-      expected: ep && params.get('seed') === null ? { winner: ep.winner, duration: ep.duration } : undefined,
+      expected: ep && params.get('seed') === null && !manual ? { winner: ep.winner, duration: ep.duration } : undefined,
       vote:
         voteSource && hero && team
           ? {
@@ -181,15 +187,56 @@ function warnIfEpisodeDiverged(arena: ArenaParams): void {
   document.body.append(badge);
 }
 
-function parseUpgrades(value: string | null): Record<string, string[]> | undefined {
+/** ?up= : héros ou upgrade inconnus refusés avec un message clair, doublons retirés. */
+function parseUpgrades(value: string | null, data: GameData): Record<string, string[]> | undefined {
   if (!value) return undefined;
-  return Object.fromEntries(
+  const raw = Object.fromEntries(
     value.split(',').map((part) => {
       const [hero, items = ''] = part.split(':');
       // Dans une URL, « + » arrive décodé en espace : on accepte les deux.
       return [hero, items.split(/[+ ]/).filter(Boolean)];
     }),
   );
+  try {
+    return normalizeUpgrades(raw, data);
+  } catch (e) {
+    throw new Error(`?up= : ${(e as Error).message}`);
+  }
 }
 
-main();
+/** Upgrades réunies sans doublon (celles de l'arc, puis celles ajoutées à la main). */
+function mergeUpgrades(a: Record<string, string[]> | undefined, b: Record<string, string[]>): Record<string, string[]> {
+  const out: Record<string, string[]> = { ...a };
+  for (const [hero, list] of Object.entries(b)) out[hero] = [...new Set([...(out[hero] ?? []), ...list])];
+  return out;
+}
+
+/**
+ * ?prev=kevin:laser_goggles:120,340,95 : vote précédent simulé (essais de la révélation). L'upgrade
+ * gagnante occupe la place de la plus grosse voix ; les autres options sont prises dans l'ordre du JSON.
+ */
+function parsePreviousVote(value: string | null, data: GameData): PreviousVote | undefined {
+  if (!value) return undefined;
+  const [recipient = '', upgrade = '', counts] = value.split(':');
+  const hero = data.heroes.find((h) => h.id === recipient);
+  const team = hero && data.units.find((u) => u.id === hero.base)?.team;
+  if (!hero || !team) throw new Error(`?prev= : héros inconnu ${recipient} (connus : ${data.heroes.map((h) => h.id).join(', ')})`);
+  if (!data.equipment.some((e) => e.id === upgrade)) throw new Error(`?prev= : upgrade inconnue ${upgrade} (connues : ${data.equipment.map((e) => e.id).join(', ')})`);
+  const votes = counts ? counts.split(',').map(Number) : null;
+  if (votes && (votes.length < 2 || votes.length > 4 || votes.some((v) => !Number.isInteger(v) || v < 0) || !votes.some((v) => v > 0))) {
+    throw new Error(`?prev= : voix invalides ${counts} (2 à 4 nombres, au moins une voix)`);
+  }
+  const others = data.equipment.map((e) => e.id).filter((id) => id !== upgrade);
+  const winnerAt = votes ? votes.indexOf(Math.max(...votes)) : 0;
+  const options = votes ? votes.map((_, i) => (i === winnerAt ? upgrade : others.shift()!)) : [upgrade];
+  return { recipient, team, upgrade, options, votes };
+}
+
+main().catch((e) => {
+  // Paramètre d'URL invalide, arc introuvable… : le message s'affiche au lieu d'un écran noir.
+  console.error(e);
+  const box = document.createElement('div');
+  box.textContent = `✗ ${(e as Error).message}`;
+  box.style.cssText = 'position:fixed;inset:16px;color:#ff6b6b;font:12px/1.6 "Press Start 2P",monospace;white-space:pre-wrap;z-index:30';
+  document.body.append(box);
+});

@@ -1,6 +1,7 @@
 // Scène de combat : fait avancer le moteur à pas fixe et dessine son état.
 // Elle ne modifie jamais les règles : elle lit Battle et réagit à ses événements.
 import Phaser from 'phaser';
+import type { PreviousVote } from '../../data/arc';
 import type { GameData, HeroDef, TeamId } from '../../data/schema';
 import { Battle, opposingTeam, TEAMS } from '../../sim/battle';
 import { hashSeed } from '../../sim/rng';
@@ -45,6 +46,8 @@ export interface ArenaParams {
     vote?: { recipient: string; team: TeamId; portrait: string; options: { label: string; visual: string }[] };
     /** K.O. cumulés de chaque héros (par nom) avant cet épisode. */
     arcKills?: Record<string, number>;
+    /** Vote de l'épisode précédent (identifiants), à révéler en ouverture ; absent ou null pour l'épisode 1. */
+    previousVote?: PreviousVote | null;
   };
   /** Passe l'intro (aperçus rapides de la régie). */
   skipIntro?: boolean;

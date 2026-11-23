@@ -1,7 +1,7 @@
 // Arcs et épisodes : l'état du feuilleton. Un arc est un fichier JSON versionné ;
 // l'état des héros à l'épisode N se déduit des upgrades votées aux épisodes précédents.
 import { z } from 'zod';
-import { Rng } from '../sim/rng';
+import { hashSeed, Rng } from '../sim/rng';
 import type { GameData } from './schema';
 import { TeamId } from './schema';
 
@@ -242,13 +242,6 @@ export function isSaturated(arc: Arc, n: number, heroId: string, data: GameData)
   return freeUpgrades(arc, n, heroId, data).length < 2;
 }
 
-/** Hachage FNV-1a d'une chaîne (graine des tirages de la boucle d'upgrade). */
-function hashString(text: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
-  return h >>> 0;
-}
-
 export interface OptionProposal {
   /** Options proposées, dans l'ordre des numéros du vote : 3, ou 2 s'il n'en reste que 2 (1 ou 0 : héros saturé). */
   options: string[];
@@ -266,7 +259,7 @@ export interface OptionProposal {
 export function proposeOptions(arc: Arc, n: number, recipient: string, seed: string, data: GameData): OptionProposal {
   const free = freeUpgrades(arc, n, recipient, data);
   const pool = [...free];
-  const rng = new Rng(hashString(`${arc.id}|${n}|${seed}`));
+  const rng = new Rng(hashSeed(`${arc.id}|${n}|${seed}`));
   for (let i = pool.length - 1; i > 0; i--) {
     const j = rng.int(0, i);
     [pool[i], pool[j]] = [pool[j], pool[i]];
