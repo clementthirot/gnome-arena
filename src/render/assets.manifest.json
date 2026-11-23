@@ -1286,10 +1286,21 @@
     "intro": "quick",
     "reveal": {
       "episode": "ÉP. {n}",
-      "hook": "{hero} A UNE NOUVELLE ARME. ÇA SUFFIRA ?",
+      "hook": "{hero} A UN NOUVEAU JOUET. ÇA SUFFIRA ?",
+      "hooks": {
+        "laser_goggles": "{hero} A UN LASER. ÇA SUFFIRA ?",
+        "magic_sword": "{hero} A UNE ÉPÉE MAGIQUE. ÇA SUFFIRA ?",
+        "grenades": "{hero} A DES GRENADES. ÇA SUFFIRA ?",
+        "glue_bomb": "{hero} A DE LA GLU. ÇA SUFFIRA ?",
+        "chicken_launcher": "{hero} LANCE DES POULETS. ÇA SUFFIRA ?",
+        "iron_pot": "{hero} A UNE CASSEROLE SUR LA TÊTE. ÇA SUFFIRA ?",
+        "cream_pie": "{hero} A UNE TARTE À LA CRÈME. ÇA SUFFIRA ?",
+        "storm_umbrella": "{hero} A UN PARAPLUIE À FOUDRE. ÇA SUFFIRA ?",
+        "fan_whistle": "{hero} A UN SIFFLET À SUPPORTERS. ÇA SUFFIRA ?"
+      },
       "hookFirst": "{gnomes} GNOMES vs {goblins} GOBELINS",
       "chose": "LE PUBLIC A CHOISI…",
-      "gets": "{hero} REÇOIT : {upgrade} !",
+      "gets": "POUR {hero} !",
       "share": "{pct} % DES VOIX",
       "newTag": "NOUVEAU",
       "newTagSeconds": 4,

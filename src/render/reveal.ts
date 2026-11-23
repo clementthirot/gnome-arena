@@ -26,6 +26,8 @@ export interface OpeningContext {
   accessoryOf(index: number, visual: string): Phaser.GameObjects.Image | undefined;
   /** Plan rapproché sur une cible (s de combat). */
   focus(target: () => { x: number; y: number }, holdSeconds: number): void;
+  /** Cadrage imposé pendant la révélation (null : retour au plan large). Sans lui, pas de recadrage. */
+  frame?(target: (() => { x: number; y: number }) | null, zoom: number): void;
   emperorSays(text: string, holdMs: number): void;
   /** Lance le combat. */
   go(): void;
@@ -49,7 +51,9 @@ const CX = SAFE.text.x + SAFE.text.w / 2;
 const VEIL_ALPHA = 0.6;
 
 /** Repères de l'ouverture avec révélation (ms depuis la première image). */
-const T = { chose: 250, reel: 400, gets: 250, fly: 650, flight: 520, go: 3500, start: 3900 } as const;
+const T = { chose: 250, reel: 400, gets: 250, fly: 550, flight: 520, land: 200, go: 3250, start: 3600 } as const;
+/** Zoom du cadrage sur le héros bénéficiaire pendant le vol de l'accessoire. */
+const FRAME_ZOOM = 1.45;
 /** Ouverture courte, sans révélation (ms). */
 const QUICK = { go: 800, start: 1250 } as const;
 
@@ -103,7 +107,7 @@ export function playOpening(ctx: OpeningContext): void {
   const vote = resolveVote(ctx);
   const count = (team: TeamId) => ctx.units.filter((u) => u.team === team).length;
   const title: OpeningTitle = { episode: ctx.episode ? fill(cfg.episode, { n: ctx.episode.number }) : undefined };
-  if (vote) title.hook = fill(cfg.hook, { hero: vote.name, upgrade: vote.eq.label.toUpperCase() });
+  if (vote) title.hook = fill(cfg.hooks[vote.eq.id] ?? cfg.hook, { hero: vote.name, upgrade: vote.eq.label.toUpperCase() });
   else {
     const parts = fill(cfg.hookFirst, { gnomes: count('gnomes'), goblins: count('goblins') }).split(/ (vs|contre) /);
     title.stack = parts.length === 3 ? [parts[0], parts[1], parts[2]] : [parts.join(' '), '', ''];
@@ -122,19 +126,25 @@ export function playOpening(ctx: OpeningContext): void {
   const d = ctx.uiDepth + 60;
   const hint = scene.add.text(CX, 600, cfg.chose, textStyle(46, '#ffe14a')).setOrigin(0.5).setDepth(d).setAlpha(0);
   scene.tweens.add({ targets: hint, alpha: 1, duration: 200, delay: T.chose });
-  if (cfg.emperor) scene.time.delayedCall(T.chose, () => ctx.emperorSays(manifest.staging.show.lines.roulette, 1800));
+  // Pas de bulle de l'empereur ici : « LE PUBLIC A CHOISI… » dit déjà la même chose, et la bulle tomberait sous le titre.
 
   // Rouleau : défile sur les options de l'épisode précédent et s'arrête sur la gagnante.
   const pool = vote.options.flatMap((o) => accessoryTexture(scene, o.visual) ?? []);
   const target = accessoryTexture(scene, vote.eq.visual) ?? pool[0];
-  const reel = spinReel(scene, { x: CX, y: 830, size: 240, depth: d, pool, target, delay: T.reel + 150, spins: 16, firstStep: 40, stepGrowth: 9 });
+  const reel = spinReel(scene, { x: CX, y: 830, size: 240, depth: d, pool, target, delay: T.reel + 150, spins: 13, firstStep: 40, stepGrowth: 9 });
   reel.container.setScale(0);
   scene.tweens.add({ targets: reel.container, scale: 1, duration: 260, delay: T.reel, ease: 'Back.easeOut' });
   // Le rouleau apparaît, puis défile 150 ms plus tard ; stopsAt compte depuis la première image.
   const stopAt = reel.stopsAt;
   const after: Phaser.GameObjects.GameObject[] = [];
+  const unit = vote.unit;
   scene.time.delayedCall(stopAt, () => {
     flash(scene, d + 5, 0.35);
+    // La caméra va chercher le héros (souvent bas dans l'arène, sous la légende des réseaux) avant le vol.
+    const s = unit ? ctx.spriteOf(unit.index) : undefined;
+    // x borné pour que le cadre reste dans le monde (pas de bord noir à droite).
+    const half = scene.scale.width / (2 * FRAME_ZOOM);
+    if (s && ctx.frame) ctx.frame(() => ({ x: Phaser.Math.Clamp(s.x, half, scene.scale.width - half), y: s.y - s.displayHeight * 0.4 }), FRAME_ZOOM);
     const label = scene.add.text(CX, 1030, vote.eq.label.toUpperCase(), textStyle(52, '#ffe14a', { wordWrap: { width: SAFE.text.w - 40 } })).setOrigin(0.5).setDepth(d);
     label.setScale(0.3);
     scene.tweens.add({ targets: label, scale: 1, duration: 220, ease: 'Back.easeOut' });
@@ -153,7 +163,6 @@ export function playOpening(ctx: OpeningContext): void {
 
   // L'accessoire quitte le rouleau et vole jusqu'au héros dans l'arène.
   const flyAt = stopAt + T.fly;
-  const unit = vote.unit;
   const worn = unit ? ctx.accessoryOf(unit.index, vote.eq.visual) : undefined;
   worn?.setAlpha(0);
   scene.time.delayedCall(flyAt, () => {
@@ -164,14 +173,23 @@ export function playOpening(ctx: OpeningContext): void {
       worn?.setAlpha(1);
       return;
     }
-    const to = worn ? { x: worn.x, y: worn.y } : { x: sprite.x, y: sprite.y - sprite.displayHeight * 0.5 };
+    // L'icône vit sur la caméra fixe de l'interface : la cible (monde) est ramenée en coordonnées écran
+    // à chaque image, puisque la caméra de jeu recadre le héros pendant le vol.
+    const cam = scene.cameras.main;
+    const to: { x: number; y: number } = { x: CX, y: SAFE.centerY };
+    const aim = () => {
+      const wx = worn ? worn.x : sprite.x;
+      const wy = worn ? worn.y : sprite.y - sprite.displayHeight * 0.5;
+      to.x = (wx - cam.worldView.x) * cam.zoom;
+      to.y = (wy - cam.worldView.y) * cam.zoom;
+    };
     const icon = scene.add.image(CX, 830, target).setDepth(d + 2);
     fitIcon(icon, 170);
-    const endScale = worn ? worn.scale : icon.scale * 0.3;
+    const startScale = icon.scale;
+    const endScale = () => (worn ? worn.scale : startScale * 0.3) * cam.zoom * 1.3;
     sound.play('whoosh');
     // Vol en cloche : x linéaire, y avec une bosse.
     const from = { x: CX, y: 830 };
-    const peak = Math.min(from.y, to.y) - 220;
     scene.tweens.addCounter({
       from: 0,
       to: 1,
@@ -179,8 +197,11 @@ export function playOpening(ctx: OpeningContext): void {
       ease: 'Sine.easeIn',
       onUpdate: (tw) => {
         const k = tw.getValue() ?? 0;
+        aim();
+        const peak = Math.min(from.y, to.y) - 220;
         icon.setPosition(from.x + (to.x - from.x) * k, (1 - k) * (1 - k) * from.y + 2 * (1 - k) * k * peak + k * k * to.y);
         icon.setAngle(k * 720);
+        icon.setScale(startScale + (endScale() - startScale) * k);
       },
       onComplete: () => {
         icon.destroy();
@@ -189,11 +210,11 @@ export function playOpening(ctx: OpeningContext): void {
         flash(scene, d + 5, 0.5);
         confetti(scene, to.x, to.y, d + 3);
         scene.tweens.add({ targets: sprite, scaleY: { from: sprite.scaleY * 0.7, to: sprite.scaleY }, duration: 260, ease: 'Back.easeOut' });
-        ctx.focus(() => ({ x: sprite.x, y: sprite.y }), 1.1);
         newTag(ctx, unit!, sprite);
+        // Un temps sur le héros équipé, puis retour au plan large avant « COMBAT ! ».
+        scene.time.delayedCall(T.land, () => ctx.frame?.(null, 1));
       },
     });
-    scene.tweens.add({ targets: icon, scale: endScale * 1.6, duration: T.flight });
   });
   scene.time.delayedCall(T.go, () => {
     combat(ctx, [hint]);
