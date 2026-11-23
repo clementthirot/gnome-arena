@@ -16,8 +16,10 @@ import { runningGagCanvas, Show } from '../show';
 import { closeCurtain } from '../curtain';
 import { asPlaceholder, bricksFor, DIRECTIONS, effectVisual, manifest, resolveAsset } from '../manifest';
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
-import { rand, seedRender, seedTick } from '../random';
-import { TEAM_COLORS, textStyle } from '../text';
+import { rand, randAt, seedNoise, seedRender, seedTick, streamFrom } from '../random';
+import { overlayRects, SAFE } from '../safeZone';
+import { bossScale, Eggs, overlayColors, overlayTexture } from '../eggs';
+import { TEAM_COLORS, TEXT, textStyle } from '../text';
 import type { ResultData } from './ResultScene';
 
 /** Monde 270 x 480 affiché en 1080 x 1920. */
@@ -78,6 +80,9 @@ interface Spectator {
   tint?: number;
 }
 
+/** Barre de rapport de force verticale, sur le bord gauche (le seul sans overlay). */
+const BALANCE = { x: 18, w: 36, top: 304, bottom: 1160 } as const;
+
 export class ArenaScene extends Phaser.Scene {
   private params!: ArenaParams;
   private battle!: Battle;
@@ -123,6 +128,24 @@ export class ArenaScene extends Phaser.Scene {
   private routed = new WeakSet<Phaser.GameObjects.GameObject>();
   private lastStandCheck = 0;
   private nextSplashAt = 0;
+  /** Rappels planifiés en temps de simulation (exécutés dans le tick : déterministes). */
+  private simTimers: { at: number; fn: () => void }[] = [];
+  private eggs!: Eggs;
+  /** Bandes cinéma (haut, bas). */
+  private letterboxBars: Phaser.GameObjects.Rectangle[] = [];
+  /** Jeton du ralenti en cours : un ralenti plus récent annule la fin du précédent. */
+  private cinemaToken = 0;
+  /** Aura et couronne des mini-boss. */
+  private bossFx = new Map<number, { aura?: Phaser.GameObjects.Image; crown?: Phaser.GameObjects.Image; auraScale: number }>();
+  private gagHat?: { img: Phaser.GameObjects.Image; dy: number };
+  /** Spectateur récurrent : position fixe (monde), dans la tribune de droite, hors des zones d'overlay. */
+  private gagSpot = { x: 0, y: 0 };
+  private lastStandSeen = new Set<number>();
+  /** Confettis de la victoire : émis à chaque tick jusqu'à cette date (s de combat). */
+  private confettiUntil = 0;
+  private confettiDebt = 0;
+  private confettiColors: number[] = [];
+  private mvpLabel?: { text: Phaser.GameObjects.Text; sprite: Phaser.GameObjects.Sprite };
 
   constructor() {
     super('arena');
@@ -150,6 +173,30 @@ export class ArenaScene extends Phaser.Scene {
     this.timeScale = params.speed;
     this.routed = new WeakSet();
     this.lastStandCheck = 0;
+    this.nextSplashAt = 0;
+    this.simTimers = [];
+    this.letterboxBars = [];
+    this.cinemaToken = 0;
+    this.bossFx = new Map();
+    this.gagHat = undefined;
+    this.lastStandSeen = new Set();
+    this.confettiUntil = 0;
+    this.confettiDebt = 0;
+    this.mvpLabel = undefined;
+  }
+
+  /** Exécute fn après `delay` secondes de combat, dans un tick (le hasard du rendu y est déterministe). */
+  private atSim(delay: number, fn: () => void): void {
+    this.simTimers.push({ at: this.battle.time + delay, fn });
+  }
+
+  private runSimTimers(): void {
+    if (!this.simTimers.length) return;
+    const now = this.battle.time + 1e-9;
+    const due = this.simTimers.filter((t) => t.at <= now);
+    if (!due.length) return;
+    this.simTimers = this.simTimers.filter((t) => t.at > now);
+    for (const t of due) t.fn();
   }
 
   create(): void {
@@ -159,6 +206,9 @@ export class ArenaScene extends Phaser.Scene {
     seedTick(0);
     const { width, height } = data.battle.arena;
     const field = this.battle.field;
+    const query = typeof location !== 'undefined' ? new URLSearchParams(location.search) : undefined;
+    this.eggs = new Eggs(seed, query?.get('eggs') === '1');
+    this.gagSpot = { x: width - 7, y: field.y + 38 };
 
     const bgKey = `arena_bg_${this.battle.biome.id}`;
     if (!this.textures.exists(bgKey)) this.textures.addCanvas(bgKey, drawArenaBackground(width, height, field, this.battle.biome));
@@ -174,15 +224,24 @@ export class ArenaScene extends Phaser.Scene {
       toast: (text) => this.toast(text),
       focus: (target) => this.director.request('heroDuel', target, this.battle.time),
       spriteOf: (unit) => this.views[unit]?.sprite,
+      later: (delay, fn) => this.atSim(delay, fn),
+      comeback: () => this.crowdWave(),
     });
     if (manifest.staging.show.runningGag) {
-      // Toujours au même endroit, épisode après épisode.
-      if (!this.textures.exists('running_gag')) this.textures.addCanvas('running_gag', runningGagCanvas());
-      const gx = field.x + field.width * 0.78;
-      const gy = field.y + field.height + 23;
-      const sprite = this.add.image(gx * SCALE, gy * SCALE, 'running_gag').setScale(SCALE).setOrigin(0.5, 1).setDepth(-900 + gy + 1);
+      // Toujours au même endroit, épisode après épisode : tribune de droite, en haut (hors légende et hors rail).
+      const hatKey = this.eggs.gagAccessory(this.params.episode?.number);
+      const hat = hatKey ? overlayTexture(this, hatKey, SCALE) : undefined;
+      const texture = hat ? 'running_gag_bare' : 'running_gag';
+      if (!this.textures.exists(texture)) this.textures.addCanvas(texture, runningGagCanvas(!!hat));
+      const { x: gx, y: gy } = this.gagSpot;
+      const sprite = this.add.image(gx * SCALE, gy * SCALE, texture).setScale(SCALE).setOrigin(0.5, 1).setDepth(-900 + gy + 1);
       this.gagSpectator = { sprite, baseY: gy * SCALE, phase: 0, side: 'gnomes' };
       this.spectators.push(this.gagSpectator);
+      if (hat) {
+        // L'accessoire de l'épisode, posé sur sa tête (bas de l'accessoire au sommet du crâne).
+        const img = this.add.image(sprite.x, sprite.y, hat.key).setScale(hat.scale).setOrigin(0.5, 1).setDepth(-900 + gy + 1.5);
+        this.gagHat = { img, dy: 7 * SCALE };
+      }
     }
     this.gas = new GasLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-430), field, manifest.staging.gas, SCALE);
     for (const u of this.battle.units) this.createUnitView(u);
@@ -194,7 +253,9 @@ export class ArenaScene extends Phaser.Scene {
     const w = width * SCALE;
     const h = height * SCALE;
     this.uiCam = this.cameras.add(0, 0, w, h);
-    this.director = new Director(this.cameras.main, manifest.staging.camera, w, h);
+    this.director = new Director(this.cameras.main, manifest.staging.camera, w, h, manifest.staging.cinema.maxShot);
+    this.createLetterbox();
+    if (query?.get('safe') === '1') this.drawSafeOverlay();
     this.bindInput();
     if (this.params.skipIntro) {
       this.running = true;
@@ -224,7 +285,9 @@ export class ArenaScene extends Phaser.Scene {
     // Clé absente du manifeste : on génère le placeholder de secours à la volée.
     if (!this.textures.exists(key) && entry.type === 'placeholder') this.textures.addCanvas(key, drawPlaceholder(entry));
     const sprite = this.add.sprite(u.x * SCALE, u.y * SCALE, this.textures.exists(key) ? key : '__MISSING');
-    const baseScale = entry.type === 'placeholder' ? SCALE : (entry.size * SCALE) / entry.frameHeight;
+    // Mini-boss à l'image : un héros grossit avec ses upgrades (la simulation, elle, ne change pas).
+    const boss = u.hero ? bossScale(u.equipment.length) : 1;
+    const baseScale = (entry.type === 'placeholder' ? SCALE : (entry.size * SCALE) / entry.frameHeight) * boss;
     sprite.setScale(baseScale).setOrigin(0.5, 0.75);
     const directional = entry.type === 'spritesheet' && !!entry.directions && this.anims.exists(`${key}_idle_0`);
     if (!directional) sprite.setFlipX(u.facing < 0);
@@ -238,7 +301,21 @@ export class ArenaScene extends Phaser.Scene {
       const bar = this.add.graphics().setDepth(9800);
       this.heroHud.set(u.index, { name, bar });
     }
-    if (u.equipment.length) this.accessories.set(u.index, u.equipment.map((eq) => this.createAccessory(eq.visual)).filter((a): a is Accessory => !!a));
+    if (u.equipment.length) {
+      const list = u.equipment.map((eq) => this.createAccessory(eq.visual)).filter((a): a is Accessory => !!a);
+      list.forEach((a) => a.img.setScale(a.img.scaleX * boss));
+      this.accessories.set(u.index, list);
+    }
+    const mb = manifest.staging.miniBoss;
+    if (u.hero && u.equipment.length >= mb.auraFrom) {
+      const aura = overlayTexture(this, mb.aura, SCALE * boss);
+      const crown = overlayTexture(this, mb.crown, SCALE);
+      this.bossFx.set(u.index, {
+        aura: aura && this.add.image(0, 0, aura.key).setScale(aura.scale).setAlpha(0.85),
+        crown: crown && this.add.image(0, 0, crown.key).setScale(crown.scale).setOrigin(0.5, 1),
+        auraScale: aura?.scale ?? 1,
+      });
+    }
   }
 
   /** Accessoire d'upgrade superposé au héros, depuis le manifeste (placeholder ou image). */
@@ -279,6 +356,7 @@ export class ArenaScene extends Phaser.Scene {
     const sheets = { gnomes: fanSheet('gnomes'), goblins: fanSheet('goblins') };
     const place = (x: number, y: number, side: 'gnomes' | 'goblins', facing: 'south' | 'north' | 'east' | 'west') => {
       if (Show.logeContains(field, x, y)) return;
+      if (manifest.staging.show.runningGag && Math.abs(x - this.gagSpot.x) < 4 && Math.abs(y - this.gagSpot.y) < 6) return;
       const sheet = sheets[side];
       if (sheet) {
         // Le supporter regarde l'arène ; sans 8 directions, première image retournée vers le centre.
@@ -316,20 +394,78 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Interface permanente sur le bord gauche (seul côté sans overlay des réseaux) : barre de rapport de
+   * force verticale, gobelins en haut (ils partent du haut), gnomes en bas, effectifs à chaque bout.
+   */
   private createHud(): void {
-    const w = this.scale.width;
-    this.add.rectangle(0, 0, w, 96, 0x000000, 0.45).setOrigin(0).setDepth(9900);
     this.balanceBar = this.add.graphics().setDepth(9902);
+    const cx = BALANCE.x + BALANCE.w / 2;
     this.hud = {
-      left: this.add.text(24, 48, '', textStyle(30, TEAM_COLORS.gnomes.main)).setOrigin(0, 0.5).setDepth(9901),
-      right: this.add.text(w - 24, 48, '', textStyle(30, TEAM_COLORS.goblins.main)).setOrigin(1, 0.5).setDepth(9901),
-      clock: this.add.text(w / 2, 48, '0:00', textStyle(30)).setOrigin(0.5).setDepth(9901),
+      // Gobelins en haut de la barre, gnomes en bas.
+      right: this.add.text(cx, BALANCE.top - 10, '', textStyle(TEXT.S + 4, TEAM_COLORS.goblins.main)).setOrigin(0.5, 1).setDepth(9903),
+      left: this.add.text(cx, BALANCE.bottom + 10, '', textStyle(TEXT.S + 4, TEAM_COLORS.gnomes.main)).setOrigin(0.5, 0).setDepth(9903),
+      // Chrono discret, à côté du haut de la barre ; absent de la vidéo enregistrée (il n'apporte rien).
+      clock: this.add.text(BALANCE.x + BALANCE.w + 14, BALANCE.top + 4, '', textStyle(TEXT.XS, '#ffffff')).setOrigin(0, 0).setDepth(9903).setAlpha(0.7).setVisible(!this.params.record),
     };
-    this.add
-      .text(w / 2, this.scale.height - 20, `seed ${this.params.seed}`, textStyle(18, '#d8d0e8'))
-      .setOrigin(0.5, 1)
-      .setDepth(9901)
-      .setAlpha(0.8);
+    // La seed n'a rien à faire dans la vidéo : seulement hors enregistrement, dans la zone basse.
+    if (!this.params.record) {
+      this.add
+        .text(this.scale.width / 2, this.scale.height - 20, `seed ${this.params.seed}`, textStyle(18, '#d8d0e8'))
+        .setOrigin(0.5, 1)
+        .setDepth(9901)
+        .setAlpha(0.8);
+    }
+  }
+
+  /** Bandes noires de cinéma : elles tombent dans les zones d'overlay (haut, légende), rien d'utile n'est masqué. */
+  private createLetterbox(): void {
+    const { width: w, height: h } = this.scale;
+    const top = manifest.staging.cinema.letterboxTop;
+    const bottomH = h - SAFE.action.bottom;
+    this.letterboxBars = [
+      this.add.rectangle(0, -top, w, top, 0x000000, 1).setOrigin(0).setDepth(9945),
+      this.add.rectangle(0, h, w, bottomH, 0x000000, 1).setOrigin(0).setDepth(9945),
+    ];
+  }
+
+  private letterbox(on: boolean): void {
+    const { height: h } = this.scale;
+    const [top, bottom] = this.letterboxBars;
+    if (!top) return;
+    this.tweens.killTweensOf(this.letterboxBars);
+    this.tweens.add({ targets: top, y: on ? 0 : -top.height, duration: on ? 180 : 260, ease: 'Quad.easeOut' });
+    this.tweens.add({ targets: bottom, y: on ? h - bottom.height : h, duration: on ? 180 : 260, ease: 'Quad.easeOut' });
+  }
+
+  /**
+   * Ralenti « bullet time » : temps du combat ralenti, zoom sur la cible, bandes cinéma.
+   * La fin est en temps réel (la simulation, elle, ne dépend pas du moment où le ralenti s'arrête).
+   */
+  private bulletTime(target: () => { x: number; y: number }, moment: { enabled: boolean; slowmo: number; ms: number; zoom: number; letterbox: boolean }, force = false): void {
+    if (!moment.enabled || (!force && this.slowmo < 1)) return;
+    const token = ++this.cinemaToken;
+    this.slowmo = moment.slowmo;
+    this.director.cinema(target, this.battle.time, (moment.slowmo * moment.ms) / 1000 + 0.45, moment.zoom);
+    if (moment.letterbox) this.letterbox(true);
+    sound.play('whoosh');
+    this.time.delayedCall(moment.ms, () => {
+      if (token !== this.cinemaToken) return;
+      this.slowmo = 1;
+      this.letterbox(false);
+    });
+  }
+
+  /** `?safe=1` : zones couvertes par l'overlay des réseaux, par-dessus tout. */
+  private drawSafeOverlay(): void {
+    const g = this.add.graphics().setDepth(99990);
+    for (const r of overlayRects(this.scale.width, this.scale.height)) {
+      g.fillStyle(0xff0040, 0.28).fillRect(r.x, r.y, r.w, r.h);
+      g.lineStyle(4, 0xff0040, 0.9).strokeRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
+      this.add.text(r.x + 12, r.y + 10, r.name.toUpperCase(), textStyle(TEXT.XS, '#ff8099')).setDepth(99991);
+    }
+    // Centre visuel de la zone utile.
+    g.lineStyle(2, 0x00ffcc, 0.7).lineBetween(0, SAFE.centerY, this.scale.width, SAFE.centerY);
   }
 
   private bindInput(): void {
@@ -469,7 +605,13 @@ export class ArenaScene extends Phaser.Scene {
       this.tweens.killTweensOf(this.currentBanner);
       this.currentBanner.destroy();
     }
-    const t = this.add.text(w / 2, h * 0.5, text, textStyle(52, color, { wordWrap: { width: w * 0.9 } })).setOrigin(0.5).setDepth(9960);
+    void w;
+    void h;
+    // Bas de la zone sûre (tiers inférieur, au-dessus de la légende) : le carton ne couvre plus l'action qu'il annonce.
+    const t = this.add
+      .text(SAFE.text.x + SAFE.text.w / 2, SAFE.captionTop - 110, text, textStyle(52, color, { wordWrap: { width: SAFE.text.w - 40 } }))
+      .setOrigin(0.5)
+      .setDepth(9960);
     this.currentBanner = t;
     t.setScale(0.4).setAlpha(0);
     this.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 220, ease: 'Back.easeOut' });
@@ -478,15 +620,19 @@ export class ArenaScene extends Phaser.Scene {
 
   /** Annonce discrète en haut de l'écran (incidents d'arène). */
   private toast(text: string): void {
-    const t = this.add.text(this.scale.width / 2, 150, text, textStyle(36, '#ffb347')).setOrigin(0.5).setDepth(9955).setAlpha(0);
-    this.tweens.add({ targets: t, alpha: 1, y: 170, duration: 180 });
+    const t = this.add
+      .text(SAFE.text.x + SAFE.text.w / 2, SAFE.top + 20, text, textStyle(TEXT.M - 4, '#ffb347', { wordWrap: { width: SAFE.text.w - 40 } }))
+      .setOrigin(0.5)
+      .setDepth(9955)
+      .setAlpha(0);
+    this.tweens.add({ targets: t, alpha: 1, y: SAFE.top + 40, duration: 180 });
     this.tweens.add({ targets: t, alpha: 0, delay: 1400, duration: 300, onComplete: () => t.destroy() });
   }
 
   /** Petit texte qui jaillit au-dessus d'une unité (attaque spéciale, raté). */
   private popup(u: Unit, text: string, color: string, size: number): void {
     const v = this.views[u.index];
-    const t = this.add.text(v.sprite.x, v.sprite.y - v.sprite.displayHeight - 40, text, textStyle(size, color)).setOrigin(0.5, 1).setDepth(9850);
+    const t = this.add.text(v.sprite.x, v.sprite.y - v.sprite.displayHeight - 40, text, textStyle(Math.max(TEXT.XS + 2, size), color)).setOrigin(0.5, 1).setDepth(9850);
     this.tweens.add({ targets: t, y: t.y - 40, alpha: 0, delay: 350, duration: 650, onComplete: () => t.destroy() });
   }
 
@@ -507,7 +653,10 @@ export class ArenaScene extends Phaser.Scene {
         if (this.battle.result) this.battle.epilogue();
         else this.battle.step();
         seedTick(this.battle.tick);
+        seedNoise(this.battle.tick);
         this.handleEvents(this.battle.events);
+        this.tickVisuals(this.battle.dt);
+        this.runSimTimers();
         this.accumulator -= dtMs;
         steps++;
       }
@@ -516,15 +665,15 @@ export class ArenaScene extends Phaser.Scene {
     const alpha = Math.min(1, this.accumulator / dtMs);
     this.drawUnits(alpha, this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale : 0);
     this.drawZone();
-    this.ambience(Math.min(delta, 100) / 1000);
-    this.gas.update(this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale : 0, this.battle.zone, this.battle.zoneScale);
+    this.gas.update(this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale * this.slowmo : 0, this.battle.zone);
     this.drawEffects(delta / 1000);
     this.animateCrowd(this.time.now / 1000);
     this.updateHud();
     this.watchLastStand();
     this.juice.drawStatus(this.battle.units, this.views, this.time.now);
     this.show.update();
-    this.drawBalance(Math.min(delta, 100) / 1000);
+    this.drawBalance();
+    this.drawStageExtras();
     this.director.update(this.battle.time);
     this.routeCameras();
   }
@@ -535,7 +684,9 @@ export class ArenaScene extends Phaser.Scene {
     this.lastStandCheck = this.battle.time + 1;
     for (const team of TEAMS) {
       const mine = this.battle.alive(team);
-      if (mine.length === 1 && mine[0].hero && this.battle.alive(opposingTeam(team)).length >= 3) {
+      if (mine.length === 1 && mine[0].hero && this.battle.alive(opposingTeam(team)).length >= 3 && !this.lastStandSeen.has(mine[0].index)) {
+        // Un seul plan par héros : un gros plan reste court.
+        this.lastStandSeen.add(mine[0].index);
         const hero = this.views[mine[0].index].sprite;
         this.director.request('lastStand', () => hero, this.battle.time, 4);
       }
@@ -625,11 +776,12 @@ export class ArenaScene extends Phaser.Scene {
           if (u.hero) {
             const victim = view.sprite;
             const killer = e.killer >= 0 ? units[e.killer] : undefined;
-            if (killer?.hero) {
-              // Duel de héros : on cadre les deux.
-              const k = this.views[killer.index].sprite;
-              this.director.request('heroDuel', () => ({ x: (k.x + victim.x) / 2, y: (k.y + victim.y) / 2 }), this.battle.time);
-            } else this.director.request('heroDeath', () => victim, this.battle.time);
+            // Chute d'un héros : ralenti, zoom et bandes cinéma ; duel de héros : on cadre les deux.
+            const k = killer?.hero ? this.views[killer.index].sprite : undefined;
+            const target = k ? () => ({ x: (k.x + victim.x) / 2, y: (k.y + victim.y) / 2 }) : () => victim;
+            if (manifest.staging.cinema.heroDeath.enabled && !this.ending) this.bulletTime(target, manifest.staging.cinema.heroDeath);
+            else if (k) this.director.request('heroDuel', target, this.battle.time);
+            else this.director.request('heroDeath', target, this.battle.time);
             const hud = this.heroHud.get(e.unit);
             hud?.name.setAlpha(0.6);
             this.balanceFlash = 1;
@@ -681,8 +833,9 @@ export class ArenaScene extends Phaser.Scene {
         case 'land': {
           const splash = manifest.staging.koSplash;
           // Onomatopée réservée aux vraies grosses chutes, et pas plus d'une à la fois.
-          const loud = e.dead && e.impact >= splash.minImpact && this.time.now >= this.nextSplashAt;
-          if (loud) this.nextSplashAt = this.time.now + splash.gapMs;
+          // Temps de combat (pas l'horloge de la scène) : le tirage du mot ne dépend pas du framerate.
+          const loud = e.dead && e.impact >= splash.minImpact && this.battle.time >= this.nextSplashAt;
+          if (loud) this.nextSplashAt = this.battle.time + splash.gapMs / 1000;
           const word = loud ? { text: splash.words[Math.floor(rand() * splash.words.length)], color: splash.color } : undefined;
           Bricks.land(ctx, this.views[e.unit], e.x, e.y, e.impact, word);
           if (!e.dead) this.playReaction(this.views[e.unit], 'getup');
@@ -705,13 +858,14 @@ export class ArenaScene extends Phaser.Scene {
             const s = this.views[e.unit].sprite;
             this.director.request('misfire', () => s, this.battle.time);
           }
-          else if (eq) this.popup(u, eq.short.toUpperCase() + ' !', '#ffe14a', 24);
+          else if (eq) this.popup(u, eq.short.toUpperCase() + ' !', '#ffe14a', TEXT.XS + 2);
           break;
         }
         case 'effect':
           this.fxLayer.effect(e.visual, e.x, e.y, e.radius);
           if (e.source >= 0 && effectVisual(e.visual).spinSource) this.views[e.source].whirlUntil = this.time.now + effectVisual(e.visual).duration * 1000;
-          this.hitStands(e.x, e.y, e.radius + 6);
+          this.hitStands(e.x, e.y, e.radius + 6, e.radius >= 12);
+          if (e.radius >= manifest.staging.easterEggs.emperorFall.minRadius && this.eggs.take('emperorFall')) this.show.emperorTumble(manifest.staging.easterEggs.emperorFall.line);
           if (e.radius >= manifest.staging.camera.bigImpactRadius) {
             this.cameras.main.shake(320, 0.014);
             this.cameras.main.flash(140, 255, 236, 200);
@@ -817,6 +971,8 @@ export class ArenaScene extends Phaser.Scene {
     }
     if (!best || bestScore > 40) return false;
     const target = best;
+    // Le spectateur s'envole plus tard (fin du vol de la flèche) : ses tirages sont faits maintenant, dans le tick.
+    const rnd = streamFrom(rand());
     const arrow = this.add.rectangle(x * SCALE, y * SCALE, 5 * SCALE, SCALE, 0xf4f0e0).setRotation(Math.atan2(dy, dx)).setDepth(9000);
     this.tweens.add({
       targets: arrow,
@@ -825,28 +981,28 @@ export class ArenaScene extends Phaser.Scene {
       duration: 220,
       onComplete: () => {
         arrow.destroy();
-        this.hurtSpectator(target, true);
+        this.hurtSpectator(target, true, rnd);
       },
     });
     return true;
   }
 
   /** Un spectateur prend un coup : il est éjecté hors de l'écran, et les gradins se vident peu à peu. */
-  private hurtSpectator(s: Spectator, shout: boolean): void {
+  private hurtSpectator(s: Spectator, shout: boolean, rnd: () => number = rand): void {
     if (!s.sprite.visible) return;
     if (s !== this.gagSpectator && manifest.staging.crowd.ejectOnHit) {
-      this.ejectSpectator(s, shout);
+      this.ejectSpectator(s, shout, rnd);
       return;
     }
     s.sprite.setTint(0xff6060);
     this.time.delayedCall(250, () => (s.tint === undefined ? s.sprite.clearTint() : s.sprite.setTint(s.tint)));
     this.tweens.add({ targets: s.sprite, y: s.baseY - 5 * SCALE, duration: 110, yoyo: true });
     if (!shout) return;
-    const ouch = this.add.text(s.sprite.x, s.baseY - 9 * SCALE, 'AÏE !', textStyle(22, '#ffffff')).setOrigin(0.5, 1).setDepth(9850);
+    const ouch = this.add.text(Math.min(s.sprite.x, 820), s.baseY - 9 * SCALE, 'AÏE !', textStyle(TEXT.XS + 2, '#ffffff')).setOrigin(0.5, 1).setDepth(9850);
     this.tweens.add({ targets: ouch, y: ouch.y - 30, alpha: 0, delay: 300, duration: 500, onComplete: () => ouch.destroy() });
   }
 
-  private ejectSpectator(s: Spectator, shout: boolean): void {
+  private ejectSpectator(s: Spectator, shout: boolean, rand: () => number): void {
     this.spectators = this.spectators.filter((o) => o !== s);
     const sprite = s.sprite;
     this.tweens.killTweensOf(sprite);
@@ -876,16 +1032,17 @@ export class ArenaScene extends Phaser.Scene {
       onComplete: () => sprite.destroy(),
     });
     if (shout) {
-      const ouch = this.add.text(x0, s.baseY - 9 * SCALE, 'AÏE !', textStyle(22, '#ffffff')).setOrigin(0.5, 1).setDepth(9850);
+      const ouch = this.add.text(Math.min(Math.max(x0, 100), 820), s.baseY - 9 * SCALE, 'AÏE !', textStyle(TEXT.XS + 2, '#ffffff')).setOrigin(0.5, 1).setDepth(9850);
       this.tweens.add({ targets: ouch, y: ouch.y - 30, alpha: 0, delay: 300, duration: 500, onComplete: () => ouch.destroy() });
     }
   }
 
   /** Explosions et rayons qui débordent sur les gradins : les spectateurs à portée trinquent. */
-  private hitStands(x: number, y: number, radius: number): void {
+  private hitStands(x: number, y: number, radius: number, explosive = false): void {
     const f = this.battle.field;
     const edge = Math.min(x - f.x, f.x + f.width - x, y - f.y, f.y + f.height - y);
     if (edge > radius) return;
+    if (explosive && this.crowdBurst(x, y, radius)) return;
     let shouted = false;
     for (const s of this.spectators) {
       if (Math.hypot(s.sprite.x / SCALE - x, s.baseY / SCALE - 3 - y) > radius + 4) continue;
@@ -972,15 +1129,24 @@ export class ArenaScene extends Phaser.Scene {
     this.director.release(this.battle.time);
     const r = this.battle.result!;
     const cfg = manifest.staging.show;
+    const cin = manifest.staging.cinema;
+    // Dernier K.O. : silence, ralenti, zoom et bandes cinéma, écrit à l'écran (lecture sans le son)… puis la foule explose.
     sound.stopMusic();
-    sound.play('cheer');
-    // Ralenti sur le dernier K.O., caméra sur la victime.
-    this.slowmo = cfg.slowmo;
+    this.time.delayedCall(350, () => sound.play('cheer'));
     const last = this.views[this.lastVictim]?.sprite;
-    if (last) this.director.request('lastStand', () => last, this.battle.time, 1.2);
-    this.time.delayedCall(1200, () => {
+    const center = { x: this.scale.width / 2, y: SAFE.centerY };
+    if (cin.lastKO.enabled) {
+      this.bulletTime(last ? () => last : () => center, cin.lastKO, true);
+      if (r.winner !== 'draw') this.banner(cin.lastKOText, '#ffffff', Math.max(400, cin.lastKO.ms - 300));
+    } else {
+      this.slowmo = cfg.slowmo;
+      if (last) this.director.request('lastStand', () => last, this.battle.time, 1.2);
+    }
+    const slowMs = cin.lastKO.enabled ? cin.lastKO.ms : 1200;
+    this.time.delayedCall(slowMs, () => {
       this.slowmo = 1;
       this.director.release(this.battle.time);
+      if (r.winner !== 'draw') this.winnerShot(r.winner);
       const label = r.winner === 'draw' ? 'ÉGALITÉ !' : `VICTOIRE DES ${TEAM_COLORS[r.winner].label} !`;
       this.banner(label, r.winner === 'draw' ? '#ffffff' : TEAM_COLORS[r.winner].main, 2200);
       // L'empereur annonce la roulette ; roulement de tambour jusqu'au rideau.
@@ -1020,17 +1186,135 @@ export class ArenaScene extends Phaser.Scene {
     }
     flags.setAlpha(0);
     this.tweens.add({ targets: flags, alpha: 1, duration: 300 });
-    this.time.addEvent({
-      delay: 40,
-      repeat: 60,
-      callback: () => {
-        for (let i = 0; i < 3; i++) {
-          this.particles.push({ x: (rand() * w) / SCALE, y: f.y - 30 + rand() * 10, vx: (rand() - 0.5) * 40, vy: 10 + rand() * 30, life: 2.2, maxLife: 2.2, color: colors[Math.floor(rand() * 3)], size: 2 });
-        }
-      },
+    void w;
+    // Confettis et cris émis dans les ticks (épilogue) : mêmes tirages quel que soit le framerate.
+    this.confettiColors = colors;
+    this.confettiUntil = this.battle.time + 2.4;
+    this.atSim(0, () => this.cheer(winner, 1));
+    for (let k = 1; k <= 4; k++) this.atSim(0.6 * k, () => this.cheer(winner, 0.7));
+  }
+
+  /** Plan du vainqueur : la caméra se pose sur le meilleur survivant du camp gagnant, « MVP » au-dessus de lui. */
+  private winnerShot(winner: TeamId): void {
+    const cfg = manifest.staging.cinema.winner;
+    if (!cfg.enabled) return;
+    const alive = this.battle.units.filter((u) => u.team === winner && u.state !== 'dead');
+    if (!alive.length) return;
+    const score = (u: Unit) => u.kills + (u.hero ? 1000 : 0);
+    const mvp = alive.reduce((a, b) => (score(b) > score(a) ? b : a));
+    const sprite = this.views[mvp.index].sprite;
+    this.director.cinema(() => sprite, this.battle.time, cfg.hold, cfg.zoom);
+    if (!mvp.hero) return;
+    const text = this.add.text(sprite.x, sprite.y, cfg.label, textStyle(TEXT.S, '#ffe14a')).setOrigin(0.5, 1).setDepth(9870).setScale(0.2);
+    this.tweens.add({ targets: text, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    this.mvpLabel = { text, sprite };
+  }
+
+  /** Confettis de la victoire, fond d'ambiance, barre de force : avancés au rythme de la simulation. */
+  private tickVisuals(dt: number): void {
+    this.ambience(dt);
+    this.gas.emit(dt, this.battle.zoneScale);
+    if (this.battle.time < this.confettiUntil) {
+      const f = this.battle.field;
+      this.confettiDebt += dt * 75;
+      while (this.confettiDebt >= 1) {
+        this.confettiDebt -= 1;
+        const colors = this.confettiColors;
+        this.particles.push({ x: (rand() * this.scale.width) / SCALE, y: f.y - 30 + rand() * 10, vx: (rand() - 0.5) * 40, vy: 10 + rand() * 30, life: 2.2, maxLife: 2.2, color: colors[Math.floor(rand() * colors.length)], size: 2 });
+      }
+    }
+    const sg = this.battle.strength('gnomes');
+    const sb = this.battle.strength('goblins');
+    const target = sg + sb > 0 ? sg / (sg + sb) : 0.5;
+    this.balanceShown += (target - this.balanceShown) * Math.min(1, dt * 4);
+    this.balanceKick = Math.max(0, this.balanceKick - dt * 3);
+    this.balanceFlash = Math.max(0, this.balanceFlash - dt * 2.5);
+  }
+
+  /** Easter egg « le public explose » : un bloc de spectateurs part en confettis, puis revient sonné. */
+  private crowdBurst(x: number, y: number, radius: number): boolean {
+    const cfg = manifest.staging.easterEggs.crowdBurst;
+    const block = this.spectators.filter((s) => s !== this.gagSpectator && s.sprite.visible && Math.hypot(s.sprite.x / SCALE - x, s.baseY / SCALE - 3 - y) <= radius * 1.6 + 8);
+    if (block.length < 3 || !this.eggs.take('crowdBurst')) return false;
+    const [c1, c2] = overlayColors(cfg.visual);
+    for (const s of block) {
+      this.tweens.killTweensOf(s.sprite);
+      s.sprite.setVisible(false);
+      const sx = s.sprite.x / SCALE;
+      const sy = s.baseY / SCALE - 3;
+      const own = s.tint ?? (s.side === 'gnomes' ? TEAM_COLORS.gnomes.bar : TEAM_COLORS.goblins.bar);
+      for (let k = 0; k < 8; k++) {
+        const life = 1.3 + rand() * 0.7;
+        this.particles.push({ x: sx, y: sy - rand() * 5, vx: (rand() - 0.5) * 140, vy: -90 - rand() * 130, life, maxLife: life, color: [c1, c2, own, 0xffffff][k % 4], size: rand() < 0.5 ? 2 : 1 });
+      }
+    }
+    // Visuel remplaçable : une image dans le manifeste remplace le simple nuage de pixels.
+    const art = manifest.overlays[cfg.visual]?.type === 'image' ? overlayTexture(this, cfg.visual, SCALE) : undefined;
+    if (art) {
+      const img = this.add.image(x * SCALE, y * SCALE, art.key).setScale(art.scale * 0.3).setDepth(9010);
+      this.tweens.add({ targets: img, scale: art.scale, alpha: 0, duration: 700, onComplete: () => img.destroy() });
+    }
+    this.comic(x, y - 6, 'BOUM !', '#ffe14a', 56);
+    this.cameras.main.shake(260, 0.012);
+    sound.play('explosion');
+    sound.play('cheer');
+    this.show.emperorSays(cfg.line, 1600, 'none');
+    this.atSim(cfg.respawnMs / 1000, () => {
+      for (const s of block) {
+        // Il revient, sonné : gris, il titube.
+        s.sprite.setVisible(true).setAlpha(0).setTint(0xb8b8c0);
+        s.sprite.y = s.baseY + 4 * SCALE;
+        this.tweens.add({ targets: s.sprite, alpha: 1, y: s.baseY, duration: 260, ease: 'Back.easeOut' });
+        this.tweens.add({
+          targets: s.sprite,
+          angle: { from: -14, to: 14 },
+          duration: 150,
+          yoyo: true,
+          repeat: 5,
+          delay: 260,
+          onComplete: () => {
+            s.sprite.setAngle(0);
+            if (s.tint === undefined) s.sprite.clearTint();
+            else s.sprite.setTint(s.tint);
+          },
+        });
+      }
+      const head = block[Math.floor(block.length / 2)];
+      this.comic(head.sprite.x / SCALE, head.baseY / SCALE - 12, '@#!?', '#ffffff', 34);
     });
-    this.cheer(winner, 1);
-    this.time.addEvent({ delay: 600, repeat: 4, callback: () => this.cheer(winner, 0.7) });
+    return true;
+  }
+
+  /** Ola des gradins (retournement) : la vague parcourt le public de gauche à droite. */
+  private crowdWave(): void {
+    if (!this.eggs.take('wave')) return;
+    const w = this.scale.width;
+    for (const s of this.spectators) {
+      if (!s.sprite.visible) continue;
+      this.tweens.killTweensOf(s.sprite);
+      this.tweens.add({ targets: s.sprite, y: s.baseY - 6 * SCALE, duration: 160, yoyo: true, delay: (s.sprite.x / w) * 900, ease: 'Quad.easeOut' });
+    }
+    sound.play('cheer');
+  }
+
+  /** Suivi des décors attachés : aura et couronne des mini-boss, accessoire du spectateur, étiquette MVP. */
+  private drawStageExtras(): void {
+    const pulse = 1 + 0.08 * Math.sin(this.battle.time * 6);
+    for (const [i, fx] of this.bossFx) {
+      const s = this.views[i].sprite;
+      const dead = this.battle.units[i].state === 'dead';
+      fx.aura?.setVisible(!dead);
+      fx.crown?.setVisible(!dead);
+      if (dead) continue;
+      fx.aura?.setPosition(s.x, s.y + s.displayHeight * 0.22).setDepth(s.depth - 0.002).setScale(fx.auraScale * pulse);
+      fx.crown?.setPosition(s.x, s.y - s.displayHeight * 0.72).setAngle(s.angle).setDepth(s.depth + 0.002);
+    }
+    const g = this.gagSpectator;
+    if (g && this.gagHat) this.gagHat.img.setPosition(g.sprite.x, g.sprite.y - this.gagHat.dy).setAngle(g.sprite.angle).setVisible(g.sprite.visible);
+    if (this.mvpLabel) {
+      const { text, sprite } = this.mvpLabel;
+      text.setPosition(sprite.x, sprite.y - sprite.displayHeight * 0.8 - 62);
+    }
   }
 
   /** Le spectateur récurrent finit toujours touché. */
@@ -1048,8 +1332,10 @@ export class ArenaScene extends Phaser.Scene {
         ease: 'Quad.easeIn',
         onComplete: () => {
           tomato.destroy();
-          this.hurtSpectator(s, true);
-          this.comic(s.sprite.x / SCALE, s.baseY / SCALE - 14, 'SPLOTCH !', '#e83a2a', 32);
+          // Joué en temps réel (après le ralenti) : tirages pris d'un flux propre à la seed.
+          const rnd = streamFrom(randAt(1, 99));
+          this.hurtSpectator(s, true, rnd);
+          this.comic(s.sprite.x / SCALE, s.baseY / SCALE - 14, 'SPLOTCH !', '#e83a2a', 32, rnd);
         },
       });
     });
@@ -1152,8 +1438,9 @@ export class ArenaScene extends Phaser.Scene {
 
   private drawHeroHud(u: Unit, v: UnitView, hud: HeroHud): void {
     const top = v.sprite.y - v.sprite.displayHeight * 0.8;
-    const bw = 84;
-    const bh = 12;
+    // Plus grande et contourée : lisible sur téléphone même en plan large.
+    const bw = 110;
+    const bh = 16;
     const bx = Math.round(v.sprite.x - bw / 2);
     const by = Math.round(top - 18);
     hud.name.setPosition(v.sprite.x, by - 6);
@@ -1235,29 +1522,30 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  /** Une seule barre partagée entre les deux camps, selon les PV restants (la mesure de la victoire aux points). */
-  private drawBalance(dt: number): void {
+  /**
+   * Une seule barre partagée entre les deux camps, selon les PV restants (la mesure de la victoire aux
+   * points). Verticale, sur le bord gauche : gobelins en haut, gnomes en bas, comme sur le terrain.
+   * Lissage, secousse et éclat avancent au rythme des ticks (tickVisuals) : rien ne dépend du framerate.
+   */
+  private drawBalance(): void {
     const g = this.balanceBar;
-    const w = this.scale.width;
-    const sg = this.battle.strength('gnomes');
-    const sb = this.battle.strength('goblins');
-    const target = sg + sb > 0 ? sg / (sg + sb) : 0.5;
-    this.balanceShown += (target - this.balanceShown) * Math.min(1, dt * 4);
-    this.balanceKick = Math.max(0, this.balanceKick - dt * 3);
-    this.balanceFlash = Math.max(0, this.balanceFlash - dt * 2.5);
-    const x = 24;
-    const y = 104;
-    const bw = w - 48;
-    const bh = 22;
-    const split = Math.round(x + bw * this.balanceShown + (rand() - 0.5) * 16 * this.balanceKick);
+    const { x, w: bw, top, bottom } = BALANCE;
+    const bh = bottom - top;
+    // La jonction tremble sur les gros coups (oscillation en temps de combat, pas de tirage).
+    const jitter = Math.sin(this.battle.time * 97) * 14 * this.balanceKick;
+    const split = Math.round(Phaser.Math.Clamp(top + bh * (1 - this.balanceShown) + jitter, top, bottom));
     g.clear();
-    g.fillStyle(0x000000, 1).fillRect(x - 5, y - 5, bw + 10, bh + 10);
-    g.fillStyle(TEAM_COLORS.gnomes.bar, 1).fillRect(x, y, split - x, bh);
-    g.fillStyle(TEAM_COLORS.goblins.bar, 1).fillRect(split, y, x + bw - split, bh);
-    // Reflet en haut de la barre, jonction qui brille sur les gros coups.
-    g.fillStyle(0xffffff, 0.25).fillRect(x, y, bw, 5);
-    g.fillStyle(0xffffff, 0.6 + 0.4 * this.balanceKick).fillRect(split - 3, y - 7, 6, bh + 14);
-    if (this.balanceFlash > 0) g.fillStyle(0xffffff, this.balanceFlash * 0.7).fillRect(x, y, bw, bh);
+    g.fillStyle(0x000000, 1).fillRect(x - 5, top - 5, bw + 10, bh + 10);
+    g.fillStyle(TEAM_COLORS.goblins.bar, 1).fillRect(x, top, bw, split - top);
+    g.fillStyle(TEAM_COLORS.gnomes.bar, 1).fillRect(x, split, bw, bottom - split);
+    // Reflet sur le côté, jonction qui brille sur les gros coups (et flashe quand un héros tombe).
+    g.fillStyle(0xffffff, 0.25).fillRect(x, top, 6, bh);
+    const glow = 0.6 + 0.4 * this.balanceKick;
+    g.fillStyle(0xffffff, glow).fillRect(x - 8, split - 3, bw + 16, 6);
+    if (this.balanceFlash > 0) {
+      g.fillStyle(0xffffff, this.balanceFlash * 0.7).fillRect(x, top, bw, bh);
+      g.fillStyle(0xffe14a, this.balanceFlash).fillRect(x - 12, split - 6, bw + 24, 12);
+    }
   }
 
   /** Particules d'ambiance du biome : feuilles, neige, braises. */
@@ -1265,6 +1553,7 @@ export class ArenaScene extends Phaser.Scene {
     const kind = this.battle.biome.ambient;
     if (kind === 'none' || dt <= 0 || this.particles.length > manifest.staging.juice.maxParticles - 20) return;
     const f = this.battle.field;
+    // Appelé à chaque tick (temps de combat) : le tirage ne dépend ni du framerate ni de ?speed.
     const rate = kind === 'snow' ? 14 : kind === 'embers' ? 8 : 4;
     if (rand() > rate * dt) return;
     const colors = kind === 'snow' ? [0xffffff, 0xe8f0ff] : kind === 'embers' ? [0xff6a2a, 0xffb347] : [0x8ac84a, 0xc8a83a, 0x6a9a2a];
@@ -1275,21 +1564,23 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   /** Onomatopée de bande dessinée, posée dans l'arène. */
-  private comic(x: number, y: number, text: string, color = '#ffe14a', size = 40): void {
+  private comic(x: number, y: number, text: string, color = '#ffe14a', size = 40, rnd: () => number = rand): void {
     const t = this.add
       .text(x * SCALE, y * SCALE - 20, text, textStyle(size, color, { strokeThickness: 10 }))
       .setOrigin(0.5)
       .setDepth(9850)
-      .setAngle(rand() * 20 - 10)
+      .setAngle(rnd() * 20 - 10)
       .setScale(0.2);
+    // Jamais sous le rail des boutons ni hors de l'écran (plan large).
+    t.x = Phaser.Math.Clamp(t.x, 60 + t.width / 2, 880 - t.width / 2);
     this.tweens.add({ targets: t, scale: 1.1, duration: 160, ease: 'Back.easeOut' });
     this.tweens.add({ targets: t, alpha: 0, y: t.y - 30, delay: 650, duration: 350, onComplete: () => t.destroy() });
   }
 
   private updateHud(): void {
     const count = (team: (typeof TEAMS)[number]) => this.battle.units.filter((u) => u.team === team && u.state !== 'dead').length;
-    this.hud.left.setText(`GNOMES ${count('gnomes')}`);
-    this.hud.right.setText(`${count('goblins')} GOBELINS`);
+    this.hud.left.setText(`${count('gnomes')}`);
+    this.hud.right.setText(`${count('goblins')}`);
     const t = Math.floor(this.battle.time);
     this.hud.clock.setText(`${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}${this.paused ? ' II' : ''}`);
   }

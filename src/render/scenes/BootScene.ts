@@ -25,6 +25,9 @@ export class BootScene extends Phaser.Scene {
     for (const [key, entry] of Object.entries(manifest.accessories)) {
       if (entry.type === 'image') this.load.image(`acc_img_${key}`, entry.url);
     }
+    for (const [key, entry] of Object.entries(manifest.overlays)) {
+      if (entry.type === 'image') this.load.image(`ovl_img_${key}`, entry.url);
+    }
   }
 
   create(params: ArenaParams): void {

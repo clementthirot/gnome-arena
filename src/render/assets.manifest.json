@@ -1218,7 +1218,7 @@
     "camera": {
       "enabled": true,
       "zoom": 1.7,
-      "hold": 1.8,
+      "hold": 1.4,
       "cooldown": 7,
       "follow": 0.1,
       "triggers": {
@@ -1317,6 +1317,39 @@
       "useSprites": true,
       "scale": 0.8,
       "ejectOnHit": true
+    },
+    "cinema": {
+      "heroDeath": { "enabled": true, "slowmo": 0.35, "ms": 700, "zoom": 1.9, "letterbox": true },
+      "lastKO": { "enabled": true, "slowmo": 0.25, "ms": 1300, "zoom": 2.1, "letterbox": true },
+      "letterboxTop": 170,
+      "maxShot": 1.5,
+      "winner": { "enabled": true, "zoom": 1.8, "hold": 1.5, "label": "MVP" },
+      "lastKOText": "DERNIER K.O. !"
+    },
+    "easterEggs": {
+      "crowdBurst": { "chance": 0.35, "cap": 1, "visual": "fx_crowd_burst", "respawnMs": 2600, "line": "OUPS..." },
+      "wave": { "chance": 1, "cap": 1 },
+      "emperorFall": { "chance": 0.4, "cap": 1, "minRadius": 30, "line": "MON TRÔNE !" },
+      "gagAccessories": ["gag_tophat", "gag_helmet", "gag_umbrella", "gag_flower", "gag_viking", "gag_propeller", "gag_duck"]
+    },
+    "miniBoss": {
+      "perUpgrade": 0.08,
+      "max": 1.3,
+      "auraFrom": 3,
+      "aura": "boss_aura",
+      "crown": "boss_crown"
     }
+  },
+  "overlays": {
+    "boss_aura": { "type": "placeholder", "kind": "aura", "color": "#ffd23a", "accent": "#ff8a2a" },
+    "boss_crown": { "type": "placeholder", "kind": "crown", "color": "#ffd23a", "accent": "#e83a5a" },
+    "fx_crowd_burst": { "type": "placeholder", "kind": "confetti", "color": "#ffe14a", "accent": "#ff5aa8" },
+    "gag_tophat": { "type": "placeholder", "kind": "tophat", "color": "#ffe14a", "accent": "#d83b3b" },
+    "gag_helmet": { "type": "placeholder", "kind": "helmet", "color": "#b8c0cc", "accent": "#5a6270" },
+    "gag_umbrella": { "type": "placeholder", "kind": "umbrella", "color": "#e83a5a", "accent": "#ffffff" },
+    "gag_flower": { "type": "placeholder", "kind": "flower", "color": "#ff7ab8", "accent": "#ffe14a" },
+    "gag_viking": { "type": "placeholder", "kind": "viking", "color": "#9a9aa8", "accent": "#f4f0e0" },
+    "gag_propeller": { "type": "placeholder", "kind": "propeller", "color": "#3a8ae8", "accent": "#e83a3a" },
+    "gag_duck": { "type": "placeholder", "kind": "duck", "color": "#ffd23a", "accent": "#ff8a2a" }
   }
 }

@@ -4,7 +4,7 @@ import type Phaser from 'phaser';
 import type { BeamSegment, Projectile } from '../sim/types';
 import type { Particle } from './animations';
 import { effectVisual, type EffectVisual } from './manifest';
-import { rand } from './random';
+import { noise, rand } from './random';
 
 interface Lasting {
   visual: EffectVisual;
@@ -222,14 +222,14 @@ export class FxLayer {
         if (v.size >= 10) {
           g.fillStyle(accent, 0.25).fillCircle(x, y, r * 1.8);
           for (let i = 0; i < 3; i++) {
-            this.particles.push({ x: p.x + (rand() - 0.5) * v.size * 0.6, y: p.y - lift + (rand() - 0.5) * v.size * 0.6, vx: (rand() - 0.5) * 30, vy: -40 - rand() * 40, life: 0.5, maxLife: 0.5, color: i % 2 ? color : accent, size: 2 });
+            this.particles.push({ x: p.x + (noise() - 0.5) * v.size * 0.6, y: p.y - lift + (noise() - 0.5) * v.size * 0.6, vx: (noise() - 0.5) * 30, vy: -40 - noise() * 40, life: 0.5, maxLife: 0.5, color: i % 2 ? color : accent, size: 2 });
           }
         }
         // Ombre au sol pour lire la cloche.
         if (p.arc > 0) this.ground.fillStyle(0x000000, 0.25).fillEllipse(x, p.y * S, r * 2, r);
         g.fillStyle(color, 1).fillCircle(x, y, r);
         g.fillStyle(accent, 1).fillRect(x - r * 0.5, y - r * 0.6, Math.max(S, r * 0.5), Math.max(S, r * 0.5));
-        if (rand() < 0.5) this.particles.push({ x: p.x, y: p.y - lift, vx: 0, vy: -10, life: 0.25, maxLife: 0.25, color: accent, size: 1 });
+        if (noise() < 0.5) this.particles.push({ x: p.x, y: p.y - lift, vx: 0, vy: -10, life: 0.25, maxLife: 0.25, color: accent, size: 1 });
         break;
       }
       default:
