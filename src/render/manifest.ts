@@ -101,6 +101,38 @@ const AccessorySchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+/**
+ * Visuels de mise en scène du lot réalisation (aura du mini-boss, couronne, confettis du public,
+ * accessoires du spectateur récurrent) : placeholder dessiné par code (eggs.ts), ou image.
+ */
+export const OVERLAY_KINDS = ['aura', 'crown', 'confetti', 'tophat', 'helmet', 'umbrella', 'flower', 'viking', 'propeller', 'duck'] as const;
+const OverlayShapeSchema = z.object({ kind: z.enum(OVERLAY_KINDS), color, accent: color });
+const OverlaySchema = z.discriminatedUnion('type', [
+  OverlayShapeSchema.extend({ type: z.literal('placeholder') }),
+  z.object({
+    type: z.literal('image'),
+    url: z.string(),
+    /** Hauteur d'affichage en px monde. */
+    size: z.number().positive(),
+    placeholder: OverlayShapeSchema.optional(),
+  }),
+]);
+export type OverlayEntry = z.infer<typeof OverlaySchema>;
+
+/** Un moment de cinéma : ralenti, zoom et bandes noires (qui tombent dans les zones d'overlay). */
+const CinemaMomentSchema = z.object({
+  enabled: z.boolean().default(true),
+  /** Facteur appliqué au temps du combat pendant le ralenti. */
+  slowmo: z.number().min(0.05).max(1).default(0.3),
+  /** Durée du ralenti (ms, temps réel à vitesse 1). */
+  ms: z.number().min(0).default(900),
+  zoom: z.number().min(1).max(3).default(2),
+  letterbox: z.boolean().default(true),
+});
+
+/** Easter egg rare : éligibilité tirée de la seed (chance), puis au plus `cap` fois par épisode. */
+const EggSchema = z.object({ chance: z.number().min(0).max(1), cap: z.number().int().min(0).default(1) });
+
 /** Rendu d'un effet, d'un projectile ou d'un incident, désigné par la clé "visual" des données. */
 const EffectVisualSchema = z.object({
   kind: z.enum(['arrow', 'line', 'ball', 'ring', 'puddle', 'bolt', 'spark', 'swirl']),
@@ -273,6 +305,45 @@ const StagingSchema = z.object({
     stars: z.boolean().default(true),
     sweat: z.boolean().default(true),
   }),
+  /** Ralentis « bullet time » et plan du vainqueur. */
+  cinema: z
+    .object({
+      heroDeath: CinemaMomentSchema.default({ slowmo: 0.35, ms: 700, zoom: 1.9 }),
+      lastKO: CinemaMomentSchema.default({ slowmo: 0.25, ms: 1300, zoom: 2.1 }),
+      /** Hauteur des bandes noires (px écran) : haut, et bas à partir du bas de la zone d'action. */
+      letterboxTop: z.number().min(0).default(170),
+      /** Plafond de durée d'un gros plan (s de combat). */
+      maxShot: z.number().positive().default(1.5),
+      /** Plan du vainqueur (MVP) après le dernier K.O. */
+      winner: z.object({ enabled: z.boolean().default(true), zoom: z.number().min(1).max(3).default(1.8), hold: z.number().positive().default(1.5), label: z.string().default('MVP') }).default({}),
+      /** Le dernier K.O. s'écrit à l'écran (lecture sans le son). */
+      lastKOText: z.string().default('DERNIER K.O. !'),
+    })
+    .default({}),
+  /** Easter eggs rares et déterministes (tirés de la seed). */
+  easterEggs: z
+    .object({
+      /** Une explosion touche les gradins : un bloc de spectateurs part en confettis, puis revient sonné. */
+      crowdBurst: EggSchema.extend({ visual: z.string().default('fx_crowd_burst'), respawnMs: z.number().min(0).default(2600), line: z.string().default('OUPS...') }).default({ chance: 0.35, cap: 1 }),
+      /** Ola des gradins lors d'un retournement. */
+      wave: EggSchema.default({ chance: 1, cap: 1 }),
+      /** L'empereur tombe de son trône sur un énorme coup (rayon d'effet minimal, px monde). */
+      emperorFall: EggSchema.extend({ minRadius: z.number().positive().default(30), line: z.string().default('MON TRÔNE !') }).default({ chance: 0.4, cap: 1 }),
+      /** Le spectateur récurrent porte un accessoire différent à chaque épisode (clés de `overlays`). */
+      gagAccessories: z.array(z.string()).default([]),
+    })
+    .default({}),
+  /** Mini-boss à l'image : le héros grossit avec ses upgrades (rendu seulement). */
+  miniBoss: z
+    .object({
+      perUpgrade: z.number().min(0).default(0.08),
+      max: z.number().min(1).default(1.3),
+      /** Nombre d'upgrades à partir duquel il reçoit l'aura et la couronne. */
+      auraFrom: z.number().int().min(1).default(3),
+      aura: z.string().default('boss_aura'),
+      crown: z.string().default('boss_crown'),
+    })
+    .default({}),
   strayShots: z.object({
     /** Probabilité qu'une flèche ratée près du bord file dans les gradins. */
     chance: z.number().min(0).max(1).default(0.35),
@@ -288,6 +359,7 @@ const ManifestSchema = z.object({
   accessories: z.record(z.string(), AccessorySchema),
   effects: z.record(z.string(), EffectVisualSchema),
   staging: StagingSchema,
+  overlays: z.record(z.string(), OverlaySchema).default({}),
 });
 
 export type AccessoryEntry = z.infer<typeof AccessorySchema>;

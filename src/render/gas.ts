@@ -77,11 +77,11 @@ export class GasLayer {
     }
   }
 
-  update(dt: number, zone: FieldRect, zoneScale: number): void {
-    const g = this.g;
-    const S = this.scale;
-    g.clear();
-    // Les conduits crachent dès que la zone se resserre, de plus en plus fort.
+  /**
+   * Les conduits crachent dès que la zone se resserre, de plus en plus fort. Appelé à chaque tick de
+   * simulation (pas à chaque image) : les bouffées tirées ne dépendent ni du framerate ni de ?speed.
+   */
+  emit(dt: number, zoneScale: number): void {
     if (zoneScale < 1 && dt > 0) {
       this.emitDebt += dt * this.config.ventRate * this.vents.length * (1 + (1 - zoneScale) * 2);
       while (this.emitDebt >= 1) {
@@ -101,6 +101,12 @@ export class GasLayer {
         });
       }
     }
+  }
+
+  update(dt: number, zone: FieldRect): void {
+    const g = this.g;
+    const S = this.scale;
+    g.clear();
     const color = hex(this.config.color);
     const accent = hex(this.config.accent);
     for (let i = this.puffs.length - 1; i >= 0; i--) {
