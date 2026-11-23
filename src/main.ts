@@ -9,6 +9,7 @@
 //   ?intro=0            passe l'intro (aperçus rapides de la régie)
 //   ?draft=<json>       réglages d'arc en brouillon, pour un épisode pas encore figé (aperçu de la régie)
 //   ?vote=kevin:laser_goggles,magic_sword,grenades   carte de vote en brouillon (aperçu de la régie)
+//   ?prev=kevin:laser_goggles:120,340,95   vote précédent à révéler en ouverture (essais ; voix facultatives)
 import '@fontsource/press-start-2p';
 import Phaser from 'phaser';
 import { startRecording } from './capture/recorder';

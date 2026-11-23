@@ -1235,6 +1235,30 @@
       "enabled": true,
       "duration": 2.8
     },
+    "intro": "quick",
+    "reveal": {
+      "episode": "ÉP. {n}",
+      "hook": "{hero} A UNE NOUVELLE ARME. ÇA SUFFIRA ?",
+      "hookFirst": "{gnomes} GNOMES vs {goblins} GOBELINS",
+      "chose": "LE PUBLIC A CHOISI…",
+      "gets": "{hero} REÇOIT : {upgrade} !",
+      "share": "{pct} % DES VOIX",
+      "newTag": "NOUVEAU",
+      "newTagSeconds": 4,
+      "emperor": true,
+      "victory": "VICTOIRE DES {team}",
+      "draw": "MATCH NUL",
+      "postponed": "LE VOTE EST REPORTÉ",
+      "mvp": "MVP",
+      "voteFor": "RECEVRA LA PROCHAINE UPGRADE",
+      "voteCall": "VOTE 1, 2 OU 3 EN COMMENTAIRE",
+      "slot": {
+        "frame": "#c8902a",
+        "window": "#14101c",
+        "light": "#ffe14a"
+      },
+      "confetti": ["#ffe14a", "#ff5a8a", "#7fb0ff", "#9be05a", "#ffffff"]
+    },
     "strayShots": {
       "chance": 0.6,
       "edgeDistance": 45
