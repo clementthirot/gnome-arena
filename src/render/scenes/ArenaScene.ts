@@ -1,6 +1,7 @@
 // Scène de combat : fait avancer le moteur à pas fixe et dessine son état.
 // Elle ne modifie jamais les règles : elle lit Battle et réagit à ses événements.
 import Phaser from 'phaser';
+import type { PreviousVote } from '../../data/arc';
 import type { GameData, HeroDef, TeamId } from '../../data/schema';
 import { Battle, opposingTeam, TEAMS } from '../../sim/battle';
 import { hashSeed } from '../../sim/rng';
@@ -14,6 +15,7 @@ import { Juice } from '../juice';
 import { sound } from '../audio';
 import { runningGagCanvas, Show } from '../show';
 import { closeCurtain } from '../curtain';
+import { playOpening } from '../reveal';
 import { asPlaceholder, bricksFor, DIRECTIONS, effectVisual, manifest, resolveAsset } from '../manifest';
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
 import { rand, seedRender, seedTick } from '../random';
@@ -46,6 +48,8 @@ export interface ArenaParams {
     vote?: { recipient: string; team: TeamId; portrait: string; options: { label: string; visual: string }[] };
     /** K.O. cumulés de chaque héros (par nom) avant cet épisode. */
     arcKills?: Record<string, number>;
+    /** Vote de l'épisode précédent (identifiants), à révéler en ouverture ; absent ou null pour l'épisode 1. */
+    previousVote?: PreviousVote | null;
   };
   /** Passe l'intro (aperçus rapides de la régie). */
   skipIntro?: boolean;
@@ -201,7 +205,8 @@ export class ArenaScene extends Phaser.Scene {
       this.running = true;
       this.show.start();
       sound.startMusic();
-    } else this.playIntro();
+    } else if (manifest.staging.intro === 'classic') this.playIntro();
+    else this.playOpening();
     this.routeCameras();
   }
 
@@ -410,6 +415,25 @@ export class ArenaScene extends Phaser.Scene {
       veil.destroy();
       this.running = true;
       this.show.start();
+    });
+  }
+
+  /** Ouverture rapide et révélation du vote précédent (src/render/reveal.ts). */
+  private playOpening(): void {
+    playOpening({
+      scene: this,
+      data: this.params.data,
+      units: this.battle.units,
+      episode: this.params.episode,
+      uiDepth: UI_DEPTH,
+      spriteOf: (i) => this.views[i]?.sprite,
+      accessoryOf: (i, visual) => this.accessories.get(i)?.find((a) => a.img.texture.key.endsWith(`_${visual}`))?.img,
+      focus: (target, hold) => this.director.request('heroDuel', target, this.battle.time, hold),
+      emperorSays: (text, ms) => this.show.emperorSays(text, ms, 'raise'),
+      go: () => {
+        this.running = true;
+        this.show.start();
+      },
     });
   }
 
@@ -983,7 +1007,7 @@ export class ArenaScene extends Phaser.Scene {
     this.time.delayedCall(1200, () => {
       this.slowmo = 1;
       this.director.release(this.battle.time);
-      const label = r.winner === 'draw' ? 'ÉGALITÉ !' : `VICTOIRE DES ${TEAM_COLORS[r.winner].label} !`;
+      const label = r.winner === 'draw' ? 'MATCH NUL !' : `VICTOIRE DES ${TEAM_COLORS[r.winner].label} !`;
       this.banner(label, r.winner === 'draw' ? '#ffffff' : TEAM_COLORS[r.winner].main, 2200);
       // L'empereur annonce la roulette ; roulement de tambour jusqu'au rideau.
       this.show.victory(r.winner, () => sound.drumroll(Math.max(0.5, cfg.finale - 1.2 - cfg.rouletteCall)));
