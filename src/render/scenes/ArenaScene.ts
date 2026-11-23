@@ -255,6 +255,15 @@ export class ArenaScene extends Phaser.Scene {
     const query = typeof location !== 'undefined' ? new URLSearchParams(location.search) : undefined;
     this.eggs = new Eggs(seed, query?.get('eggs') === '1');
     this.gagSpot = { x: width - 7, y: field.y + 38 };
+    if (this.eggs.force) {
+      // Mode vérification (?eggs=1) : chaque gag se produit au moins une fois, à heure fixe.
+      const burst = { x: this.gagSpot.x, y: this.gagSpot.y + 26 };
+      this.atSim(4, () => {
+        if (this.crowdBurst(burst.x, burst.y, 14, true)) this.director.cutaway(() => ({ x: (burst.x - 30) * SCALE, y: burst.y * SCALE }), this.battle.time, 1.4, 1.4);
+      });
+      this.atSim(8, () => this.crowdWave());
+      this.atSim(12, () => this.emperorFall());
+    }
 
     const bgKey = `arena_bg_${this.battle.biome.id}`;
     if (!this.textures.exists(bgKey)) this.textures.addCanvas(bgKey, drawArenaBackground(width, height, field, this.battle.biome));
@@ -717,7 +726,7 @@ export class ArenaScene extends Phaser.Scene {
           this.prev[i].z = this.battle.units[i].z;
         }
         // Après la fin, l'arène continue de vivre (épilogue) pendant l'annonce.
-        if (this.battle.result) this.battle.epilogue();
+        if (this.battle.result) this.epilogue();
         else this.battle.step();
         seedTick(this.battle.tick);
         seedNoise(this.battle.tick);
@@ -743,6 +752,22 @@ export class ArenaScene extends Phaser.Scene {
     this.drawStageExtras();
     this.director.update(this.battle.time);
     this.routeCameras();
+  }
+
+  /**
+   * Épilogue sans dégâts : le gaz ne tue plus personne après la victoire. Pendant ce tick, la zone
+   * couvre tout le terrain (plus de dégâts ni d'aspiration), puis on remet la zone affichée. Le
+   * résultat et la durée sont déjà figés : ils ne changent pas, et l'image finale ne dépend plus de ?speed.
+   */
+  private epilogue(): void {
+    const zone = this.battle.zone;
+    const f = this.battle.field;
+    this.battle.zone = { x: f.x - 1e6, y: f.y - 1e6, width: f.width + 2e6, height: f.height + 2e6 };
+    try {
+      this.battle.epilogue();
+    } finally {
+      this.battle.zone = zone;
+    }
   }
 
   /** Un héros seul contre au moins trois ennemis : la caméra ne le lâche plus. */
@@ -933,7 +958,7 @@ export class ArenaScene extends Phaser.Scene {
           this.fxLayer.effect(e.visual, e.x, e.y, e.radius);
           if (e.source >= 0 && effectVisual(e.visual).spinSource) this.views[e.source].whirlUntil = this.time.now + effectVisual(e.visual).duration * 1000;
           this.hitStands(e.x, e.y, e.radius + 6, e.radius >= 12);
-          if (e.radius >= manifest.staging.easterEggs.emperorFall.minRadius && this.eggs.take('emperorFall')) this.show.emperorTumble(manifest.staging.easterEggs.emperorFall.line);
+          if (e.radius >= manifest.staging.easterEggs.emperorFall.minRadius) this.emperorFall();
           if (e.radius >= manifest.staging.camera.bigImpactRadius) {
             this.cameras.main.shake(320, 0.014);
             this.cameras.main.flash(140, 255, 236, 200);
@@ -1300,10 +1325,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   /** Easter egg « le public explose » : un bloc de spectateurs part en confettis, puis revient sonné. */
-  private crowdBurst(x: number, y: number, radius: number): boolean {
+  private crowdBurst(x: number, y: number, radius: number, forced = false): boolean {
     const cfg = manifest.staging.easterEggs.crowdBurst;
     const block = this.spectators.filter((s) => s !== this.gagSpectator && s.sprite.visible && Math.hypot(s.sprite.x / SCALE - x, s.baseY / SCALE - 3 - y) <= radius * 1.6 + 8);
-    if (block.length < 3 || !this.eggs.take('crowdBurst')) return false;
+    if (block.length < (forced ? 1 : 3) || !this.eggs.take('crowdBurst')) return false;
     const [c1, c2] = overlayColors(cfg.visual);
     for (const s of block) {
       this.tweens.killTweensOf(s.sprite);
@@ -1351,6 +1376,15 @@ export class ArenaScene extends Phaser.Scene {
       this.comic(head.sprite.x / SCALE, head.baseY / SCALE - 12, '@#!?', '#ffffff', 34);
     });
     return true;
+  }
+
+  /** Easter egg « l'empereur tombe de son trône » : bref contrechamp sur la loge pour qu'on le voie. */
+  private emperorFall(): void {
+    if (!this.eggs.take('emperorFall')) return;
+    this.show.emperorTumble(manifest.staging.easterEggs.emperorFall.line);
+    const emperor = this.children.list.find((o): o is Phaser.GameObjects.Image => o instanceof Phaser.GameObjects.Image && o.texture.key === 'emperor');
+    // Cadré un peu sous lui : la bulle « MON TRÔNE ! » au-dessus reste dans l'image.
+    if (emperor) this.director.cutaway(() => ({ x: emperor.x, y: emperor.y - 20 }), this.battle.time, 1.3, 1.5);
   }
 
   /** Ola des gradins (retournement) : la vague parcourt le public de gauche à droite. */
