@@ -267,5 +267,27 @@
         ]
       }
     ]
+  },
+  {
+    "id": "giant_chicken",
+    "label": "UNE POULE GÉANTE !",
+    "enabled": false,
+    "weight": 1,
+    "from": 15,
+    "until": 55,
+    "target": "densest",
+    "telegraph": 0.8,
+    "telegraphRadius": 10,
+    "visual": "giant_chicken",
+    "effects": [
+      {
+        "type": "beam",
+        "width": 14,
+        "amount": 4,
+        "knockback": 200,
+        "bounces": 0,
+        "visual": "giant_chicken"
+      }
+    ]
   }
 ]
