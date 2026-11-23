@@ -125,8 +125,10 @@ export function spinReel(scene: Phaser.Scene, o: ReelOptions): Reel {
   // quand l'affichage rame) : l'arrêt programmé tombe toujours après la dernière icône.
   let elapsed = 0;
   let shown = -1;
+  // Une fois l'arrêt joué, plus aucun pas de défilement ne doit changer l'icône (les deux horloges peuvent diverger).
+  let stopped = false;
   const roll = (_time?: number, delta = 0) => {
-    if (!icon.active) return;
+    if (stopped || !icon.active) return;
     elapsed += delta;
     let n = shown;
     while (n + 1 < spins && starts[n + 1] <= elapsed) n++;
@@ -139,6 +141,7 @@ export function spinReel(scene: Phaser.Scene, o: ReelOptions): Reel {
     scene.events.on('update', roll);
   });
   scene.time.delayedCall(delay + total, () => {
+    stopped = true;
     off();
     if (!icon.active) return;
     scene.tweens.killTweensOf(icon);
