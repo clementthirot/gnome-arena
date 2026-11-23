@@ -18,6 +18,7 @@ import { asPlaceholder, bricksFor, DIRECTIONS, effectVisual, manifest, resolveAs
 import { drawAccessory, drawPlaceholder, drawSpectator } from '../placeholders';
 import { rand, seedRender, seedTick } from '../random';
 import { TEAM_COLORS, textStyle } from '../text';
+import { upgradeFx } from '../upgradeFx';
 import type { ResultData } from './ResultScene';
 
 /** Monde 270 x 480 affiché en 1080 x 1920. */
@@ -554,6 +555,7 @@ export class ArenaScene extends Phaser.Scene {
     for (const e of events) {
       this.show.onEvent(e);
       this.soundFor(e);
+      upgradeFx(this, e, this.battle, SCALE);
       if (e.type === 'death') this.lastVictim = e.unit;
       if (e.type === 'hit' && e.source >= 0 && units[e.source]?.hero && units[e.source].team === units[e.unit]?.team && e.source !== e.unit) {
         this.friendlyHits.set(e.source, (this.friendlyHits.get(e.source) ?? 0) + 1);

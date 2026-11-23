@@ -1040,6 +1040,48 @@
         "color": "#7a7a86",
         "accent": "#4a4a52"
       }
+    },
+    "acc_pie": {
+      "type": "placeholder",
+      "anchor": [-0.42, 0.05],
+      "kind": "pie",
+      "color": "#fff4e0",
+      "accent": "#c8823a"
+    },
+    "acc_umbrella": {
+      "type": "placeholder",
+      "anchor": [0.3, -0.55],
+      "kind": "umbrella",
+      "color": "#3a4ab8",
+      "accent": "#fff7a8"
+    },
+    "acc_whistle": {
+      "type": "placeholder",
+      "anchor": [0.3, -0.05],
+      "kind": "whistle",
+      "color": "#d8d8e0",
+      "accent": "#e83a2a"
+    },
+    "giant_chicken": {
+      "type": "placeholder",
+      "anchor": [0, 0],
+      "kind": "chicken",
+      "color": "#ffffff",
+      "accent": "#ff8a00"
+    }
+  },
+  "upgradeFx": {
+    "$comment": "Lot D : onomatopées des upgrades (src/render/upgradeFx.ts). Texte >= 26 px.",
+    "potBong": { "text": "BONG !", "color": "#d8dce8", "size": 44, "minGap": 1.5, "equipment": "iron_pot" },
+    "specials": {
+      "fan_whistle": { "text": "TUUUT !", "color": "#ffe14a", "size": 40 },
+      "storm_umbrella": { "text": "ZZZAP !", "color": "#bfe0ff", "size": 40 }
+    },
+    "effects": {
+      "cream_splat": { "text": "SPLOTCH !", "color": "#fffaf0", "size": 40 }
+    },
+    "runners": {
+      "giant_chicken": { "accessory": "giant_chicken", "size": 26, "word": { "text": "COT COT !!", "color": "#ffffff", "size": 48 } }
     }
   },
   "effects": {
@@ -1212,7 +1254,13 @@
       "accent": "#e8c8ff",
       "size": 2,
       "duration": 0.45
-    }
+    },
+    "cream_pie": { "kind": "ball", "color": "#fff4e0", "accent": "#c8823a", "size": 4 },
+    "cream_splat": { "kind": "puddle", "color": "#fffaf0", "accent": "#ffd0e0", "size": 1, "duration": 2 },
+    "storm_bolt": { "kind": "bolt", "color": "#e8f4ff", "accent": "#6a8aff", "size": 2.5, "duration": 0.3 },
+    "whistle_blow": { "kind": "ring", "color": "#ffe14a", "accent": "#ffffff", "size": 2, "duration": 0.5 },
+    "giant_chicken": { "kind": "line", "color": "#c8a46c", "accent": "#e0c590", "size": 6, "duration": 0.6 },
+    "giant_chicken_body": { "kind": "ball", "color": "#ffffff", "accent": "#ff8a00", "size": 22 }
   },
   "staging": {
     "camera": {
