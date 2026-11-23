@@ -1042,25 +1042,25 @@
       }
     },
     "acc_pie": {
-      "type": "placeholder",
-      "anchor": [-0.42, 0.05],
-      "kind": "pie",
-      "color": "#fff4e0",
-      "accent": "#c8823a"
+      "type": "image",
+      "url": "sprites/generated/acc_pie.png",
+      "size": 6,
+      "anchor": [0.42, 0.05],
+      "placeholder": { "kind": "pie", "color": "#fff4e0", "accent": "#c8823a" }
     },
     "acc_umbrella": {
-      "type": "placeholder",
-      "anchor": [0.3, -0.55],
-      "kind": "umbrella",
-      "color": "#3a4ab8",
-      "accent": "#fff7a8"
+      "type": "image",
+      "url": "sprites/generated/acc_umbrella.png",
+      "size": 11,
+      "anchor": [-0.15, -0.55],
+      "placeholder": { "kind": "umbrella", "color": "#3a4ab8", "accent": "#fff7a8" }
     },
     "acc_whistle": {
-      "type": "placeholder",
+      "type": "image",
+      "url": "sprites/generated/acc_whistle.png",
+      "size": 3.5,
       "anchor": [0.3, -0.05],
-      "kind": "whistle",
-      "color": "#d8d8e0",
-      "accent": "#e83a2a"
+      "placeholder": { "kind": "whistle", "color": "#d8d8e0", "accent": "#e83a2a" }
     },
     "giant_chicken": {
       "type": "placeholder",

@@ -14,7 +14,10 @@ import {
   type Arc,
 } from '../src/data/arc';
 
-const data = loadGameData();
+// Catalogue figé aux 6 upgrades d'origine : les comptes de saturation ne dépendent pas des upgrades ajoutées ensuite.
+const ORIGINAL = ['laser_goggles', 'magic_sword', 'grenades', 'glue_bomb', 'chicken_launcher', 'iron_pot'];
+const full = loadGameData();
+const data = { ...full, equipment: full.equipment.filter((e) => ORIGINAL.includes(e.id)) };
 const heroes = ['bob', 'kevin', 'grok', 'snik'];
 const empty = (): Arc => parseArc({ id: 'loop', title: 'Boucle', heroes, episodes: [] }, data);
 
