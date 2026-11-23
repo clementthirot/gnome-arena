@@ -1052,7 +1052,7 @@
       "type": "image",
       "url": "sprites/generated/acc_umbrella.png",
       "size": 11,
-      "anchor": [-0.55, -0.2],
+      "anchor": [-0.4, -0.28],
       "placeholder": { "kind": "umbrella", "color": "#3a4ab8", "accent": "#fff7a8" }
     },
     "acc_whistle": {

@@ -60,7 +60,8 @@ export class ResultScene extends Phaser.Scene {
 
   create(r: ResultData): void {
     const { width: w, height: h } = this.scale;
-    const vote = r.params.episode?.vote;
+    // Match nul : pas de camp perdant pour recevoir l'upgrade, le vote est reporté (pas de carte).
+    const vote = r.winner === 'draw' ? undefined : r.params.episode?.vote;
     this.add.rectangle(0, 0, w, h, 0x1c1826).setOrigin(0);
     // Bandes de pixels en fond, pour rester dans la DA.
     for (let y = 0; y < h; y += 36) this.add.rectangle(0, y, w, 32, y % 72 ? 0x241f31 : 0x211c2d).setOrigin(0);
@@ -89,7 +90,16 @@ export class ResultScene extends Phaser.Scene {
     controls.push(...this.button(w / 2 + 220, h - 200, 'SUIVANT', next));
     controls.push(this.add.text(w / 2, h - 90, `seed ${r.params.seed} · R rejouer · N suivante`, textStyle(26, '#a098b0')).setOrigin(0.5).setDepth(6000));
     this.time.delayedCall(hold - LOOP_FADE_MS - 150, () => this.tweens.add({ targets: controls, alpha: 0, duration: 150 }));
-    this.time.delayedCall(hold + 1200, () => this.tweens.add({ targets: controls, alpha: 1, duration: 250 }));
+    // Après la boucle, la 1re image reste nette un moment (capture d'écran possible) : commandes rendues
+    // au bout de 3 s, ou tout de suite au premier clic.
+    let shown = false;
+    const showControls = () => {
+      if (shown) return;
+      shown = true;
+      this.tweens.add({ targets: controls, alpha: 1, duration: 250 });
+    };
+    this.time.delayedCall(hold + 3000, showControls);
+    this.time.delayedCall(hold, () => this.input.once('pointerdown', showControls));
     this.input.keyboard?.on('keydown-R', () => this.scene.start('arena', r.params));
     this.input.keyboard?.on('keydown-N', next);
   }
@@ -103,7 +113,14 @@ export class ResultScene extends Phaser.Scene {
     const draw = r.winner === 'draw';
     const title = draw ? cfg.draw : fill(cfg.victory, { team: TEAM_COLORS[r.winner as TeamId].label });
     const color = draw ? '#ffffff' : TEAM_COLORS[r.winner as TeamId].main;
-    const big = this.add.text(CX, 525, title, textStyle(draw ? 96 : 80, color, { wordWrap: { width: SAFE.text.w - 20 }, lineSpacing: 24 })).setOrigin(0.5).setScale(0.3);
+    const big = this.add.text(CX, 525, title, textStyle(draw ? 96 : 80, color, { wordWrap: { width: SAFE.text.w - 20 }, lineSpacing: 24, align: 'center' })).setOrigin(0.5).setScale(0.3);
+    // Titre long (« VICTOIRE DES GOBELINS ») : on réduit la police jusqu'à tenir sur deux lignes,
+    // au-dessus du MVP (et du « vote reporté » en cas de nul).
+    const maxH = draw && postponed && ep ? 180 : 300;
+    for (let size = draw ? 96 : 80; big.height > maxH && size > 56; ) {
+      size -= 4;
+      big.setFontSize(size);
+    }
     this.tweens.add({ targets: big, scale: 1, duration: 400, ease: 'Back.easeOut' });
     items.push(big);
     // Égalité d'épisode sans vote : la série continue, le vote est reporté.
