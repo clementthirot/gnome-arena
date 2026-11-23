@@ -216,7 +216,9 @@ export class ArenaScene extends Phaser.Scene {
     this.gagSpot = { x: width - 7, y: field.y + 38 };
 
     const bgKey = `arena_bg_${this.battle.biome.id}`;
-    if (!this.textures.exists(bgKey)) this.textures.addCanvas(bgKey, drawArenaBackground(width, height, field, this.battle.biome));
+    const groundKey = `art_ground_${this.battle.biome.id}`;
+    const groundTile = this.textures.exists(groundKey) ? (this.textures.get(groundKey).getSourceImage() as HTMLImageElement) : undefined;
+    if (!this.textures.exists(bgKey)) this.textures.addCanvas(bgKey, drawArenaBackground(width, height, field, this.battle.biome, groundTile));
     this.add.image(0, 0, bgKey).setOrigin(0).setScale(SCALE).setDepth(-1000);
     this.createCrowd();
 

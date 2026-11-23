@@ -48,6 +48,20 @@ export class FxLayer {
     if (v.kind === 'ring' && radius >= 25) this.burst(x, y, v, 40, 150);
     this.lasting.push({ visual: v, x, y, radius: r, age: 0, life: v.duration, seed: rand() * 1000 });
     if (v.decal) this.lasting.push({ visual: effectVisual(v.decal), x, y, radius: r * 0.75, age: 0, life: effectVisual(v.decal).duration, seed: 0 });
+    this.spriteFx(key, v, x, y, radius);
+  }
+
+  /** Image PixelLab facultative (manifeste effects.<clé>.sprite) : grossit puis s'efface, par-dessus le dessin. */
+  private spriteFx(key: string, v: EffectVisual, x: number, y: number, radius: number): void {
+    const scene = this.g.scene;
+    const tex = `fx_img_${key}`;
+    if (!v.sprite || !scene.textures.exists(tex)) return;
+    const S = this.scale;
+    const img = scene.add.image(x * S, y * S, tex).setDepth(this.g.depth + 1);
+    if (v.sprite.anchor === 'bottom') img.setOrigin(0.5, 1);
+    const target = (Math.max(v.sprite.size, radius * 2) * S) / Math.max(img.width, img.height);
+    img.setScale(target * 0.6).setRotation(v.sprite.anchor === 'bottom' ? 0 : (rand() - 0.5) * 0.6);
+    scene.tweens.add({ targets: img, scale: target * 1.1, alpha: 0, duration: Math.max(250, v.duration * 1000), ease: 'Quad.easeIn', onComplete: () => img.destroy() });
   }
 
   beam(key: string, fromX: number, fromY: number, toX: number, toY: number, width?: number): void {

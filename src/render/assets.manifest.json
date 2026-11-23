@@ -988,7 +988,7 @@
     "acc_grenades": {
       "type": "image",
       "url": "sprites/generated/acc_grenades.png",
-      "size": 4,
+      "size": 4.5,
       "anchor": [
         0,
         0.22
@@ -1030,7 +1030,7 @@
     "acc_pot": {
       "type": "image",
       "url": "sprites/generated/acc_pot.png",
-      "size": 5,
+      "size": 6.5,
       "anchor": [
         0,
         -0.5
@@ -1068,6 +1068,16 @@
       "kind": "chicken",
       "color": "#ffffff",
       "accent": "#ff8a00"
+    }
+  },
+  "art": {
+    "$comment": "Lot G : illustrations PixelLab (docs/sprites.md). Sans fichier, titre en texte et sol dessiné par code.",
+    "title": "sprites/arena/title.png",
+    "grounds": {
+      "sable": "sprites/arena/ground_sable.png",
+      "foret": "sprites/arena/ground_foret.png",
+      "neige": "sprites/arena/ground_neige.png",
+      "volcan": "sprites/arena/ground_volcan.png"
     }
   },
   "upgradeFx": {
@@ -1146,21 +1156,24 @@
       "color": "#ffb347",
       "accent": "#fff2b0",
       "size": 2,
-      "duration": 0.4
+      "duration": 0.4,
+      "sprite": { "url": "sprites/fx/explosion.png", "size": 22 }
     },
     "dust": {
       "kind": "ring",
       "color": "#c8a46c",
       "accent": "#e0c590",
       "size": 2,
-      "duration": 0.45
+      "duration": 0.45,
+      "sprite": { "url": "sprites/fx/dust.png", "size": 20 }
     },
     "lightning": {
       "kind": "bolt",
       "color": "#fff7a8",
       "accent": "#9fd8ff",
       "size": 2,
-      "duration": 0.25
+      "duration": 0.25,
+      "sprite": { "url": "sprites/fx/lightning.png", "size": 30, "anchor": "bottom" }
     },
     "glue": {
       "kind": "puddle",
@@ -1201,7 +1214,8 @@
       "accent": "#fff2b0",
       "size": 4,
       "duration": 0.7,
-      "decal": "crater"
+      "decal": "crater",
+      "sprite": { "url": "sprites/fx/explosion.png", "size": 40 }
     },
     "crater": {
       "kind": "puddle",
@@ -1256,8 +1270,8 @@
       "duration": 0.45
     },
     "cream_pie": { "kind": "ball", "color": "#fff4e0", "accent": "#c8823a", "size": 4 },
-    "cream_splat": { "kind": "puddle", "color": "#fffaf0", "accent": "#ffd0e0", "size": 1, "duration": 2 },
-    "storm_bolt": { "kind": "bolt", "color": "#e8f4ff", "accent": "#6a8aff", "size": 2.5, "duration": 0.3 },
+    "cream_splat": { "kind": "puddle", "color": "#fffaf0", "accent": "#ffd0e0", "size": 1, "duration": 2, "sprite": { "url": "sprites/fx/cream_splat.png", "size": 14 } },
+    "storm_bolt": { "kind": "bolt", "color": "#e8f4ff", "accent": "#6a8aff", "size": 2.5, "duration": 0.3, "sprite": { "url": "sprites/fx/lightning.png", "size": 30, "anchor": "bottom" } },
     "whistle_blow": { "kind": "ring", "color": "#ffe14a", "accent": "#ffffff", "size": 2, "duration": 0.5 },
     "giant_chicken": { "kind": "line", "color": "#c8a46c", "accent": "#e0c590", "size": 6, "duration": 0.6 },
     "giant_chicken_body": { "kind": "ball", "color": "#ffffff", "accent": "#ff8a00", "size": 22 }
