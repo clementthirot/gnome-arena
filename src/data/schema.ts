@@ -281,6 +281,8 @@ export const EquipmentSchema = z.object({
   short: z.string().max(14),
   /** Accessoire superposé au héros par le rendu (clé du manifeste, section accessories). */
   visual: visualKey,
+  /** Rôles (roles.json) auxquels l'upgrade peut être proposée au vote ; absent = tous. */
+  roles: z.array(id).min(1).optional(),
   stats: z
     .object({
       hp: positive.default(1),
@@ -704,6 +706,7 @@ export const GameDataSchema = z
     });
     if (!data.biomes.some((b) => b.id === data.battle.biome)) issue(['battle', 'biome'], `biome inconnu : ${data.battle.biome}`);
     const equipment = new Set(data.equipment.map((e) => e.id));
+    data.equipment.forEach((e, i) => e.roles?.forEach((r, j) => roles.has(r) || issue(['equipment', i, 'roles', j], `rôle inconnu : ${r}`)));
     data.heroes.forEach((h, i) => {
       if (h.rival && !data.heroes.some((o) => o.id === h.rival)) issue(['heroes', i, 'rival'], `rival inconnu : ${h.rival}`);
       h.upgrades.forEach((up, j) => {
