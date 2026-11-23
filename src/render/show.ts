@@ -73,8 +73,13 @@ interface Bubble {
   text: Phaser.GameObjects.Text;
   box: Phaser.GameObjects.Graphics;
   follow: () => { x: number; y: number };
-  /** Fin, en secondes de combat. */
-  until: number;
+  /** Durée de la bulle (s). */
+  hold: number;
+  /** Naissance, en s de combat et en ms de scène : le combat est figé pendant l'ouverture, la scène non. */
+  bornBattle: number;
+  bornScene: number;
+  /** Bulle de l'empereur : jamais deux à la fois. */
+  emperor: boolean;
   /** Bulle sous son locuteur (pointe vers le haut) : l'empereur est collé à la marge haute. */
   below: boolean;
 }
@@ -127,20 +132,37 @@ export class Show {
     return Math.abs(x - cx) < 15 && y > field.y - 28 && y < field.y;
   }
 
-  private bubble(text: string, follow: () => { x: number; y: number }, holdMs: number, color = '#141420', below = false): void {
+  private bubble(text: string, follow: () => { x: number; y: number }, holdMs: number, color = '#141420', below = false, emperor = false): void {
+    // Une seule bulle d'empereur : la nouvelle remplace l'ancienne (sinon les textes s'impriment l'un sur l'autre).
+    if (emperor) this.dropBubbles((b) => b.emperor);
     const t = this.scene.add.text(0, 0, text, textStyle(TEXT.XS + 2, color, { stroke: '#ffffff', strokeThickness: 0, wordWrap: { width: 460 } })).setOrigin(0.5, below ? 0 : 1).setDepth(9861);
     const box = this.scene.add.graphics().setDepth(9860);
-    const b: Bubble = { text: t, box, follow, until: this.battle.time + holdMs / 1000, below };
+    const b: Bubble = { text: t, box, follow, hold: holdMs / 1000, bornBattle: this.battle.time, bornScene: this.scene.time.now, below, emperor };
     this.bubbles.push(b);
     t.setScale(0.3);
     this.scene.tweens.add({ targets: t, scale: 1, duration: 180, ease: 'Back.easeOut' });
+  }
+
+  private dropBubbles(which: (b: Bubble) => boolean): void {
+    for (let i = this.bubbles.length - 1; i >= 0; i--) {
+      const b = this.bubbles[i];
+      if (!which(b)) continue;
+      b.text.destroy();
+      b.box.destroy();
+      this.bubbles.splice(i, 1);
+    }
+  }
+
+  /** Âge d'une bulle (s) : le plus grand du temps de combat et du temps de scène (combat figé avant COMBAT). */
+  private age(b: Bubble): number {
+    return Math.max(this.battle.time - b.bornBattle, (this.scene.time.now - b.bornScene) / 1000);
   }
 
   /** L'empereur parle (bulle au-dessus de la loge) et fait un geste. */
   emperorSays(text: string, holdMs = 1800, gesture: 'raise' | 'up' | 'down' | 'none' = 'none'): void {
     const p = this.emperorPos;
     // L'empereur est presque sous la barre du haut des réseaux : sa bulle s'ouvre en dessous de lui.
-    this.bubble(text, () => ({ x: p.x * this.scale, y: Math.max((p.y + 4) * this.scale, SAFE.top + 64) }), holdMs, '#141420', true);
+    this.bubble(text, () => ({ x: p.x * this.scale, y: Math.max((p.y + 4) * this.scale, SAFE.top + 64) }), holdMs, '#141420', true, true);
     if (gesture === 'raise') this.scene.tweens.add({ targets: this.emperor, y: this.emperor.y - 3 * this.scale, duration: 140, yoyo: true, repeat: 1 });
     if (gesture === 'up' || gesture === 'down') {
       const thumb = this.scene.add.text(p.x * this.scale + 70, (p.y - 8) * this.scale, gesture === 'up' ? '👍' : '👎', { fontSize: '44px' }).setOrigin(0.5).setDepth(9861);
@@ -239,16 +261,9 @@ export class Show {
 
   /** Rivalités et retournements, vérifiés deux fois par seconde. */
   update(): void {
-    const now = this.battle.time;
     const cam = this.scene.cameras.main;
-    for (let i = this.bubbles.length - 1; i >= 0; i--) {
-      const b = this.bubbles[i];
-      if (now > b.until) {
-        b.text.destroy();
-        b.box.destroy();
-        this.bubbles.splice(i, 1);
-        continue;
-      }
+    this.dropBubbles((b) => this.age(b) > b.hold);
+    for (const b of this.bubbles) {
       const p = b.follow();
       const w = b.text.width * b.text.scaleX + 24;
       const h = b.text.height * b.text.scaleY + 14;

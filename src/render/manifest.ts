@@ -180,16 +180,18 @@ const StagingSchema = z.object({
   reveal: z.object({
     episode: z.string().default('ÉP. {n}'),
     /** Accroche lisible sans le son dès la première image (épisode avec vote précédent). */
-    hook: z.string().default('{hero} A UNE NOUVELLE ARME. ÇA SUFFIRA ?'),
+    hook: z.string().default('{hero} A UN NOUVEAU JOUET. ÇA SUFFIRA ?'),
+    /** Accroche propre à une upgrade (clé : id de l'équipement), à la place de `hook`. */
+    hooks: z.record(z.string(), z.string()).default({}),
     /** Accroche sans vote précédent. */
     hookFirst: z.string().default('{gnomes} GNOMES vs {goblins} GOBELINS'),
     chose: z.string().default('LE PUBLIC A CHOISI…'),
-    gets: z.string().default('{hero} REÇOIT : {upgrade} !'),
+    gets: z.string().default('POUR {hero} !'),
     share: z.string().default('{pct} % DES VOIX'),
     newTag: z.string().default('NOUVEAU'),
     /** Durée de l'étiquette « NOUVEAU » au-dessus du héros, une fois le combat lancé (s). */
     newTagSeconds: z.number().min(0).default(4),
-    /** L'empereur annonce la roulette pendant la révélation (réplique show.lines.roulette). */
+    /** Réservé (l'empereur ne parle plus pendant la révélation : le titre le dit déjà). */
     emperor: z.boolean().default(true),
     victory: z.string().default('VICTOIRE DES {team}'),
     draw: z.string().default('MATCH NUL'),

@@ -616,6 +616,7 @@ export class ArenaScene extends Phaser.Scene {
       spriteOf: (i) => this.views[i]?.sprite,
       accessoryOf: (i, visual) => this.accessories.get(i)?.find((a) => a.img.texture.key.endsWith(`_${visual}`))?.img,
       focus: (target, hold) => this.director.request('heroDuel', target, this.battle.time, hold),
+      frame: (target, zoom) => (target ? this.director.cinema(target, this.battle.time, 60, zoom) : this.director.release(this.battle.time)),
       emperorSays: (text, ms) => this.show.emperorSays(text, ms, 'raise'),
       go: () => {
         this.running = true;
