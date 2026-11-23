@@ -276,9 +276,20 @@ Fait :
 - **Nouvelles upgrades** : tarte à la crème, parapluie à foudre, sifflet à supporters ; « BONG ! » de la casserole ;
   incident « poule géante » (désactivé par défaut pour ne pas changer les seeds existantes).
 - Combat sans upgrade strictement identique au bench (100 seeds) : l'équilibrage n'a pas bougé.
+- **Assets PixelLab** (placeholders, remplaçables par le manifeste) : logo « gnomes vs Gobelins » de l'ouverture et de la
+  boucle de fin, les 9 accessoires d'upgrade, la couronne du mini-boss, un sol par biome, explosion, poussière, éclair et
+  éclaboussure de tarte. 28 générations utilisées ; prompts et seeds dans `docs/sprites.md`.
+- **Rondes de test 2 et 3** sur la version intégrée : bulles de l'empereur, cadrage du héros pendant la révélation,
+  couronne et accessoires sur un héros grossi, easter eggs vérifiables (`?eggs=1`), épilogue sans gaz qui tue les
+  vainqueurs, caméra bornée, carte de vote qui s'arrêtait sur la mauvaise icône.
 
 Questions ouvertes pour Clément :
 - Héros suggéré : le moins équipé (ta règle, gardée) ou le plus équipé non saturé, pour qu'un vrai mini-boss émerge ?
 - Activer la poule géante (change toutes les seeds) ?
 - Que faire quand un héros a toutes les upgrades : fin d'arc, upgrades « niveau 2 », nouvelles upgrades ?
-- Publication automatique (n8n, API des plateformes) et comptage des votes par API : à décider ensemble.
+- Publication automatique et comptage des votes : à décider ensemble. Proposition :
+  1. un script d'enregistrement sans navigateur visible (Playwright + `?record=1`, puis ffmpeg webm → mp4) ;
+  2. un workflow n8n qui publie le mp4 (YouTube Data API pour les Shorts, Instagram Graph API pour les Reels avec un
+     compte pro, TikTok Content Posting API après validation de l'app) avec la légende et le vote 1/2/3 ;
+  3. 24 h après, n8n récupère les commentaires (API YouTube et Instagram ; TikTok plus limité) et les passe à
+     `npm run episode -- vote --comments`, puis prépare l'épisode suivant pour validation.
