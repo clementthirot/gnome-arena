@@ -1554,7 +1554,7 @@ export class ArenaScene extends Phaser.Scene {
     for (const [i, hud] of this.heroHud) {
       if (units[i].state === 'dead') {
         hud.bar.clear();
-        hud.name.setPosition(this.views[i].sprite.x, this.views[i].sprite.y - 30);
+        hud.name.setPosition(this.nameX(hud.name, this.views[i].sprite.x), this.views[i].sprite.y - 30);
       }
     }
   }
@@ -1564,6 +1564,16 @@ export class ArenaScene extends Phaser.Scene {
     const f = this.views[i].facing >= 0 ? 1 : -1;
     const body = this.bodyRect(i);
     return { x: (body.left + body.right) / 2 + a.ax * (body.right - body.left) * f, y: (body.top + body.bottom) / 2 + a.ay * (body.bottom - body.top) };
+  }
+
+  /** Étiquette de héros bornée à l'écran (entre la jauge gauche et la tribune droite), même en gros plan. */
+  private nameX(name: Phaser.GameObjects.Text, x: number): number {
+    const cam = this.cameras.main;
+    const z = cam.zoom || 1;
+    const half = (name.width * name.scaleX) / 2;
+    const minX = cam.worldView.x + 70 / z + half;
+    const maxX = cam.worldView.x + 1010 / z - half;
+    return minX > maxX ? x : Math.min(maxX, Math.max(minX, x));
   }
 
   private drawHeroHud(u: Unit, v: UnitView, hud: HeroHud): void {
@@ -1576,7 +1586,7 @@ export class ArenaScene extends Phaser.Scene {
     const bh = 16;
     const bx = Math.round(v.sprite.x - bw / 2);
     const by = Math.round(top - 18);
-    hud.name.setPosition(v.sprite.x, by - 6);
+    hud.name.setPosition(this.nameX(hud.name, v.sprite.x), by - 6);
     const frac = Math.max(0, u.hp / u.maxHp);
     hud.bar.clear();
     hud.bar.fillStyle(0x000000, 1).fillRect(bx - 4, by - 4, bw + 8, bh + 8);
