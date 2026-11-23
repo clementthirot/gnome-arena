@@ -8,6 +8,7 @@
 //   ?intro=0            passe l'intro (aperçus rapides de la régie)
 //   ?draft=<json>       réglages d'arc en brouillon, pour un épisode pas encore figé (aperçu de la régie)
 //   ?vote=kevin:laser_goggles,magic_sword,grenades   carte de vote en brouillon (aperçu de la régie)
+//   ?prev=kevin:laser_goggles:120,340,95   vote précédent à révéler en ouverture (essais ; voix facultatives)
 import '@fontsource/press-start-2p';
 import Phaser from 'phaser';
 import { startRecording } from './capture/recorder';
@@ -15,6 +16,7 @@ import { sound } from './render/audio';
 import { loadGameData, type GameData } from './data';
 import { episodeSetup, killsBefore, parseArc } from './data/arc';
 import { Battle } from './sim/battle';
+import type { PreviousVote } from './render/reveal';
 import type { ArenaParams } from './render/scenes/ArenaScene';
 import { ArenaScene } from './render/scenes/ArenaScene';
 import { BootScene } from './render/scenes/BootScene';
@@ -112,15 +114,18 @@ async function arenaParams(data: GameData): Promise<ArenaParams> {
   const speed = Number(params.get('speed') ?? 1) || 1;
   const record = params.get('record') === '1';
   const arcId = params.get('arc');
+  const prev = parsePreviousVote(params.get('prev'), data);
   if (!arcId) {
+    const upgrades = withPrevious(parseUpgrades(params.get('up')), prev);
     return {
       data,
       seed: params.get('seed') ?? String(Math.floor(Math.random() * 100000)),
       speed: record ? 1 : speed,
       record,
       skipIntro: params.get('intro') === '0' && !record,
-      upgrades: parseUpgrades(params.get('up')),
+      upgrades,
       biome: params.get('biome') ?? undefined,
+      episode: prev ? { number: Number(params.get('ep')) || 2, previousVote: prev } : undefined,
     };
   }
   const raw = await loadArc(arcId);
@@ -146,9 +151,10 @@ async function arenaParams(data: GameData): Promise<ArenaParams> {
     skipIntro: params.get('intro') === '0' && !record,
     heroes: episode.setup.heroes,
     biome: params.get('biome') ?? episode.setup.biome,
-    upgrades: episode.setup.upgrades,
+    upgrades: withPrevious(episode.setup.upgrades, prev),
     episode: {
       number,
+      previousVote: prev,
       arcKills: Object.fromEntries(Object.entries(killsBefore(arc, number)).map(([id, k]) => [data.heroes.find((h) => h.id === id)?.name ?? id, k])),
       expected: ep && params.get('seed') === null ? { winner: ep.winner, duration: ep.duration } : undefined,
       vote:
@@ -179,6 +185,30 @@ function warnIfEpisodeDiverged(arena: ArenaParams): void {
   badge.textContent = message;
   badge.style.cssText = 'position:fixed;bottom:8px;left:8px;right:8px;color:#ffb347;font:11px/1.5 "Press Start 2P",monospace;z-index:10';
   document.body.append(badge);
+}
+
+/**
+ * Paramètre d'essai `?prev=héros:upgrade[:voix1,voix2,voix3]` (le lot arc remplit previousVote depuis l'épisode N-1).
+ * Les autres options sont complétées dans l'ordre d'equipment.json ; l'upgrade est placée sur l'option la plus votée.
+ */
+function parsePreviousVote(value: string | null, data: GameData): PreviousVote | undefined {
+  const [recipient, upgrade, rawVotes] = value?.split(':') ?? [];
+  const hero = data.heroes.find((h) => h.id === recipient);
+  const team = hero && data.units.find((u) => u.id === hero.base)?.team;
+  if (!hero || !team || !data.equipment.some((e) => e.id === upgrade)) return undefined;
+  const votes = rawVotes ? rawVotes.split(',').map(Number) : null;
+  const n = votes?.length ?? 3;
+  const others = data.equipment.map((e) => e.id).filter((id) => id !== upgrade);
+  const win = votes ? votes.indexOf(Math.max(...votes)) : 0;
+  const options = Array.from({ length: n }, (_, i) => (i === win ? upgrade : others.shift()!));
+  return { recipient: hero.id, team, upgrade, options, votes };
+}
+
+/** Le héros du vote précédent porte son upgrade (si l'arc ne la lui a pas déjà donnée). */
+function withPrevious(upgrades: Record<string, string[]> | undefined, prev: PreviousVote | undefined): Record<string, string[]> | undefined {
+  if (!prev) return upgrades;
+  const owned = upgrades?.[prev.recipient] ?? [];
+  return owned.includes(prev.upgrade) ? upgrades : { ...upgrades, [prev.recipient]: [...owned, prev.upgrade] };
 }
 
 function parseUpgrades(value: string | null): Record<string, string[]> | undefined {
