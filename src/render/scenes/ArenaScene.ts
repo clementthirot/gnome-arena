@@ -22,6 +22,7 @@ import { rand, randAt, seedNoise, seedRender, seedTick, streamFrom } from '../ra
 import { overlayRects, SAFE } from '../safeZone';
 import { bossScale, Eggs, overlayColors, overlayTexture } from '../eggs';
 import { TEAM_COLORS, TEXT, textStyle } from '../text';
+import { upgradeFx } from '../upgradeFx';
 import type { ResultData } from './ResultScene';
 
 /** Monde 270 x 480 affiché en 1080 x 1920. */
@@ -729,6 +730,7 @@ export class ArenaScene extends Phaser.Scene {
     for (const e of events) {
       this.show.onEvent(e);
       this.soundFor(e);
+      upgradeFx(this, e, this.battle, SCALE);
       if (e.type === 'death') this.lastVictim = e.unit;
       if (e.type === 'hit' && e.source >= 0 && units[e.source]?.hero && units[e.source].team === units[e.unit]?.team && e.source !== e.unit) {
         this.friendlyHits.set(e.source, (this.friendlyHits.get(e.source) ?? 0) + 1);

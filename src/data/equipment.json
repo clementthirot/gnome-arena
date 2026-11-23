@@ -173,5 +173,93 @@
       "mass": 1.4,
       "speed": 0.95
     }
+  },
+  {
+    "id": "cream_pie",
+    "label": "Tarte à la crème",
+    "short": "tarte",
+    "visual": "acc_pie",
+    "special": {
+      "minRange": 10,
+      "maxRange": 90,
+      "cooldown": 4.5,
+      "misfire": {
+        "chance": 0.1,
+        "mode": "self"
+      },
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 100,
+          "arc": 20,
+          "spread": 6,
+          "visual": "cream_pie",
+          "effects": [
+            {
+              "type": "stun",
+              "radius": 14,
+              "duration": 1.6,
+              "visual": "cream_splat"
+            },
+            {
+              "type": "damage",
+              "power": 0.5,
+              "radius": 14
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "storm_umbrella",
+    "label": "Parapluie à foudre",
+    "short": "foudre",
+    "visual": "acc_umbrella",
+    "special": {
+      "maxRange": 60,
+      "cooldown": 7,
+      "misfire": {
+        "chance": 0.15,
+        "mode": "random"
+      },
+      "effects": [
+        {
+          "type": "ricochet",
+          "power": 0.9,
+          "bounces": 6,
+          "range": 40,
+          "falloff": 0.85,
+          "knockback": 40,
+          "visual": "storm_bolt"
+        }
+      ]
+    }
+  },
+  {
+    "id": "fan_whistle",
+    "label": "Sifflet à supporters",
+    "short": "sifflet",
+    "visual": "acc_whistle",
+    "special": {
+      "maxRange": 50,
+      "cooldown": 14,
+      "misfire": {
+        "chance": 0.3,
+        "mode": "self"
+      },
+      "effects": [
+        {
+          "type": "spawn",
+          "units": {
+            "gnomes": "gnome_fan",
+            "goblins": "goblin_fan"
+          },
+          "count": 2,
+          "team": "self",
+          "visual": "whistle_blow"
+        }
+      ]
+    }
   }
 ]

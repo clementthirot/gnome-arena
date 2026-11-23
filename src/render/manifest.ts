@@ -79,7 +79,7 @@ const SpriteSheetSchema = z.object({
 
 /** Accessoire d'upgrade superposé au héros, sans régénérer le personnage. */
 const AccessoryShapeSchema = z.object({
-  kind: z.enum(['goggles', 'sword', 'grenades', 'jar', 'chicken', 'pot']),
+  kind: z.enum(['goggles', 'sword', 'grenades', 'jar', 'chicken', 'pot', 'pie', 'umbrella', 'whistle']),
   color,
   accent: color,
 });
