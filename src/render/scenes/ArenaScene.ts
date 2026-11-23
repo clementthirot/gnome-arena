@@ -67,6 +67,44 @@ interface Accessory {
   ay: number;
 }
 
+/** Silhouette visible d'un héros, en fractions de son image (les planches PixelLab ont de grandes marges vides). */
+interface Body {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+/** Boîte des pixels opaques d'une image (frame) : les ancres suivent le corps, pas le cadre transparent. */
+function opaqueBox(frame: Phaser.Textures.Frame): Body {
+  const full = { top: 0, bottom: 1, left: 0, right: 1 };
+  const src = frame.source.image as CanvasImageSource | undefined;
+  const w = frame.cutWidth;
+  const h = frame.cutHeight;
+  if (!src || !w || !h) return full;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    ctx.drawImage(src, frame.cutX, frame.cutY, w, h, 0, 0, w, h);
+    const px = ctx.getImageData(0, 0, w, h).data;
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++)
+        if (px[(y * w + x) * 4 + 3] > 40) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+    if (x1 < 0) return full;
+    return { top: y0 / h, bottom: (y1 + 1) / h, left: x0 / w, right: (x1 + 1) / w };
+  } catch {
+    return full;
+  }
+}
+
 interface HeroHud {
   name: Phaser.GameObjects.Text;
   bar: Phaser.GameObjects.Graphics;
@@ -94,6 +132,8 @@ export class ArenaScene extends Phaser.Scene {
   private views: UnitView[] = [];
   private heroHud = new Map<number, HeroHud>();
   private accessories = new Map<number, Accessory[]>();
+  /** Silhouette visible de chaque héros (ancres du HUD, de la couronne et des accessoires). */
+  private bodies = new Map<number, Body>();
   private fxLayer!: FxLayer;
   private prev: { x: number; y: number; z: number }[] = [];
   /** Ombres des unités en l'air. */
@@ -169,6 +209,7 @@ export class ArenaScene extends Phaser.Scene {
     this.views = [];
     this.heroHud.clear();
     this.accessories.clear();
+    this.bodies.clear();
     this.particles = [];
     this.spectators = [];
     this.accumulator = 0;
@@ -302,6 +343,7 @@ export class ArenaScene extends Phaser.Scene {
     this.views.push(view);
 
     if (u.hero) {
+      this.bodies.set(u.index, opaqueBox(sprite.frame));
       const team = TEAM_COLORS[u.team];
       const name = this.add.text(0, 0, u.hero.name, textStyle(26, team.main)).setOrigin(0.5, 1).setDepth(9800);
       const bar = this.add.graphics().setDepth(9800);
@@ -1323,6 +1365,21 @@ export class ArenaScene extends Phaser.Scene {
     sound.play('cheer');
   }
 
+  /** Silhouette visible d'un héros, en px monde (le cadre entier pour une unité sans silhouette mesurée). */
+  private bodyRect(i: number): { top: number; bottom: number; left: number; right: number } {
+    const s = this.views[i].sprite;
+    const b = this.bodies.get(i) ?? { top: 0, bottom: 1, left: 0, right: 1 };
+    const fx = s.flipX ? (k: number) => 1 - k : (k: number) => k;
+    const l = fx(b.left);
+    const r = fx(b.right);
+    return {
+      top: s.y + (b.top - s.originY) * s.displayHeight,
+      bottom: s.y + (b.bottom - s.originY) * s.displayHeight,
+      left: s.x + (Math.min(l, r) - s.originX) * s.displayWidth,
+      right: s.x + (Math.max(l, r) - s.originX) * s.displayWidth,
+    };
+  }
+
   /** Suivi des décors attachés : aura et couronne des mini-boss, accessoire du spectateur, étiquette MVP. */
   private drawStageExtras(): void {
     const pulse = 1 + 0.08 * Math.sin(this.battle.time * 6);
@@ -1332,8 +1389,10 @@ export class ArenaScene extends Phaser.Scene {
       fx.aura?.setVisible(!dead);
       fx.crown?.setVisible(!dead);
       if (dead) continue;
-      fx.aura?.setPosition(s.x, s.y + s.displayHeight * 0.22).setDepth(s.depth - 0.002).setScale(fx.auraScale * pulse);
-      fx.crown?.setPosition(s.x, s.y - s.displayHeight * 0.72).setAngle(s.angle).setDepth(s.depth + 0.002);
+      // Halo aux pieds et couronne sur le crâne (silhouette visible) ; drawHeroHud remonte nom et barre d'autant.
+      const body = this.bodyRect(i);
+      fx.aura?.setPosition((body.left + body.right) / 2, body.bottom - 1 * SCALE).setDepth(s.depth - 0.002).setScale(fx.auraScale * pulse);
+      fx.crown?.setPosition((body.left + body.right) / 2, body.top + 3 * SCALE).setAngle(s.angle).setDepth(s.depth + 0.002);
     }
     const g = this.gagSpectator;
     if (g && this.gagHat) this.gagHat.img.setPosition(g.sprite.x, g.sprite.y - this.gagHat.dy).setAngle(g.sprite.angle).setVisible(g.sprite.visible);
@@ -1450,7 +1509,11 @@ export class ArenaScene extends Phaser.Scene {
         a.img.setVisible(!dead);
         if (dead) continue;
         const f = this.views[i].facing >= 0 ? 1 : -1;
-        a.img.setPosition(s.x + a.ax * s.displayWidth * f, s.y - s.displayHeight * 0.25 + a.ay * s.displayHeight);
+        // Ancres relatives à la silhouette visible : elles suivent l'échelle du héros (mini-boss compris).
+        const body = this.bodyRect(i);
+        const bw = body.right - body.left;
+        const bh = body.bottom - body.top;
+        a.img.setPosition((body.left + body.right) / 2 + a.ax * bw * f, (body.top + body.bottom) / 2 + a.ay * bh);
         a.img.setFlipX(f < 0).setAngle(s.angle).setDepth(s.depth + 0.001);
       }
     }
@@ -1463,7 +1526,9 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private drawHeroHud(u: Unit, v: UnitView, hud: HeroHud): void {
-    const top = v.sprite.y - v.sprite.displayHeight * 0.8;
+    // Au-dessus du crâne visible, et au-dessus de la couronne du mini-boss quand il en porte une.
+    const crown = this.bossFx.get(u.index)?.crown;
+    const top = this.bodyRect(u.index).top - (crown ? crown.displayHeight - 2 * SCALE : 0);
     // Plus grande et contourée : lisible sur téléphone même en plan large.
     const bw = 110;
     const bh = 16;
