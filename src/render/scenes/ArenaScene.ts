@@ -1543,11 +1543,8 @@ export class ArenaScene extends Phaser.Scene {
         a.img.setVisible(!dead);
         if (dead) continue;
         const f = this.views[i].facing >= 0 ? 1 : -1;
-        // Ancres relatives à la silhouette visible : elles suivent l'échelle du héros (mini-boss compris).
-        const body = this.bodyRect(i);
-        const bw = body.right - body.left;
-        const bh = body.bottom - body.top;
-        a.img.setPosition((body.left + body.right) / 2 + a.ax * bw * f, (body.top + body.bottom) / 2 + a.ay * bh);
+        const at = this.accessoryAt(i, a);
+        a.img.setPosition(at.x, at.y);
         a.img.setFlipX(f < 0).setAngle(s.angle).setDepth(s.depth + 0.001);
       }
     }
@@ -1559,10 +1556,18 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  /** Position d'un accessoire : ancres relatives à la silhouette visible, elles suivent l'échelle du héros (mini-boss compris). */
+  private accessoryAt(i: number, a: Accessory): { x: number; y: number } {
+    const f = this.views[i].facing >= 0 ? 1 : -1;
+    const body = this.bodyRect(i);
+    return { x: (body.left + body.right) / 2 + a.ax * (body.right - body.left) * f, y: (body.top + body.bottom) / 2 + a.ay * (body.bottom - body.top) };
+  }
+
   private drawHeroHud(u: Unit, v: UnitView, hud: HeroHud): void {
-    // Au-dessus du crâne visible, et au-dessus de la couronne du mini-boss quand il en porte une.
+    // Au-dessus du crâne visible, de la couronne du mini-boss et des accessoires portés sur la tête (casserole…).
     const crown = this.bossFx.get(u.index)?.crown;
-    const top = this.bodyRect(u.index).top - (crown ? crown.displayHeight - 2 * SCALE : 0);
+    let top = this.bodyRect(u.index).top - (crown ? crown.displayHeight - 2 * SCALE : 0);
+    for (const a of this.accessories.get(u.index) ?? []) top = Math.min(top, this.accessoryAt(u.index, a).y - a.img.displayHeight * a.img.originY);
     // Plus grande et contourée : lisible sur téléphone même en plan large.
     const bw = 110;
     const bh = 16;
