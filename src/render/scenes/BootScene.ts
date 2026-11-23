@@ -28,6 +28,8 @@ export class BootScene extends Phaser.Scene {
     for (const [key, entry] of Object.entries(manifest.overlays)) {
       if (entry.type === 'image') this.load.image(`ovl_img_${key}`, entry.url);
     }
+    // Cadre de la machine à sous : image facultative, sinon dessiné par slotMachine.ts.
+    if (manifest.staging.reveal.slot.url) this.load.image('ui_slot_frame', manifest.staging.reveal.slot.url);
   }
 
   create(params: ArenaParams): void {

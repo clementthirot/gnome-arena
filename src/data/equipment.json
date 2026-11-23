@@ -31,6 +31,7 @@
     "label": "Épée magique",
     "short": "épée",
     "visual": "acc_sword",
+    "roles": ["melee", "charger", "skirmisher"],
     "stats": {
       "damage": 1.05
     },

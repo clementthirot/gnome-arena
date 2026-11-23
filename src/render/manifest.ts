@@ -174,6 +174,34 @@ const StagingSchema = z.object({
       .default({}),
   }),
   heroIntro: z.object({ enabled: z.boolean().default(true), duration: z.number().positive().default(2.8) }),
+  /** Ouverture : « quick » (titre en surimpression, révélation du vote, combat en ≤ 4,5 s) ou « classic » (roster des héros, prono, 3-2-1). */
+  intro: z.enum(['quick', 'classic']).default('quick'),
+  /** Révélation du vote précédent, écran de fin et carte de vote (textes : {hero}, {upgrade}, {pct}, {team}, {n}…). */
+  reveal: z.object({
+    episode: z.string().default('ÉP. {n}'),
+    /** Accroche lisible sans le son dès la première image (épisode avec vote précédent). */
+    hook: z.string().default('{hero} A UNE NOUVELLE ARME. ÇA SUFFIRA ?'),
+    /** Accroche sans vote précédent. */
+    hookFirst: z.string().default('{gnomes} GNOMES vs {goblins} GOBELINS'),
+    chose: z.string().default('LE PUBLIC A CHOISI…'),
+    gets: z.string().default('{hero} REÇOIT : {upgrade} !'),
+    share: z.string().default('{pct} % DES VOIX'),
+    newTag: z.string().default('NOUVEAU'),
+    /** Durée de l'étiquette « NOUVEAU » au-dessus du héros, une fois le combat lancé (s). */
+    newTagSeconds: z.number().min(0).default(4),
+    /** L'empereur annonce la roulette pendant la révélation (réplique show.lines.roulette). */
+    emperor: z.boolean().default(true),
+    victory: z.string().default('VICTOIRE DES {team}'),
+    draw: z.string().default('MATCH NUL'),
+    postponed: z.string().default('LE VOTE EST REPORTÉ'),
+    mvp: z.string().default('MVP'),
+    voteFor: z.string().default('RECEVRA LA PROCHAINE UPGRADE'),
+    voteCall: z.string().default('VOTE 1, 2 OU 3 EN COMMENTAIRE'),
+    /** Cadre du rouleau : placeholder dessiné ; `url` (optionnelle) le remplace par une image, clé ui_slot_frame. */
+    slot: z.object({ frame: color.default('#c8902a'), window: color.default('#14101c'), light: color.default('#ffe14a'), url: z.string().optional() }).default({}),
+    /** Confettis de l'accrochage de l'accessoire. */
+    confetti: z.array(color).min(1).default(['#ffe14a', '#ff5a8a', '#7fb0ff', '#9be05a', '#ffffff']),
+  }).default({}),
   /** Projection : le personnage se détache de son ombre et suit son arc. Purement visuel. */
   flight: z.object({
     /** Hauteur affichée = hauteur simulée × ce facteur. */
