@@ -1414,7 +1414,7 @@
   },
   "overlays": {
     "boss_aura": { "type": "placeholder", "kind": "aura", "color": "#ffd23a", "accent": "#ff8a2a" },
-    "boss_crown": { "type": "placeholder", "kind": "crown", "color": "#ffd23a", "accent": "#e83a5a" },
+    "boss_crown": { "type": "image", "url": "sprites/generated/boss_crown.png", "size": 6, "placeholder": { "kind": "crown", "color": "#ffd23a", "accent": "#e83a5a" } },
     "fx_crowd_burst": { "type": "placeholder", "kind": "confetti", "color": "#ffe14a", "accent": "#ff5aa8" },
     "gag_tophat": { "type": "placeholder", "kind": "tophat", "color": "#ffe14a", "accent": "#d83b3b" },
     "gag_helmet": { "type": "placeholder", "kind": "helmet", "color": "#b8c0cc", "accent": "#5a6270" },
