@@ -27,6 +27,20 @@ l'entrée) et le signale dans la console, au lieu de planter.
 | `hero_grok`, `hero_snik`, `hero_morva` | héros gobelins | 32 × 32 | idle, walk, attack, death |
 | `acc_goggles`, `acc_sword`, `acc_grenades`, `acc_glue`, `acc_chicken`, `acc_pot` | accessoires d'upgrade, séparés du personnage | ~12 × 12 | aucune |
 
+Nouveaux emplacements (novembre 2026), tous avec un dessin de secours tant qu'aucune image n'est fournie :
+
+| Clé (section du manifeste) | Quoi | État |
+| --- | --- | --- |
+| `acc_pie`, `acc_umbrella`, `acc_whistle` (`accessories`) | tarte à la crème, parapluie à foudre, sifflet à supporters | placeholder PixelLab dans `sprites/generated/` |
+| `boss_crown` (`overlays`) | couronne du mini-boss (3 upgrades et plus) | placeholder PixelLab |
+| `boss_aura` (`overlays`) | aura du mini-boss | dessin par code |
+| `gag_tophat`, `gag_helmet`, `gag_umbrella`, `gag_flower`, `gag_viking`, `gag_propeller`, `gag_duck` (`overlays`) | accessoires du spectateur récurrent (un par épisode) | dessin par code |
+| `fx_crowd_burst` (`overlays`) | éclats du public qui explose | dessin par code |
+| `giant_chicken` (`accessories`), `giant_chicken_body` (`effects`) | la poule géante (incident désactivé par défaut) | dessin par code |
+| `ui_slot_frame` (`staging.reveal.slot.url`) | cadre de la machine à sous | dessin par code |
+
+Pour une image : `"type": "image", "url": "sprites/...png", "size": <hauteur en px monde>` en gardant `placeholder` en secours.
+
 Règles communes, pour que la nuée reste lisible sur téléphone :
 
 - pixel art 16 bits, fond transparent, **personnage tourné vers la droite** (le moteur retourne l'image) ;
