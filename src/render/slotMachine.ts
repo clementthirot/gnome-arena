@@ -4,6 +4,7 @@
 // Partagée par la révélation d'ouverture (reveal.ts) et la carte de vote de fin (ResultScene).
 import type Phaser from 'phaser';
 import { sound } from './audio';
+import { FRAME_INSET, goldFrame } from './frame';
 import { manifest } from './manifest';
 import { drawAccessory } from './placeholders';
 
@@ -77,9 +78,12 @@ export function spinReel(scene: Phaser.Scene, o: ReelOptions): Reel {
   const growth = o.stepGrowth ?? 11;
   const delay = o.delay ?? 0;
   const container = scene.add.container(o.x, o.y).setDepth(o.depth);
-  const frameKey = 'ui_slot_frame';
-  if (scene.textures.exists(frameKey)) {
-    container.add(scene.add.image(0, 0, frameKey).setDisplaySize(size * 1.3, size * 1.3));
+  // Le cadre doré commun des écrans de fin, de côté size.
+  const frame = goldFrame(scene, 0, 0, size, size);
+  // L'icône tient dans le fond sombre du cadre, sans toucher le liseré.
+  const iconSize = frame ? size - 2 * FRAME_INSET.x - 4 : size * 0.72;
+  if (frame) {
+    container.add(frame);
   } else {
     const pad = Math.round(size * 0.12);
     const g = scene.add.graphics();
@@ -98,7 +102,7 @@ export function spinReel(scene: Phaser.Scene, o: ReelOptions): Reel {
   const pool = o.pool.length ? o.pool : [o.target];
   const offset = o.offset ?? 0;
   const icon = scene.add.image(0, 0, pool[offset % pool.length]);
-  fitIcon(icon, size * 0.72);
+  fitIcon(icon, iconSize);
   container.add(icon);
 
   // Défilement réglé sur l'horloge de la scène (et non une icône par image) : même rythme
@@ -116,7 +120,7 @@ export function spinReel(scene: Phaser.Scene, o: ReelOptions): Reel {
     if (n === spins - 1 && pool[k] === o.target && pool.length > 1) k = (k + 1) % pool.length;
     const ms = first + n * growth;
     icon.setTexture(pool[k]);
-    fitIcon(icon, size * 0.72);
+    fitIcon(icon, iconSize);
     icon.setY(-size * 0.28).setAlpha(0.55);
     scene.tweens.add({ targets: icon, y: 0, alpha: 1, duration: Math.max(20, ms * 0.8) });
     if (o.sound !== false) sound.play('tick');
@@ -146,7 +150,7 @@ export function spinReel(scene: Phaser.Scene, o: ReelOptions): Reel {
     if (!icon.active) return;
     scene.tweens.killTweensOf(icon);
     icon.setTexture(o.target).setY(0).setAlpha(1);
-    fitIcon(icon, size * 0.72);
+    fitIcon(icon, iconSize);
     const s = icon.scale;
     scene.tweens.add({ targets: icon, scale: { from: s * 1.35, to: s }, duration: 220, ease: 'Back.easeOut' });
     const lights = container.getData('lights') as Phaser.GameObjects.Rectangle[] | undefined;

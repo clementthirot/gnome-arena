@@ -118,6 +118,25 @@ Accessoire :
 
 `anchor` place l'accessoire par rapport au centre du héros, en fraction de sa taille (x vers l'avant du regard, y vers le bas).
 
+## Thèmes (mêmes règles, autres assets)
+
+Un thème est un fichier `src/render/themes/<id>.json` choisi dans l'URL : `?theme=noel` (la régie ouverte
+avec `?theme=noel` prévisualise aussi dans ce thème). Il ne contient que ce qui change :
+
+- `name` : titre de l'onglet ;
+- `teams` : nom et couleurs des deux camps à l'écran (`label`, `main` pour le texte, `bar` pour les jauges) ;
+  les identifiants `gnomes` / `goblins` des données et des règles ne changent pas ;
+- `manifest` : morceaux de `assets.manifest.json` à remplacer. Les objets sont fusionnés clé par clé, les
+  tableaux et valeurs remplacés, `null` retire une entrée (retour au placeholder ou au repli dessiné).
+
+Les images du thème vont dans `public/sprites/themes/<id>/`. Pour un personnage PixelLab :
+`npm run sprites -- pixellab <dossier> <clés…> --theme=noel` range la sheet dans ce dossier et écrit son entrée
+dans le thème, sans toucher au manifeste de base. Pour une image (sol, titre, cadre…), ajouter son chemin à la main
+sous `manifest.art`, `manifest.staging`, etc. Le test `tests/themes.test.ts` vérifie que chaque thème donne un
+manifeste valide, ne vise que des clés connues et que ses images existent.
+
+Les textes des données (cris des héros, noms d'unités dans `src/data`) font partie des règles et restent communs.
+
 ## Vérifier
 
 1. `npm run dev`, puis `?seed=1&up=bob:laser_goggles` pour voir un héros équipé.
@@ -134,6 +153,14 @@ Chaque clé a un repli dessiné par code : supprimer le fichier (ou l'entrée) s
 | --- | --- | --- | --- | --- |
 | sprites/arena/title.png | `art.title` | 256x128 / 7101 | game title logo text 'GNOMES VS GOBELINS', chunky bold blocky letters, GNOMES blue/red, VS yellow, GOBELINS green, fantasy arcade battle logo | Remplace « 50 GNOMES / vs / 50 GOBELINS » dans `drawOpeningTitle` (reveal.ts), donc aussi sur l'image de boucle de fin ; effectifs affichés dessous (« 50 contre 50 »). Repli : texte. |
 | sprites/arena/ground_<biome>.png (sable, foret, neige, volcan) | `art.grounds.<biome>` | 128x128 / 7301-7304 | seamless tileable top-down {desert sand / short grass / packed snow / volcanic ash rock} ground texture, low contrast, flat, no objects ; `no_background: false`, `view: "high top-down"`, `outline: "lineless"`, `detail: "low detail"` | Raccord rendu sans couture (fondu tramé avec la copie décalée d'une demi-tuile), contraste ramené vers la moyenne (x0,3 ; forêt x0,15), 16 couleurs. Répété sur le terrain par arenaArt.ts à la place des mouchetures. Repli : dessin par code. |
+| sprites/arena/stands.png | `art.stands` | 64x64 / 3 (`create_image_pro_flash`, style du roi) | seamless tileable colosseum stone bleacher seats seen from above, straight horizontal rows of grey-purple stone steps, flat orthographic | Répété sur tout le fond par arenaArt.ts, en mode « luminosité » sur la couleur des gradins du biome (la pierre prend la teinte du biome). Repli : rangées dessinées. |
+| sprites/arena/king.png | `art.king` | 32x32 / 7 (`create_image_pro_flash`) | chubby arena emperor king sitting, front view, big golden crown, purple royal robe with ermine collar, smug grin | Affiché à x0,75 devant le trône (show.ts) ; c'est lui qui tombe dans l'easter egg. Repli : empereur ASCII. |
+| sprites/arena/throne.png | `art.throne` | 32x32 / 7 (`create_image_pro_flash`, style du roi) | empty royal throne, red velvet, ornate golden frame with a small crown | Reste en place quand le roi tombe. |
+| fx/gas_1.png, fx/gas_2.png | `staging.gas.sprites` | 48x48 / 11, 27 (`create_image_pixflux`) | puff of toxic green poison gas cloud, billowy, lineless | Bouffées du gaz de la zone (gas.ts) : grossissent, tournent, s'effacent. Repli : disques de couleur. |
+| sprites/ui/pattern.png | `art.menu.pattern` | 32x32, tuile refaite à partir de `create_image_pro_flash` | seamless repeating pattern of tiny gnome hats and goblin heads on dark purple | Fond des écrans de fin et du rideau de la roulette, pixels x4, défile en diagonale (`art.menu.scroll`, `patternAlpha`). Repli : fond rayé. |
+| sprites/ui/card.png | `art.menu.card` | 173x260 (`create_ui_asset`) | ornate golden pixel art card frame, dark purple inside | Cadre unique des écrans de fin (src/render/frame.ts) : cartes de vote, plaques de titre, fenêtres des rouleaux et rideau de la roulette, en 9-slice (bords 20/20/22/22) x1,5. Repli : rectangles. |
+| sprites/ui/plaque.png, sprites/ui/plaque_crown.png | `art.menu.plaque`, `art.menu.crown` | 151x88 + 41x18 (`create_ui_asset`, couronne détachée) | golden royal title plaque with a small crown on top | Seule la couronne sert, posée sur le cadre doré des titres (la plaque est remplacée par le cadre des cartes, pour des cadres identiques). |
+| sprites/ui/slot_frame.png | `staging.reveal.slot.url` | 32x33 (`create_ui_asset`) | golden slot machine reel frame | Non utilisé : les rouleaux prennent le cadre des cartes (sans card.png, cadre dessiné). |
 | generated/acc_goggles.png | `accessories.acc_goggles` | 32x32 / 7211 | pair of round red glass goggles with black rims and black strap | Recadré sur la bande des verres (lignes 11-26). 1er essai (7201) inutilisable. |
 | generated/acc_sword.png | `acc_sword` | 32x32 / 7202 | short steel sword pointing up, brown leather hilt, gold crossguard | |
 | generated/acc_grenades.png | `acc_grenades` (size 4 -> 4,5) | 32x32 / 7203 | belt of three small round green grenades on a brown leather strap | |
@@ -146,7 +173,7 @@ Chaque clé a un repli dessiné par code : supprimer le fichier (ou l'entrée) s
 | fx/cream_splat.png | `effects.cream_splat.sprite` | 48x48 / 7415, `view: "high top-down"` | flat splash of white whipped cream on the ground, droplets, no pie crust | 1er essai (7405) dessinait une tarte entière. |
 | fx/impact.png | (non branché) | 48x48 / 7402 | comic hit impact star burst, white and yellow spiky flash | Livré pour un futur effet d'impact ; brancher via `"sprite": { "url": "sprites/fx/impact.png", "size": 12 }`. |
 
-Schéma (src/render/manifest.ts) : `art` (facultatif, `title` + `grounds`) et `effects.<clé>.sprite`
+Schéma (src/render/manifest.ts) : `art` (facultatif, `title`, `grounds`, `stands`, `king`, `throne`, `menu`) et `effects.<clé>.sprite`
 (`url`, `size` px monde minimum — un gros rayon d'effet l'agrandit —, `anchor` `center` | `bottom`). L'image d'effet
 grossit de 0,6 à 1,1 fois sa taille en s'effaçant (durée = `duration` de l'effet, 250 ms minimum), par-dessus le dessin par code.
 Les accessoires restent orientés vers la droite (retournés quand le héros regarde à gauche) et servent aussi d'icônes

@@ -190,7 +190,7 @@ export class ArenaScene extends Phaser.Scene {
   private confettiUntil = 0;
   private confettiDebt = 0;
   private confettiColors: number[] = [];
-  private mvpLabel?: { text: Phaser.GameObjects.Text; sprite: Phaser.GameObjects.Sprite };
+  private mvpLabel?: { text: Phaser.GameObjects.Text; index: number };
 
   constructor() {
     super('arena');
@@ -268,7 +268,8 @@ export class ArenaScene extends Phaser.Scene {
     const bgKey = `arena_bg_${this.battle.biome.id}`;
     const groundKey = `art_ground_${this.battle.biome.id}`;
     const groundTile = this.textures.exists(groundKey) ? (this.textures.get(groundKey).getSourceImage() as HTMLImageElement) : undefined;
-    if (!this.textures.exists(bgKey)) this.textures.addCanvas(bgKey, drawArenaBackground(width, height, field, this.battle.biome, groundTile));
+    const standsTile = this.textures.exists('art_stands') ? (this.textures.get('art_stands').getSourceImage() as HTMLImageElement) : undefined;
+    if (!this.textures.exists(bgKey)) this.textures.addCanvas(bgKey, drawArenaBackground(width, height, field, this.battle.biome, groundTile, standsTile));
     this.add.image(0, 0, bgKey).setOrigin(0).setScale(SCALE).setDepth(-1000);
     this.createCrowd();
 
@@ -533,16 +534,10 @@ export class ArenaScene extends Phaser.Scene {
     if (this.params.record) return;
     kb?.on('keydown-M', () => sound.toggleMute());
     kb?.on('keydown-SPACE', () => (this.paused = !this.paused));
-    kb?.on('keydown-R', () => this.restart(this.params.seed));
-    kb?.on('keydown-N', () => this.scene.restart({ ...this.params, seed: nextSeed(this.params.seed), episode: undefined }));
     kb?.on('keydown-ONE', () => (this.timeScale = 1));
     kb?.on('keydown-TWO', () => (this.timeScale = 2));
     kb?.on('keydown-FOUR', () => (this.timeScale = 4));
     kb?.on('keydown-EIGHT', () => (this.timeScale = 8));
-  }
-
-  private restart(seed: string): void {
-    this.scene.restart({ ...this.params, seed });
   }
 
   // ---------------------------------------------------------------- cartons
@@ -550,9 +545,9 @@ export class ArenaScene extends Phaser.Scene {
   private playIntro(): void {
     const { width: w, height: h } = this.scale;
     const veil = this.add.rectangle(0, 0, w, h, 0x000000, 0.55).setOrigin(0).setDepth(9950);
-    const gnomes = this.add.text(w / 2, h * 0.4, 'GNOMES', textStyle(84, TEAM_COLORS.gnomes.main)).setOrigin(0.5).setDepth(9951);
+    const gnomes = this.add.text(w / 2, h * 0.4, TEAM_COLORS.gnomes.label, textStyle(84, TEAM_COLORS.gnomes.main)).setOrigin(0.5).setDepth(9951);
     const vs = this.add.text(w / 2, h * 0.47, 'contre', textStyle(40)).setOrigin(0.5).setDepth(9951);
-    const goblins = this.add.text(w / 2, h * 0.54, 'GOBELINS', textStyle(84, TEAM_COLORS.goblins.main)).setOrigin(0.5).setDepth(9951);
+    const goblins = this.add.text(w / 2, h * 0.54, TEAM_COLORS.goblins.label, textStyle(84, TEAM_COLORS.goblins.main)).setOrigin(0.5).setDepth(9951);
     const title = [gnomes, vs, goblins];
     if (this.params.episode) {
       title.push(this.add.text(w / 2, h * 0.3, `ÉPISODE ${this.params.episode.number}`, textStyle(44, '#ffe14a')).setOrigin(0.5).setDepth(9951));
@@ -688,7 +683,7 @@ export class ArenaScene extends Phaser.Scene {
     void h;
     // Bas de la zone sûre (tiers inférieur, au-dessus de la légende) : le carton ne couvre plus l'action qu'il annonce.
     const t = this.add
-      .text(SAFE.text.x + SAFE.text.w / 2, SAFE.captionTop - 110, text, textStyle(52, color, { wordWrap: { width: SAFE.text.w - 40 } }))
+      .text(SAFE.centered.x + SAFE.centered.w / 2, SAFE.captionTop - 110, text, textStyle(52, color, { wordWrap: { width: SAFE.centered.w - 40 }, align: 'center' }))
       .setOrigin(0.5)
       .setDepth(9960);
     this.currentBanner = t;
@@ -700,7 +695,7 @@ export class ArenaScene extends Phaser.Scene {
   /** Annonce discrète en haut de l'écran (incidents d'arène). */
   private toast(text: string): void {
     const t = this.add
-      .text(SAFE.text.x + SAFE.text.w / 2, SAFE.top + 20, text, textStyle(TEXT.M - 4, '#ffb347', { wordWrap: { width: SAFE.text.w - 40 } }))
+      .text(SAFE.centered.x + SAFE.centered.w / 2, SAFE.top + 20, text, textStyle(TEXT.M - 4, '#ffb347', { wordWrap: { width: SAFE.centered.w - 40 }, align: 'center' }))
       .setOrigin(0.5)
       .setDepth(9955)
       .setAlpha(0);
@@ -1245,8 +1240,7 @@ export class ArenaScene extends Phaser.Scene {
       if (r.winner !== 'draw') this.winnerShot(r.winner);
       const label = r.winner === 'draw' ? 'MATCH NUL !' : `VICTOIRE DES ${TEAM_COLORS[r.winner].label} !`;
       this.banner(label, r.winner === 'draw' ? '#ffffff' : TEAM_COLORS[r.winner].main, 2200);
-      // L'empereur annonce la roulette ; roulement de tambour jusqu'au rideau.
-      this.show.victory(r.winner, () => sound.drumroll(Math.max(0.5, cfg.finale - 1.2 - cfg.rouletteCall)));
+      this.show.victory(r.winner);
       if (r.winner !== 'draw') this.celebrate(r.winner);
       this.finalGag();
     });
@@ -1303,7 +1297,7 @@ export class ArenaScene extends Phaser.Scene {
     if (!mvp.hero) return;
     const text = this.add.text(sprite.x, sprite.y, cfg.label, textStyle(TEXT.S, '#ffe14a')).setOrigin(0.5, 1).setDepth(9870).setScale(0.2);
     this.tweens.add({ targets: text, scale: 1, duration: 220, ease: 'Back.easeOut' });
-    this.mvpLabel = { text, sprite };
+    this.mvpLabel = { text, index: mvp.index };
   }
 
   /** Confettis de la victoire, fond d'ambiance, barre de force : avancés au rythme de la simulation. */
@@ -1385,7 +1379,7 @@ export class ArenaScene extends Phaser.Scene {
   private emperorFall(): void {
     if (!this.eggs.take('emperorFall')) return;
     this.show.emperorTumble(manifest.staging.easterEggs.emperorFall.line);
-    const emperor = this.children.list.find((o): o is Phaser.GameObjects.Image => o instanceof Phaser.GameObjects.Image && o.texture.key === 'emperor');
+    const emperor = this.children.list.find((o): o is Phaser.GameObjects.Image => o instanceof Phaser.GameObjects.Image && (o.texture.key === 'emperor' || o.texture.key === 'art_king'));
     // Cadré un peu sous lui : la bulle « MON TRÔNE ! » au-dessus reste dans l'image.
     if (emperor) this.director.cutaway(() => ({ x: emperor.x, y: emperor.y - 20 }), this.battle.time, 1.3, 1.5);
   }
@@ -1434,8 +1428,10 @@ export class ArenaScene extends Phaser.Scene {
     const g = this.gagSpectator;
     if (g && this.gagHat) this.gagHat.img.setPosition(g.sprite.x, g.sprite.y - this.gagHat.dy).setAngle(g.sprite.angle).setVisible(g.sprite.visible);
     if (this.mvpLabel) {
-      const { text, sprite } = this.mvpLabel;
-      text.setPosition(sprite.x, sprite.y - sprite.displayHeight * 0.8 - 62);
+      const { text, index } = this.mvpLabel;
+      const body = this.bodyRect(index);
+      // Au-dessus du nom et de la barre de vie du héros.
+      text.setPosition((body.left + body.right) / 2, body.top - 46);
     }
   }
 
@@ -1518,7 +1514,8 @@ export class ArenaScene extends Phaser.Scene {
       else if (!busy) {
         // 8 directions : on regarde où l'on va, sinon sa cible, sinon son camp d'en face.
         const t = u.target >= 0 ? units[u.target] : undefined;
-        if (moving) v.dir = directionOf(u.vx, u.vy);
+        if (this.ending && !moving) v.dir = this.battle.result?.winner === u.team ? 0 : v.dir;
+        else if (moving) v.dir = directionOf(u.vx, u.vy);
         else if (t && t.state !== 'dead') v.dir = directionOf(t.x - u.x, t.y - u.y);
         else v.dir = directionOf(u.facing, 0);
       }
@@ -1527,8 +1524,14 @@ export class ArenaScene extends Phaser.Scene {
       const anim = moving && this.anims.exists(walk) ? walk : animKey(v, 'idle');
       if (!busy && v.sprite.anims.currentAnim?.key !== anim && this.anims.exists(anim)) v.sprite.play(anim);
       const celebrating = this.ending && this.battle.result?.winner === u.team;
-      const hop = moving || celebrating ? Math.abs(Math.sin(this.time.now / (u.state === 'flee' || celebrating ? 50 : 90) + i)) * (celebrating ? 0.2 : 0.08) : 0;
-      v.sprite.setScale(v.baseScale * (2 - v.squash) * (1 - hop * 0.5), v.baseScale * v.squash * (1 + hop));
+      if (v.dir !== undefined) {
+        // 8 directions : l'animation fait la marche ; les vainqueurs sautent sur place, sans se déformer.
+        v.sprite.setScale(v.baseScale * (2 - v.squash), v.baseScale * v.squash);
+        if (celebrating) v.sprite.y -= Math.round(Math.abs(Math.sin(this.time.now / 160 + i * 0.7)) * 3) * SCALE;
+      } else {
+        const hop = moving || celebrating ? Math.abs(Math.sin(this.time.now / (u.state === 'flee' || celebrating ? 50 : 90) + i)) * (celebrating ? 0.2 : 0.08) : 0;
+        v.sprite.setScale(v.baseScale * (2 - v.squash) * (1 - hop * 0.5), v.baseScale * v.squash * (1 + hop));
+      }
       if (v.whirlUntil > this.time.now) v.sprite.setAngle(((v.whirlUntil - this.time.now) * 1.6) % 360);
       else if (u.gag === 'dance') v.sprite.setAngle(Math.sin(this.time.now / 90) * 22);
       else if (u.stunTimer > 0) v.sprite.setAngle(Math.sin(this.time.now / 40) * 14);
@@ -1727,9 +1730,4 @@ export class ArenaScene extends Phaser.Scene {
     const t = Math.floor(this.battle.time);
     this.hud.clock.setText(`${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}${this.paused ? ' II' : ''}`);
   }
-}
-
-export function nextSeed(seed: string): string {
-  const n = Number(seed);
-  return Number.isFinite(n) ? String(n + 1) : `${seed}-2`;
 }

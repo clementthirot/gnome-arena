@@ -118,18 +118,25 @@ export class Show {
     private readonly heroes: readonly HeroDef[],
     private readonly hooks: ShowHooks,
   ) {
-    if (!scene.textures.exists('emperor')) scene.textures.addCanvas('emperor', emperorCanvas());
     const f = battle.field;
-    this.emperorPos = { x: f.x + f.width / 2, y: f.y - 6 };
-    this.emperor = scene.add.image(this.emperorPos.x * scale, this.emperorPos.y * scale, 'emperor').setScale(scale).setOrigin(0.5, 1).setDepth(-300);
+    // Roi PixelLab assis devant son trône (il peut en tomber) ; sinon l'empereur en pixel art ASCII.
+    const art = scene.textures.exists('art_king') && scene.textures.exists('art_throne');
+    this.emperorPos = { x: f.x + f.width / 2, y: art ? f.y - 10 : f.y - 6 };
+    if (art) {
+      scene.add.image(this.emperorPos.x * scale, (f.y - 2) * scale, 'art_throne').setScale(scale).setOrigin(0.5, 1).setDepth(-301);
+      this.emperor = scene.add.image(this.emperorPos.x * scale, this.emperorPos.y * scale, 'art_king').setScale(scale * 0.75).setOrigin(0.5, 1).setDepth(-300);
+    } else {
+      if (!scene.textures.exists('emperor')) scene.textures.addCanvas('emperor', emperorCanvas());
+      this.emperor = scene.add.image(this.emperorPos.x * scale, this.emperorPos.y * scale, 'emperor').setScale(scale).setOrigin(0.5, 1).setDepth(-300);
+    }
     // Dais de la loge.
-    scene.add.rectangle(this.emperorPos.x * scale, (this.emperorPos.y + 1) * scale, 22 * scale, 3 * scale, 0xa02030).setDepth(-301);
+    scene.add.rectangle(this.emperorPos.x * scale, (f.y - 5) * scale, 22 * scale, 3 * scale, 0xa02030).setDepth(-302);
   }
 
   /** Zone de la loge, que les spectateurs ordinaires laissent libre. */
   static logeContains(field: { x: number; y: number; width: number }, x: number, y: number): boolean {
     const cx = field.x + field.width / 2;
-    return Math.abs(x - cx) < 15 && y > field.y - 28 && y < field.y;
+    return Math.abs(x - cx) < 18 && y > field.y - 36 && y < field.y;
   }
 
   private bubble(text: string, follow: () => { x: number; y: number }, holdMs: number, color = '#141420', below = false, emperor = false): void {
@@ -321,16 +328,9 @@ export class Show {
     this.trailedBy = Math.max(this.trailedBy, gap);
   }
 
-  /** Fin : pouce levé vers le vainqueur, puis la roulette des upgrades. */
-  victory(winner: TeamId | 'draw', onRoulette?: () => void): void {
-    if (winner === 'draw') {
-      this.emperorSays(this.cfg.lines.draw, 1800, 'down');
-      return;
-    }
-    this.emperorSays(this.cfg.lines.victory.replace('{team}', TEAM_COLORS[winner].label), 1700, 'up');
-    this.hooks.later(this.cfg.rouletteCall, () => {
-      this.emperorSays(this.cfg.lines.roulette, 1800, 'raise');
-      onRoulette?.();
-    });
+  /** Fin : pouce levé vers le vainqueur (ou baissé sur un nul). */
+  victory(winner: TeamId | 'draw'): void {
+    if (winner === 'draw') this.emperorSays(this.cfg.lines.draw, 1800, 'down');
+    else this.emperorSays(this.cfg.lines.victory.replace('{team}', TEAM_COLORS[winner].label), 1700, 'up');
   }
 }

@@ -29,12 +29,13 @@ npm run sprites      # vérifie les sprite sheets de public/sprites
 | `?biome=neige` | biome de l'arène : `sable`, `foret`, `neige` (glissante), `volcan` |
 | `?up=bob:magic_sword+grenades,snik:laser_goggles` | équipe des héros à la main (essais) |
 | `?speed=4` | affichage accéléré |
+| `?theme=noel` | thème visuel (mêmes règles, autres assets) : voir docs/sprites.md, « Thèmes » |
 | `?prev=kevin:laser_goggles:120,340,95` | simule le vote de l'épisode précédent (héros, upgrade gagnante, voix) pour voir la révélation d'ouverture sans arc |
 | `?safe=1` | dessine les zones couvertes par l'interface TikTok / Reels / Shorts (voir `src/render/safeZone.ts`) |
 | `?eggs=1` | force les easter eggs (public qui explose, ola, empereur qui tombe…) pour les vérifier |
 | `?mode=bench&runs=100&from=1` | mode accéléré dans un Web Worker, avec liens « voir » et « enregistrer » vers les meilleures seeds |
 
-Pendant un combat : `Espace` pause, `1` `2` `4` `8` vitesse, `R` rejouer, `N` seed suivante, `M` couper le son
+Pendant un combat : `Espace` pause, `1` `2` `4` `8` vitesse, `M` couper le son
 (le son démarre au premier clic ou à la première touche, règle des navigateurs).
 Pendant un enregistrement, garder l'onglet visible : un onglet caché n'affiche plus d'images.
 

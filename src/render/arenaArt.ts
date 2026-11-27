@@ -11,8 +11,11 @@ function decorRandom(seed: number) {
   };
 }
 
-/** groundTile : tuile PixelLab facultative (manifeste art.grounds) répétée sur le terrain à la place des mouchetures. */
-export function drawArenaBackground(width: number, height: number, field: FieldRect, biome: BiomeDef, groundTile?: CanvasImageSource): HTMLCanvasElement {
+/**
+ * groundTile : tuile PixelLab facultative (manifeste art.grounds) répétée sur le terrain à la place des mouchetures.
+ * standsTile : texture PixelLab des gradins (art.stands), teintée à la couleur des gradins du biome.
+ */
+export function drawArenaBackground(width: number, height: number, field: FieldRect, biome: BiomeDef, groundTile?: CanvasImageSource, standsTile?: CanvasImageSource): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -28,6 +31,16 @@ export function drawArenaBackground(width: number, height: number, field: FieldR
     ctx.fillRect(0, y, width, 8);
     ctx.fillStyle = p.standsLine;
     ctx.fillRect(0, y + 8, width, 1);
+  }
+  const stands = standsTile && ctx.createPattern(standsTile, 'repeat');
+  if (stands) {
+    // La pierre garde son relief (luminosité) et prend la teinte des gradins du biome.
+    ctx.fillStyle = p.stands[0];
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalCompositeOperation = 'luminosity';
+    ctx.fillStyle = stands;
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   // Muret autour du terrain.

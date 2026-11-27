@@ -10,6 +10,7 @@
 //   ?draft=<json>       réglages d'arc en brouillon, pour un épisode pas encore figé (aperçu de la régie)
 //   ?vote=kevin:laser_goggles,magic_sword,grenades   carte de vote en brouillon (aperçu de la régie)
 //   ?prev=kevin:laser_goggles:120,340,95   vote précédent à révéler en ouverture (essais ; voix facultatives)
+//   ?theme=noel         thème visuel (src/render/themes/noel.json) : mêmes règles, autres assets
 import '@fontsource/press-start-2p';
 import Phaser from 'phaser';
 import { startRecording } from './capture/recorder';
@@ -22,6 +23,7 @@ import { ArenaScene } from './render/scenes/ArenaScene';
 import { BootScene } from './render/scenes/BootScene';
 import { ResultScene } from './render/scenes/ResultScene';
 import { startBenchPage } from './tools/benchPage';
+import { theme } from './render/themes';
 
 const params = new URLSearchParams(location.search);
 // En production, les arcs sont embarqués ; en développement, la régie les sert à jour (sans recharger la page).
@@ -39,6 +41,7 @@ async function loadArc(id: string): Promise<unknown> {
 }
 
 async function main() {
+  if (theme.name) document.title = theme.name;
   await document.fonts.load('16px "Press Start 2P"');
   if (params.get('mode') === 'bench') {
     startBenchPage(document.getElementById('game')!, params);

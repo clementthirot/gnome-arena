@@ -46,7 +46,7 @@ export const OPENING_FRAME = 'opening_frame';
 const REGISTRY_TITLE = 'openingTitle';
 
 /** Centre horizontal de la zone sûre du texte. */
-const CX = SAFE.text.x + SAFE.text.w / 2;
+const CX = SAFE.centered.x + SAFE.centered.w / 2;
 /** Voile sur l'arène pendant le titre. */
 const VEIL_ALPHA = 0.6;
 
@@ -67,14 +67,14 @@ export function drawOpeningTitle(scene: Phaser.Scene, title: OpeningTitle, depth
   const items: Phaser.GameObjects.GameObject[] = [scene.add.rectangle(0, 0, w, h, 0x000000, VEIL_ALPHA).setOrigin(0).setDepth(depth)];
   if (title.episode) items.push(scene.add.text(CX, 310, title.episode, textStyle(88, '#ffe14a')).setOrigin(0.5).setDepth(depth + 1));
   if (title.hook) {
-    items.push(scene.add.text(CX, 450, title.hook, textStyle(40, '#ffffff', { wordWrap: { width: SAFE.text.w - 40 }, lineSpacing: 14 })).setOrigin(0.5).setDepth(depth + 1));
+    items.push(scene.add.text(CX, 450, title.hook, textStyle(40, '#ffffff', { wordWrap: { width: SAFE.centered.w - 40 }, lineSpacing: 14 })).setOrigin(0.5).setDepth(depth + 1));
   }
   if (title.stack) {
     const [a, vs, b] = title.stack;
     // Logo PixelLab (manifeste art.title) à la place du texte, effectifs en dessous ; sinon repli texte.
     if (scene.textures.exists('art_title')) {
       const logo = scene.add.image(CX, 680, 'art_title').setDepth(depth + 1);
-      logo.setScale(Math.floor((SAFE.text.w * 0.8) / logo.width) || 1);
+      logo.setScale(Math.floor((SAFE.centered.w * 0.9) / logo.width) || 1);
       const [na, nb] = [a, b].map((s) => /\d+/.exec(s)?.[0]);
       if (na && nb) items.push(scene.add.text(CX, 680 + logo.displayHeight / 2 + 50, `${na}  contre  ${nb}`, textStyle(44)).setOrigin(0.5).setDepth(depth + 1));
       items.push(logo);
@@ -140,7 +140,7 @@ export function playOpening(ctx: OpeningContext): void {
   // Rouleau : défile sur les options de l'épisode précédent et s'arrête sur la gagnante.
   const pool = vote.options.flatMap((o) => accessoryTexture(scene, o.visual) ?? []);
   const target = accessoryTexture(scene, vote.eq.visual) ?? pool[0];
-  const reel = spinReel(scene, { x: CX, y: 830, size: 240, depth: d, pool, target, delay: T.reel + 150, spins: 13, firstStep: 40, stepGrowth: 9 });
+  const reel = spinReel(scene, { x: CX, y: 830, size: 300, depth: d, pool, target, delay: T.reel + 150, spins: 13, firstStep: 40, stepGrowth: 9 });
   reel.container.setScale(0);
   scene.tweens.add({ targets: reel.container, scale: 1, duration: 260, delay: T.reel, ease: 'Back.easeOut' });
   // Le rouleau apparaît, puis défile 150 ms plus tard ; stopsAt compte depuis la première image.
@@ -154,7 +154,7 @@ export function playOpening(ctx: OpeningContext): void {
     // x borné pour que le cadre reste dans le monde (pas de bord noir à droite).
     const half = scene.scale.width / (2 * FRAME_ZOOM);
     if (s && ctx.frame) ctx.frame(() => ({ x: Phaser.Math.Clamp(s.x, half, scene.scale.width - half), y: s.y - s.displayHeight * 0.4 }), FRAME_ZOOM);
-    const label = scene.add.text(CX, 1030, vote.eq.label.toUpperCase(), textStyle(52, '#ffe14a', { wordWrap: { width: SAFE.text.w - 40 } })).setOrigin(0.5).setDepth(d);
+    const label = scene.add.text(CX, 1030, vote.eq.label.toUpperCase(), textStyle(52, '#ffe14a', { wordWrap: { width: SAFE.centered.w - 40 } })).setOrigin(0.5).setDepth(d);
     label.setScale(0.3);
     scene.tweens.add({ targets: label, scale: 1, duration: 220, ease: 'Back.easeOut' });
     after.push(label);
@@ -166,7 +166,7 @@ export function playOpening(ctx: OpeningContext): void {
   });
   scene.time.delayedCall(stopAt + T.gets, () => {
     hint.setText(fill(cfg.gets, { hero: vote.name, upgrade: vote.eq.label.toUpperCase() }));
-    hint.setStyle(textStyle(44, TEAM_COLORS[vote.pv.team].main, { wordWrap: { width: SAFE.text.w - 40 }, lineSpacing: 10 }));
+    hint.setStyle(textStyle(44, TEAM_COLORS[vote.pv.team].main, { wordWrap: { width: SAFE.centered.w - 40 }, lineSpacing: 10 }));
     scene.tweens.add({ targets: hint, scale: { from: 1.25, to: 1 }, duration: 200, ease: 'Back.easeOut' });
   });
 

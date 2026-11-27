@@ -58,6 +58,9 @@ function previewUrl(t: PreviewTarget): string {
   if (t.draft) q.set('draft', JSON.stringify(t.draft));
   if (t.vote) q.set('vote', `${t.vote.recipient}:${t.vote.options.join(',')}`);
   q.set('intro', '0');
+  // La régie ouverte avec ?theme=noel prévisualise dans ce thème.
+  const theme = new URLSearchParams(location.search).get('theme');
+  if (theme) q.set('theme', theme);
   return `./?${q}`;
 }
 

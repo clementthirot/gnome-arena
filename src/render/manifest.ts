@@ -2,6 +2,7 @@
 // Le moteur ne connaît que les clés ; seul le rendu sait à quoi elles ressemblent.
 import { z } from 'zod';
 import raw from './assets.manifest.json';
+import { overlay, theme } from './themes';
 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
@@ -367,7 +368,7 @@ const StagingSchema = z.object({
 });
 export type Staging = z.infer<typeof StagingSchema>;
 
-const ManifestSchema = z.object({
+export const ManifestSchema = z.object({
   defaults: z.object({ bricks: BricksSchema }),
   assets: z.record(z.string(), z.discriminatedUnion('type', [PlaceholderSchema, SpriteSheetSchema])),
   accessories: z.record(z.string(), AccessorySchema),
@@ -381,6 +382,26 @@ const ManifestSchema = z.object({
       title: z.string().optional(),
       /** Tuile de sol répétée sur le terrain, par id de biome. */
       grounds: z.record(z.string(), z.string()).default({}),
+      /** Texture des gradins, répétée et teintée aux couleurs du biome (sinon rangées dessinées). */
+      stands: z.string().optional(),
+      /** Roi et son trône dans la loge (sinon l'empereur en pixel art ASCII). */
+      king: z.string().optional(),
+      throne: z.string().optional(),
+      /**
+       * Écran de fin : motif de fond qui défile en diagonale, cadre des cartes de vote et plaque du titre
+       * (agrandis en 9-slice), couronne posée sur la plaque. Sans fichier, fond rayé et rectangles.
+       */
+      menu: z
+        .object({
+          pattern: z.string().optional(),
+          card: z.string().optional(),
+          plaque: z.string().optional(),
+          crown: z.string().optional(),
+          /** Défilement du motif, en px écran par seconde (vers le bas à droite). */
+          scroll: z.number().default(40),
+          patternAlpha: z.number().min(0).max(1).default(0.6),
+        })
+        .default({}),
     })
     .default({}),
 });
@@ -393,7 +414,8 @@ export type SpriteSheetAsset = z.infer<typeof SpriteSheetSchema>;
 export type AssetEntry = PlaceholderAsset | SpriteSheetAsset;
 export type Manifest = z.infer<typeof ManifestSchema>;
 
-export const manifest: Manifest = ManifestSchema.parse(raw);
+/** Manifeste de base, avec le thème choisi (?theme=…) superposé. */
+export const manifest: Manifest = ManifestSchema.parse(overlay(raw, theme.manifest));
 
 /** Une sheet qui n'a pas chargé retombe sur sa silhouette de secours. */
 export function asPlaceholder(entry: SpriteSheetAsset): PlaceholderAsset | undefined {

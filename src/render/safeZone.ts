@@ -16,6 +16,8 @@ export const SAFE = {
   left: 40,
   /** Rectangle garanti pour le texte important. */
   text: { x: 40, y: 220, w: 900, h: 1020 },
+  /** Bande centrée sur l'écran (x 540) qui évite aussi le rail de droite : titres et cartes centrés. */
+  centered: { x: 140, w: 800 },
   /** Rectangle où l'action reste visible. */
   action: { x: 40, y: 220, w: 900, bottom: 1500 },
   /** Centre visuel de la zone utile (et non le milieu du canvas). */

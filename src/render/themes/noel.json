@@ -1,0 +1,15 @@
+{
+  "$comment": "Thème de Noël (?theme=noel) : mêmes règles, autres assets. Seul ce qui change est listé ; le reste vient de assets.manifest.json. Sprites du thème dans public/sprites/themes/noel/ (npm run sprites -- pixellab <dossier> <clés…> --theme=noel les ajoute ici).",
+  "name": "Lutins vs Krampus",
+  "teams": {
+    "gnomes": { "label": "LUTINS", "main": "#ff6b6b", "bar": "#d83b3b" },
+    "goblins": { "label": "KRAMPUS", "main": "#b48cff", "bar": "#8a5cd8" }
+  },
+  "manifest": {
+    "staging": {
+      "reveal": {
+        "hookFirst": "{gnomes} LUTINS vs {goblins} KRAMPUS"
+      }
+    }
+  }
+}

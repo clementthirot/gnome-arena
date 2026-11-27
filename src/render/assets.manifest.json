@@ -1582,6 +1582,17 @@
       "foret": "sprites/arena/ground_foret.png",
       "neige": "sprites/arena/ground_neige.png",
       "volcan": "sprites/arena/ground_volcan.png"
+    },
+    "stands": "sprites/arena/stands.png",
+    "king": "sprites/arena/king.png",
+    "throne": "sprites/arena/throne.png",
+    "menu": {
+      "pattern": "sprites/ui/pattern.png",
+      "card": "sprites/ui/card.png",
+      "plaque": "sprites/ui/plaque.png",
+      "crown": "sprites/ui/plaque_crown.png",
+      "scroll": 40,
+      "patternAlpha": 0.6
     }
   },
   "upgradeFx": {
@@ -1914,7 +1925,8 @@
       "slot": {
         "frame": "#c8902a",
         "window": "#14101c",
-        "light": "#ffe14a"
+        "light": "#ffe14a",
+        "url": "sprites/ui/slot_frame.png"
       },
       "confetti": [
         "#ffe14a",

@@ -2,16 +2,17 @@
 //   0 - 2,5 s  « VICTOIRE DES GNOMES » (ou « MATCH NUL ») et le MVP ;
 //   2,5 s - …  la carte de vote seule : héros bénéficiaire, « VOTE 1, 2 OU 3 », 3 cartes à rouleaux ;
 //   fin        fondu vers la première image de la vidéo (même fond, même titre) : elle boucle.
-// En mode enregistrement, pas de boutons : la fin du fondu clôt la vidéo.
+// Pas de boutons : rejouer ou changer de seed se fait depuis la régie. En enregistrement, la fin du fondu clôt la vidéo.
 import Phaser from 'phaser';
 import type { TeamId } from '../../data/schema';
 import { openCurtain } from '../curtain';
+import { FRAME_INSET, FRAME_SCALE, goldFrame, hasGoldFrame } from '../frame';
 import { manifest } from '../manifest';
 import { drawOpeningTitle, fill, lastOpeningTitle, OPENING_FRAME } from '../reveal';
 import { SAFE } from '../safeZone';
 import { accessoryReel, accessoryTexture, fitIcon, spinReel } from '../slotMachine';
 import { TEAM_COLORS, textStyle } from '../text';
-import { nextSeed, type ArenaParams } from './ArenaScene';
+import type { ArenaParams } from './ArenaScene';
 
 export interface ResultData {
   params: ArenaParams;
@@ -36,7 +37,7 @@ const VERDICT_MS = 2500;
 /** Durée du fondu de boucle vers la première image (ms). */
 const LOOP_FADE_MS = 700;
 
-const CX = SAFE.text.x + SAFE.text.w / 2;
+const CX = SAFE.centered.x + SAFE.centered.w / 2;
 
 /** Coupe après le trait d'union un mot trop long pour la carte (« Lance-poulet » → « Lance- / poulet »). */
 function breakLong(label: string, maxChars: number): string {
@@ -54,17 +55,32 @@ function hash01(n: number): number {
 type Vote = NonNullable<NonNullable<ArenaParams['episode']>['vote']>;
 
 export class ResultScene extends Phaser.Scene {
+  private pattern?: Phaser.GameObjects.TileSprite;
+
   constructor() {
     super('result');
+  }
+
+  update(): void {
+    // Motif du fond qui glisse en diagonale, en boucle, calé sur l'horloge comme le rideau de la roulette.
+    if (!this.pattern) return;
+    const off = ((performance.now() / 1000) * manifest.art.menu.scroll) / this.pattern.tileScaleX;
+    this.pattern.setTilePosition(-off, -off);
   }
 
   create(r: ResultData): void {
     const { width: w, height: h } = this.scale;
     // Match nul : pas de camp perdant pour recevoir l'upgrade, le vote est reporté (pas de carte).
     const vote = r.winner === 'draw' ? undefined : r.params.episode?.vote;
-    this.add.rectangle(0, 0, w, h, 0x1c1826).setOrigin(0);
-    // Bandes de pixels en fond, pour rester dans la DA.
-    for (let y = 0; y < h; y += 36) this.add.rectangle(0, y, w, 32, y % 72 ? 0x241f31 : 0x211c2d).setOrigin(0);
+    this.add.rectangle(0, 0, w, h, 0x1c1826).setOrigin(0).setDepth(-20);
+    this.pattern = undefined;
+    if (this.textures.exists('ui_pattern')) {
+      // Motif PixelLab répété, pixels x4 comme l'arène, qui défile en diagonale.
+      this.pattern = this.add.tileSprite(0, 0, w, h, 'ui_pattern').setOrigin(0).setTileScale(4).setAlpha(manifest.art.menu.patternAlpha).setDepth(-19);
+    } else {
+      // Bandes de pixels en fond, pour rester dans la DA.
+      for (let y = 0; y < h; y += 36) this.add.rectangle(0, y, w, 32, y % 72 ? 0x241f31 : 0x211c2d).setOrigin(0).setDepth(-19);
+    }
 
     const verdict = this.verdict(r, !vote);
     if (vote) {
@@ -78,30 +94,7 @@ export class ResultScene extends Phaser.Scene {
     const hold = vote ? RESULT_HOLD_MS : RESULT_HOLD_NO_VOTE_MS;
     this.time.delayedCall(hold - LOOP_FADE_MS, () => this.loopToFirstFrame());
 
-    if (r.params.record) {
-      this.time.delayedCall(hold, () => this.game.events.emit('episode-finished'));
-      return;
-    }
-    // Hors vidéo : commandes, masquées pendant le fondu de boucle puis rendues une fois la boucle bouclée.
-    const controls: Phaser.GameObjects.GameObject[] = [];
-    controls.push(...this.button(w / 2 - 220, h - 200, 'REJOUER', () => this.scene.start('arena', r.params)));
-    // Une autre seed n'est plus l'épisode : on retire son numéro et son vote.
-    const next = () => this.scene.start('arena', { ...r.params, seed: nextSeed(r.params.seed), episode: undefined });
-    controls.push(...this.button(w / 2 + 220, h - 200, 'SUIVANT', next));
-    controls.push(this.add.text(w / 2, h - 90, `seed ${r.params.seed} · R rejouer · N suivante`, textStyle(26, '#a098b0')).setOrigin(0.5).setDepth(6000));
-    this.time.delayedCall(hold - LOOP_FADE_MS - 150, () => this.tweens.add({ targets: controls, alpha: 0, duration: 150 }));
-    // Après la boucle, la 1re image reste nette un moment (capture d'écran possible) : commandes rendues
-    // au bout de 3 s, ou tout de suite au premier clic.
-    let shown = false;
-    const showControls = () => {
-      if (shown) return;
-      shown = true;
-      this.tweens.add({ targets: controls, alpha: 1, duration: 250 });
-    };
-    this.time.delayedCall(hold + 3000, showControls);
-    this.time.delayedCall(hold, () => this.input.once('pointerdown', showControls));
-    this.input.keyboard?.on('keydown-R', () => this.scene.start('arena', r.params));
-    this.input.keyboard?.on('keydown-N', next);
+    if (r.params.record) this.time.delayedCall(hold, () => this.game.events.emit('episode-finished'));
   }
 
   /** Premier temps : vainqueur (ou match nul) et MVP. */
@@ -113,7 +106,9 @@ export class ResultScene extends Phaser.Scene {
     const draw = r.winner === 'draw';
     const title = draw ? cfg.draw : fill(cfg.victory, { team: TEAM_COLORS[r.winner as TeamId].label });
     const color = draw ? '#ffffff' : TEAM_COLORS[r.winner as TeamId].main;
-    const big = this.add.text(CX, 525, title, textStyle(draw ? 96 : 80, color, { wordWrap: { width: SAFE.text.w - 20 }, lineSpacing: 24, align: 'center' })).setOrigin(0.5).setScale(0.3);
+    // Le titre tient dans la plaque (bords dorés compris) quand elle est là.
+    const plaqueArt = hasGoldFrame(this);
+    const big = this.add.text(CX, 525, title, textStyle(draw ? 96 : 80, color, { wordWrap: { width: SAFE.centered.w - (plaqueArt ? 150 : 20) }, lineSpacing: 24, align: 'center' })).setOrigin(0.5).setScale(0.3);
     // Titre long (« VICTOIRE DES GOBELINS ») : on réduit la police jusqu'à tenir sur deux lignes,
     // au-dessus du MVP (et du « vote reporté » en cas de nul).
     const maxH = draw && postponed && ep ? 180 : 300;
@@ -122,10 +117,10 @@ export class ResultScene extends Phaser.Scene {
       big.setFontSize(size);
     }
     this.tweens.add({ targets: big, scale: 1, duration: 400, ease: 'Back.easeOut' });
-    items.push(big);
+    items.push(...this.plaque(525, big.height + 110), big);
     // Égalité d'épisode sans vote : la série continue, le vote est reporté.
     if (draw && postponed && ep) {
-      const p = this.add.text(CX, 630, cfg.postponed, textStyle(40, '#ffe14a', { wordWrap: { width: SAFE.text.w - 40 } })).setOrigin(0.5).setAlpha(0);
+      const p = this.add.text(CX, 630, cfg.postponed, textStyle(40, '#ffe14a', { wordWrap: { width: SAFE.centered.w - 40 } })).setOrigin(0.5).setAlpha(0);
       this.tweens.add({ targets: p, alpha: 1, duration: 250, delay: 500 });
       items.push(p);
     }
@@ -154,44 +149,73 @@ export class ResultScene extends Phaser.Scene {
   private voteCard(vote: Vote): void {
     const cfg = manifest.staging.reveal;
     const head: Phaser.GameObjects.GameObject[] = [];
-    const name = this.add.text(CX, 330, vote.recipient.toUpperCase(), textStyle(64, TEAM_COLORS[vote.team].main)).setOrigin(0.5);
+    const name = this.add.text(CX, 348, vote.recipient.toUpperCase(), textStyle(64, TEAM_COLORS[vote.team].main)).setOrigin(0.5);
     head.push(name);
-    // Portrait du héros bénéficiaire, à gauche de son nom.
+    // Portrait du héros bénéficiaire, à gauche de son nom : le groupe portrait + nom est centré.
     if (this.textures.exists(vote.portrait)) {
-      const portrait = this.add.image(CX - name.width / 2 - 70, 320, vote.portrait, 0);
-      fitIcon(portrait, 120);
+      const size = 110;
+      const gap = 20;
+      const left = CX - (size + gap + name.width) / 2;
+      const portrait = this.add.image(left + size / 2, 342, vote.portrait, 0);
+      fitIcon(portrait, size);
+      name.setX(left + size + gap + name.width / 2);
       head.push(portrait);
     }
-    head.push(this.add.text(CX, 420, fill(cfg.voteFor, { hero: vote.recipient.toUpperCase() }), textStyle(30, '#ffffff', { wordWrap: { width: SAFE.text.w - 40 } })).setOrigin(0.5));
-    head.push(this.add.text(CX, 525, cfg.voteCall, textStyle(42, '#ffe14a', { wordWrap: { width: SAFE.text.w - 40 }, lineSpacing: 18 })).setOrigin(0.5));
+    head.push(this.fitWidth(this.add.text(CX, 428, fill(cfg.voteFor, { hero: vote.recipient.toUpperCase() }), textStyle(24, '#ffffff')).setOrigin(0.5), SAFE.centered.w - 2 * FRAME_INSET.x - 40));
+    head.push(this.add.text(CX, 530, cfg.voteCall, textStyle(42, '#ffe14a', { wordWrap: { width: SAFE.centered.w - 2 * FRAME_INSET.x - 40 }, lineSpacing: 18, align: 'center' })).setOrigin(0.5));
+    // Cadre 250 → 630 : portrait et nom, invitation, appel au vote, même marge en haut et en bas.
+    head.push(...this.plaque(440, 380));
     head.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0));
     this.tweens.add({ targets: head, alpha: 1, duration: 250, delay: this.tweens.stagger(120, { start: 100 }) });
 
-    // Trois cartes côte à côte entre x 40 et 940, y 640 et 1225 : chiffre, rouleau, libellé.
+    // Trois cartes côte à côte sur la bande centrée, y 650 à 1170 : chiffre, rouleau, libellé,
+    // répartis avec la même marge intérieure en haut et en bas.
     const reel = accessoryReel(this);
     const n = vote.options.length;
     const gap = 12;
-    const cardW = (SAFE.text.w - gap * (n - 1)) / n;
-    const top = 640;
-    const cardH = 585;
+    const cardW = (SAFE.centered.w - gap * (n - 1)) / n;
+    const top = 650;
+    const cardH = 520;
+    const inner = cardW - 2 * FRAME_INSET.x;
+    const labelSize = 26;
     vote.options.forEach((o, i) => {
-      const x = SAFE.text.x + cardW / 2 + i * (cardW + gap);
+      const x = SAFE.centered.x + cardW / 2 + i * (cardW + gap);
       const y = top + cardH / 2;
       const card = this.add.container(x, y).setScale(0);
-      card.add(this.add.rectangle(0, 0, cardW, cardH, 0x3d3555).setStrokeStyle(6, 0x000000));
-      card.add(this.add.text(0, -200, String(i + 1), textStyle(120, '#ffe14a')).setOrigin(0.5));
-      card.add(this.add.text(0, 215, breakLong(o.label, Math.floor((cardW - 12) / 30)), textStyle(30, '#ffffff', { wordWrap: { width: cardW - 12 }, lineSpacing: 10 })).setOrigin(0.5));
+      card.add(goldFrame(this, 0, 0, cardW, cardH) ?? this.add.rectangle(0, 0, cardW, cardH, 0x3d3555).setStrokeStyle(6, 0x000000));
+      card.add(this.add.text(0, -150, String(i + 1), textStyle(100, '#ffe14a')).setOrigin(0.5));
+      // Retour à la ligne entre les mots seulement (jamais au milieu d'un mot), puis réduit s'il déborde encore.
+      const label = this.add.text(0, 150, o.label, textStyle(labelSize, '#ffffff', { lineSpacing: 8, align: 'center' })).setOrigin(0.5);
+      if (label.width > inner - 16) label.setText(breakLong(o.label, Math.floor(inner / labelSize)).replace(/ /g, '\n'));
+      card.add(this.fitWidth(label, inner - 16));
       const delay = 200 + i * 150;
       this.tweens.add({ targets: card, scale: 1, duration: 320, delay, ease: 'Back.easeOut' });
       const target = accessoryTexture(this, o.visual);
       if (!target) return;
       // Rouleau : les icônes défilent de plus en plus lentement, puis s'arrêtent sur l'option de la carte.
       // Courts et nets : le dernier s'arrête vers 1,4 s, chacun avec un petit coup de tampon.
-      const r = spinReel(this, { x, y: y + 5, size: Math.min(190, cardW - 70), depth: 1, pool: reel, target, delay: delay + 200, spins: 6 + i * 2, firstStep: 35, stepGrowth: 7, offset: i * 2 });
+      const r = spinReel(this, { x, y, size: Math.min(176, inner - 10), depth: 1, pool: reel, target, delay: delay + 200, spins: 6 + i * 2, firstStep: 35, stepGrowth: 7, offset: i * 2 });
       r.container.setScale(0);
       this.tweens.add({ targets: r.container, scale: 1, duration: 320, delay, ease: 'Back.easeOut' });
       this.time.delayedCall(r.stopsAt, () => this.tweens.add({ targets: card, scale: { from: 1.08, to: 1 }, duration: 180, ease: 'Back.easeOut' }));
     });
+  }
+
+  /** Réduit un texte trop large pour tenir dans width px. */
+  private fitWidth(text: Phaser.GameObjects.Text, width: number): Phaser.GameObjects.Text {
+    if (text.width > width) text.setScale(width / text.width);
+    return text;
+  }
+
+  /** Même cadre doré que les cartes, sur toute la bande centrée, couronne au sommet ; rien sans l'image. */
+  private plaque(y: number, height: number): Phaser.GameObjects.GameObject[] {
+    const frame = goldFrame(this, CX, y, SAFE.centered.w, height);
+    if (!frame) return [];
+    const items: Phaser.GameObjects.GameObject[] = [frame.setDepth(-1)];
+    if (this.textures.exists('ui_crown')) items.push(this.add.image(CX, y - height / 2 + 6, 'ui_crown').setOrigin(0.5, 1).setScale(FRAME_SCALE * 1.5).setDepth(-0.5));
+    items.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0));
+    this.tweens.add({ targets: items, alpha: 1, duration: 250 });
+    return items;
   }
 
   /** Fondu vers la première image (photographiée à l'ouverture, sinon redessinée) : la vidéo boucle. */
@@ -201,10 +225,13 @@ export class ResultScene extends Phaser.Scene {
     if (this.textures.exists(OPENING_FRAME)) {
       items.push(this.add.image(0, 0, OPENING_FRAME).setOrigin(0).setDisplaySize(w, h).setDepth(5000));
     } else {
+      // Sans écran d'ouverture (aperçu sans intro), pas de première image à rejoindre : on reste sur la fin
+      // plutôt que de finir sur une arène vide.
+      const title = lastOpeningTitle(this);
+      if (!title) return;
       const bg = this.textures.getTextureKeys().find((k) => k.startsWith('arena_bg_'));
       if (bg) items.push(this.add.image(0, 0, bg).setOrigin(0).setDisplaySize(w, h).setDepth(5000));
-      const title = lastOpeningTitle(this);
-      if (title) items.push(...drawOpeningTitle(this, title, 5001));
+      items.push(...drawOpeningTitle(this, title, 5001));
     }
     items.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0));
     // Le voile du titre garde son opacité de remplissage : l'alpha de l'objet ne fait que la moduler.
@@ -229,12 +256,4 @@ export class ResultScene extends Phaser.Scene {
     }
   }
 
-  private button(x: number, y: number, label: string, onClick: () => void): Phaser.GameObjects.GameObject[] {
-    const bg = this.add.rectangle(x, y, 380, 110, 0x3d6cc4).setStrokeStyle(6, 0x000000).setInteractive({ useHandCursor: true }).setDepth(6000);
-    const text = this.add.text(x, y, label, textStyle(34)).setOrigin(0.5).setDepth(6001);
-    bg.on('pointerover', () => bg.setFillStyle(0x5b8def));
-    bg.on('pointerout', () => bg.setFillStyle(0x3d6cc4));
-    bg.on('pointerup', onClick);
-    return [bg, text];
-  }
 }
