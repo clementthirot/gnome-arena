@@ -128,6 +128,9 @@ const ACCESSORY_ART: Record<string, string[]> = {
   jar: ['.aaa.', 'occco', 'ocwco', 'occco', 'ooooo'],
   chicken: ['..oo...', '.owwoa.', 'owwwwaa', 'owwwwo.', '.oooo..', '..a.a..'],
   pot: ['..oooooo..', '.occccccco.', 'oacccccca.', 'occccccco.', '.oooooooo.'],
+  pie: ['..owwo..', '.owcwco.', 'owcccwco', 'oaaaaaao', '.oooooo.'],
+  umbrella: ['...ooooo...', '.occaccacco.', 'occaccaccaco', 'oooooaooooo', '.....a.....', '.....a.....', '.....a.....', '...o.a.....', '....oo.....'],
+  whistle: ['.oooooo.', 'occccccoo', 'occocccao', '.oooooo.'],
 };
 
 export function accessoryPixels(kind: string, color: string, accent: string): PixelGrid {

@@ -29,9 +29,13 @@ npm run sprites      # vérifie les sprite sheets de public/sprites
 | `?biome=neige` | biome de l'arène : `sable`, `foret`, `neige` (glissante), `volcan` |
 | `?up=bob:magic_sword+grenades,snik:laser_goggles` | équipe des héros à la main (essais) |
 | `?speed=4` | affichage accéléré |
+| `?theme=noel` | thème visuel (mêmes règles, autres assets) : voir docs/sprites.md, « Thèmes » |
+| `?prev=kevin:laser_goggles:120,340,95` | simule le vote de l'épisode précédent (héros, upgrade gagnante, voix) pour voir la révélation d'ouverture sans arc |
+| `?safe=1` | dessine les zones couvertes par l'interface TikTok / Reels / Shorts (voir `src/render/safeZone.ts`) |
+| `?eggs=1` | force les easter eggs (public qui explose, ola, empereur qui tombe…) pour les vérifier |
 | `?mode=bench&runs=100&from=1` | mode accéléré dans un Web Worker, avec liens « voir » et « enregistrer » vers les meilleures seeds |
 
-Pendant un combat : `Espace` pause, `1` `2` `4` `8` vitesse, `R` rejouer, `N` seed suivante, `M` couper le son
+Pendant un combat : `Espace` pause, `1` `2` `4` `8` vitesse, `M` couper le son
 (le son démarre au premier clic ou à la première touche, règle des navigateurs).
 Pendant un enregistrement, garder l'onglet visible : un onglet caché n'affiche plus d'images.
 
@@ -64,9 +68,20 @@ npm run episode -- plan --seed 3047      # 2. fige l'épisode : vainqueur vérif
 # 4. publier, laisser voter en commentaire
 npm run episode -- vote --votes 120,340,95          # 5a. saisir les comptes
 npm run episode -- vote --comments export.txt       # 5b. ou compter un export de commentaires (une voix par auteur)
+npm run episode -- unvote               # annule le dernier vote compté (tant que l'épisode suivant n'est pas figé)
 npm run episode -- status                # état des héros, rapport de force, alerte si l'arc devient prévisible
 npm run episode -- close                 # fin d'arc ; new-arc --id arc2 pour la suite
 ```
+
+Les 3 options sont tirées au sort de façon déterministe (`proposeOptions` dans `src/data/arc.ts`), parmi les upgrades que
+le héros n'a pas encore et qui conviennent à son rôle (`roles` dans `equipment.json`) ; s'il n'en reste que 2, on en propose 2.
+Le héros suggéré est le moins équipé du camp perdant (un héros saturé est exclu). Un vote 0/0/0 est refusé ; à égalité de voix,
+le plus petit numéro gagne. Un match nul ne donne pas d'upgrade : choisir une autre seed.
+
+Dans la vidéo de l'épisode N, l'ouverture révèle le vote de l'épisode N-1 (machine à sous qui s'arrête sur l'upgrade gagnante,
+pourcentage des voix, l'accessoire qui vole jusqu'au héros, étiquette « NOUVEAU »), puis le combat démarre vers 4 s.
+La fin montre le vainqueur et le MVP, puis la carte de vote seule, dans la zone sûre, et se fond dans la première image
+pour boucler. L'ancienne intro longue reste disponible avec `staging.intro: "classic"` dans le manifeste.
 
 Les arcs sont des fichiers JSON dans `src/data/arcs/` : l'état des héros à l'épisode N se reconstruit à
 partir des votes précédents, donc chaque épisode publié reste rejouable à l'identique.

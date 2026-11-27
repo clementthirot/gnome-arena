@@ -251,3 +251,45 @@ Pas encore fait :
 À vérifier de ton côté :
 - Un enregistrement complet de bout en bout (le téléchargement final n'a pas été lancé pendant le développement).
 - La vidéo sort en webm (le mp4 avec son ne fonctionne pas dans Chrome) : à convertir si une plateforme le refuse.
+
+---
+
+## 8. Reprise du 23 novembre 2026 (session autonome)
+
+Équipe d'agents : game design, UI/animation, réalisation, testeur, puis un arbitre qui a tranché les contradictions,
+4 lots d'implémentation en parallèle, une ronde de test sur la version intégrée et une ronde de corrections.
+
+Fait :
+- **Boucle d'upgrade** : options tirées au sort (déterministe) et filtrées par rôle, une seule règle pour la CLI et la régie,
+  héros saturés exclus, vote 0/0/0 refusé, vote annulable (`unvote`), gel de la régie resimulé, un seul arc ouvert à la fois,
+  écritures concurrentes CLI/régie détectées, upgrades en double ou inconnues refusées.
+- **Révélation du vote précédent** en ouverture (machine à sous qui s'arrête sur la gagnante, % des voix, accessoire qui vole
+  jusqu'au héros, « NOUVEAU ») ; combat lancé vers 4 s au lieu de 8,5 s.
+- **Fin en deux temps** (vainqueur + MVP, puis carte de vote seule dans la zone sûre), « MATCH NUL » au lieu de « VICTOIRE ÉGALITÉ »,
+  fondu final qui reboucle sur la première image.
+- **Zone sûre des overlays** (`src/render/safeZone.ts`, `?safe=1`) ; barre de rapport de force verticale à gauche ; caméra
+  centrée sur la zone utile ; textes vidéo ≥ 26 px.
+- **Réalisation** : ralentis avec bandes cinéma sur la chute d'un héros et le dernier K.O., plan du vainqueur, easter eggs rares
+  (public qui explose, ola, empereur qui tombe, spectateur récurrent accessoirisé), mini-boss visible (le héros grossit et
+  porte une couronne à partir de 3 upgrades, rendu seulement).
+- **Rendu déterministe** : particules, confettis, répliques et timings calés sur le temps de simulation.
+- **Nouvelles upgrades** : tarte à la crème, parapluie à foudre, sifflet à supporters ; « BONG ! » de la casserole ;
+  incident « poule géante » (désactivé par défaut pour ne pas changer les seeds existantes).
+- Combat sans upgrade strictement identique au bench (100 seeds) : l'équilibrage n'a pas bougé.
+- **Assets PixelLab** (placeholders, remplaçables par le manifeste) : logo « gnomes vs Gobelins » de l'ouverture et de la
+  boucle de fin, les 9 accessoires d'upgrade, la couronne du mini-boss, un sol par biome, explosion, poussière, éclair et
+  éclaboussure de tarte. 28 générations utilisées ; prompts et seeds dans `docs/sprites.md`.
+- **Rondes de test 2 et 3** sur la version intégrée : bulles de l'empereur, cadrage du héros pendant la révélation,
+  couronne et accessoires sur un héros grossi, easter eggs vérifiables (`?eggs=1`), épilogue sans gaz qui tue les
+  vainqueurs, caméra bornée, carte de vote qui s'arrêtait sur la mauvaise icône.
+
+Questions ouvertes pour Clément :
+- Héros suggéré : le moins équipé (ta règle, gardée) ou le plus équipé non saturé, pour qu'un vrai mini-boss émerge ?
+- Activer la poule géante (change toutes les seeds) ?
+- Que faire quand un héros a toutes les upgrades : fin d'arc, upgrades « niveau 2 », nouvelles upgrades ?
+- Publication automatique et comptage des votes : à décider ensemble. Proposition :
+  1. un script d'enregistrement sans navigateur visible (Playwright + `?record=1`, puis ffmpeg webm → mp4) ;
+  2. un workflow n8n qui publie le mp4 (YouTube Data API pour les Shorts, Instagram Graph API pour les Reels avec un
+     compte pro, TikTok Content Posting API après validation de l'app) avec la légende et le vote 1/2/3 ;
+  3. 24 h après, n8n récupère les commentaires (API YouTube et Instagram ; TikTok plus limité) et les passe à
+     `npm run episode -- vote --comments`, puis prépare l'épisode suivant pour validation.

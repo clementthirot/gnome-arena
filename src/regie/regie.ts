@@ -2,9 +2,23 @@
 // (biome, effectifs, incidents, gags), compter les votes, clore un arc. Les arcs sont lus et
 // écrits par le relais du serveur de dev (vite.config.ts), qui les valide avant d'écrire.
 import { loadGameData } from '../data';
-import { countVotes, killsBefore, parseArc, upgradesBefore, voteWinner, type Arc, type ArcSettings, type Episode } from '../data/arc';
+import {
+  cancelVote,
+  canCancelVote,
+  countVotes,
+  killsBefore,
+  parseArc,
+  proposeOptions,
+  recipientCandidates,
+  upgradesBefore,
+  voteWinner,
+  type Arc,
+  type ArcSettings,
+  type Episode,
+} from '../data/arc';
 import type { TeamId } from '../data/schema';
 import { END_LABEL, WINNER_LABEL } from '../tools/metrics';
+import { freezeEpisode } from './freeze';
 import type { ScoutMessage, ScoutRequest, ScoutRow } from './scout.worker';
 
 const data = loadGameData();
@@ -13,6 +27,8 @@ const arcSelect = document.getElementById('arc') as HTMLSelectElement;
 const arcInfo = document.getElementById('arcInfo')!;
 
 let arcs: Arc[] = [];
+/** Révision de chaque arc au moment de sa lecture (contrôle des écritures concurrentes par le relais). */
+let revisions = new Map<string, string>();
 let arc: Arc | undefined;
 let scoutRows: ScoutRow[] = [];
 let picked: ScoutRow | undefined;
@@ -42,6 +58,9 @@ function previewUrl(t: PreviewTarget): string {
   if (t.draft) q.set('draft', JSON.stringify(t.draft));
   if (t.vote) q.set('vote', `${t.vote.recipient}:${t.vote.options.join(',')}`);
   q.set('intro', '0');
+  // La régie ouverte avec ?theme=noel prévisualise dans ce thème.
+  const theme = new URLSearchParams(location.search).get('theme');
+  if (theme) q.set('theme', theme);
   return `./?${q}`;
 }
 
@@ -181,12 +200,26 @@ const percent = (v: number) => `${(v * 100).toFixed(v < 0.1 ? 1 : 0)} %`;
 async function fetchArcs(): Promise<void> {
   const res = await fetch('./__regie/arcs');
   if (!res.ok) throw new Error('relais de la régie indisponible : lancer « npm run dev »');
-  arcs = ((await res.json()) as unknown[]).map((a) => parseArc(a, data));
+  const raw = (await res.json()) as { id: string; revision?: string }[];
+  revisions = new Map(raw.flatMap((a) => (a.revision ? [[a.id, a.revision] as const] : [])));
+  // Tri par identifiant : l'arc ouvert choisi par défaut ne dépend pas de l'ordre des fichiers.
+  arcs = raw.map((a) => parseArc(a, data)).sort((x, y) => x.id.localeCompare(y.id));
 }
 
 async function saveArc(next: Arc, status: HTMLElement, okText: string): Promise<boolean> {
-  const res = await fetch(`./__regie/arcs/${next.id}`, { method: 'PUT', body: JSON.stringify(next), headers: { 'Content-Type': 'application/json' } });
+  const headers = { 'Content-Type': 'application/json', 'X-Arc-Revision': revisions.get(next.id) ?? 'new' };
+  const res = await fetch(`./__regie/arcs/${next.id}`, { method: 'PUT', body: JSON.stringify(next), headers });
   const body = await res.json();
+  if (res.status === 409) {
+    // L'arc a été modifié ailleurs (CLI) : on recharge la version du disque au lieu de l'écraser.
+    await fetchArcs();
+    arc = arcs.find((a) => a.id === next.id) ?? arc;
+    scoutRows = [];
+    picked = undefined;
+    render();
+    message(app.querySelector('section') ?? app, `Refusé : ${body.error}.`, false);
+    return false;
+  }
   if (!res.ok) {
     message(status, `Refusé : ${body.error}`, false);
     return false;
@@ -217,8 +250,19 @@ function arcSection(a: Arc): HTMLElement {
   for (const ep of a.episodes) {
     const line = `Ép. ${ep.number} · seed ${ep.seed} · ${WINNER_LABEL[ep.winner]} en ${ep.duration} s${ep.endType ? ` · ${END_LABEL[ep.endType]}` : ''}`;
     const block = el('div', { class: 'row' }, el('span', {}, line));
-    if (ep.upgrade) block.append(el('span', { class: 'muted' }, `→ ${heroName(ep.recipient)} reçoit ${eqLabel(ep.upgrade)}`));
-    else block.append(voteForm(a, ep));
+    if (ep.upgrade) {
+      const votes = ep.votes ? ` (${ep.votes.join(' / ')})` : ' (d’office)';
+      block.append(el('span', { class: 'muted' }, `→ ${heroName(ep.recipient)} reçoit ${eqLabel(ep.upgrade)}${votes}`));
+      // Erreur de saisie : le vote reste annulable tant que l'épisode suivant n'est pas figé.
+      if (ep.votes && canCancelVote(a, ep.number)) {
+        const undo = button('Annuler le vote', async () => {
+          if (!confirm(`Annuler le vote de l'épisode ${ep.number} (${eqLabel(ep.upgrade!)} pour ${heroName(ep.recipient)}) ?`)) return;
+          await saveArc(cancelVote(a, ep.number), block, `Vote de l'épisode ${ep.number} annulé : à recompter.`);
+        });
+        undo.classList.add('small');
+        block.append(undo);
+      }
+    } else block.append(voteForm(a, ep));
     block.append(button('Revoir', () => preview({ episode: ep.number, seed: ep.seed, label: `Épisode ${ep.number} · seed ${ep.seed} · figé` })));
     s.append(block);
   }
@@ -237,12 +281,17 @@ function voteForm(a: Arc, ep: Episode): HTMLElement {
   const apply = button(
     'Valider le vote',
     async () => {
-      const votes = comments.value.trim() ? countVotes(comments.value, ep.options.length) : inputs.map((i) => Number(i.value) || 0);
+      const fromComments = !!comments.value.trim();
+      const votes = fromComments ? countVotes(comments.value, ep.options.length) : inputs.map((i) => Math.max(0, Math.round(Number(i.value) || 0)));
+      if (!votes.some((v) => v > 0)) {
+        return message(box, fromComments ? `Aucun numéro de 1 à ${ep.options.length} reconnu dans les commentaires : vote refusé.` : 'Aucune voix saisie : vote refusé.', false);
+      }
       const next = structuredClone(a);
       const target = next.episodes.find((e) => e.number === ep.number)!;
       target.votes = votes;
       target.upgrade = voteWinner(ep.options, votes);
-      await saveArc(next, box, `Vote compté (${votes.join(' / ')}) : ${heroName(ep.recipient)} reçoit ${eqLabel(target.upgrade)}.`);
+      const tie = votes.filter((v) => v === Math.max(...votes)).length > 1 ? ' Égalité de voix : le plus petit numéro l’emporte.' : '';
+      await saveArc(next, box, `Vote compté (${votes.join(' / ')}) : ${heroName(ep.recipient)} reçoit ${eqLabel(target.upgrade)}.${tie}`);
     },
     'ok',
   );
@@ -355,7 +404,12 @@ function settingsSection(a: Arc): HTMLElement {
       async () => {
         const next = structuredClone(a);
         next.settings = readSettings!();
-        await saveArc(next, s, 'Réglages enregistrés : ils s’appliquent au prochain épisode.');
+        // Les lignes du scout dataient des anciens réglages : on les jette (sinon on figerait un combat fantôme).
+        const hadScout = scoutRows.length > 0;
+        worker?.terminate();
+        scoutRows = [];
+        picked = undefined;
+        await saveArc(next, s, `Réglages enregistrés : ils s’appliquent au prochain épisode.${hadScout ? ' Relancer le scout.' : ''}`);
       },
       'ok',
     ),
@@ -408,68 +462,66 @@ function nextSection(a: Arc): HTMLElement {
     s.append(table);
   }
   if (picked && picked.winner !== 'draw') s.append(planForm(a, n, picked));
-  else if (picked) s.append(el('p', { class: 'msg err' }, 'Égalité : choisir une autre seed.'));
+  else if (picked) s.append(el('p', { class: 'msg err' }, 'Match nul : pas de camp perdant, donc pas d’upgrade. Choisir une autre seed.'));
   return s;
 }
 
 function planForm(a: Arc, n: number, row: ScoutRow): HTMLElement {
   const box = el('div', {});
-  const loser = row.winner === 'gnomes' ? 'goblins' : 'gnomes';
-  const ups = upgradesBefore(a, n);
-  const candidates = a.heroes.filter((h) => heroTeam(h) === loser);
-  // Suggestion : le moins équipé, puis le moins de K.O. dans ce combat.
-  candidates.sort((x, y) => (ups[x]?.length ?? 0) - (ups[y]?.length ?? 0) || (row.heroKills[x] ?? 0) - (row.heroKills[y] ?? 0));
+  const seed = String(row.seed);
+  // Suggestion (arc.ts, commune avec la CLI) : le moins équipé du camp perdant, puis le moins de K.O. ; héros saturés exclus.
+  const candidates = recipientCandidates(a, n, row.winner, row.heroKills, data);
   const recipient = el('select');
-  for (const h of candidates) recipient.append(el('option', { value: h }, `${heroName(h)} (${(ups[h] ?? []).length} upgrade(s), ${row.heroKills[h] ?? 0} K.O.)`));
-  const optionSelects = [0, 1, 2].map(() => el('select'));
-  const fillOptions = () => {
-    const owned = new Set(ups[recipient.value] ?? []);
-    const free = data.equipment.filter((e) => !owned.has(e.id));
-    optionSelects.forEach((sel, i) => {
-      const keep = sel.value;
-      sel.replaceChildren(...free.map((e) => el('option', { value: e.id }, e.label)));
-      sel.value = free.some((e) => e.id === keep) ? keep : (free[i]?.id ?? '');
-    });
-  };
+  for (const c of candidates) {
+    const o = el('option', { value: c.hero }, `${heroName(c.hero)} (${c.upgrades} upgrade(s), ${c.kills} K.O.)${c.saturated ? ' — saturé' : ''}`);
+    if (c.saturated) o.disabled = true;
+    recipient.append(o);
+  }
+  recipient.value = candidates.find((c) => !c.saturated)?.hero ?? '';
+  const optionsBox = el('div', {});
+  let optionSelects: HTMLSelectElement[] = [];
   const syncVote = () => {
     draftVote = { recipient: recipient.value, options: optionSelects.map((s) => s.value) };
+  };
+  /** Menus pré-remplis avec le tirage déterministe ; 2 menus s'il ne reste que 2 upgrades libres. */
+  const fillOptions = () => {
+    const proposal = proposeOptions(a, n, recipient.value, seed, data);
+    optionSelects = proposal.options.map((id) => {
+      const sel = el('select');
+      sel.replaceChildren(...proposal.free.map((e) => el('option', { value: e }, eqLabel(e))));
+      sel.value = id;
+      sel.onchange = () => (syncVote(), previewNext());
+      return sel;
+    });
+    optionsBox.replaceChildren(...optionSelects.map((sel, i) => el('label', {}, `Option ${i + 1}`, sel)));
+    if (proposal.options.length === 2) optionsBox.append(el('div', { class: 'muted' }, `Plus que 2 upgrades possibles pour ${heroName(recipient.value)} : vote à 2 options.`));
   };
   recipient.onchange = () => {
     fillOptions();
     syncVote();
     previewNext();
   };
-  optionSelects.forEach((sel) => (sel.onchange = () => (syncVote(), previewNext())));
+  box.append(el('div', { class: 'row' }, el('strong', {}, `Seed ${seed}`), el('span', { class: row.winner }, `victoire des ${WINNER_LABEL[row.winner]} en ${row.duration.toFixed(1)} s`)));
+  if (!recipient.value) {
+    box.append(el('p', { class: 'msg err' }, 'Tous les héros du camp perdant sont saturés : choisir une seed où l’autre camp perd.'));
+    return box;
+  }
   fillOptions();
   syncVote();
-
-  box.append(
-    el('div', { class: 'row' }, el('strong', {}, `Seed ${row.seed}`), el('span', { class: row.winner }, `victoire des ${WINNER_LABEL[row.winner]} en ${row.duration.toFixed(1)} s`)),
-    el('label', {}, "Héros qui recevra l'upgrade", recipient),
-    ...optionSelects.map((sel, i) => el('label', {}, `Option ${i + 1}`, sel)),
-  );
+  box.append(el('label', {}, "Héros qui recevra l'upgrade", recipient), optionsBox);
   const actions = el('div', { class: 'row' });
   actions.append(
     button('Aperçu', () => previewNext(0)),
     button(
       "Figer l'épisode",
       async () => {
-        const options = optionSelects.map((s) => s.value);
-        if (new Set(options).size !== options.length) return message(box, 'Les trois options doivent être différentes.', false);
-        const next = structuredClone(a);
-        next.episodes.push({
-          number: n,
-          seed: String(row.seed),
-          winner: row.winner,
-          duration: Math.round(row.duration * 10) / 10,
-          recipient: recipient.value,
-          options,
-          votes: null,
-          upgrade: null,
-          heroKills: row.heroKills,
-          endType: row.endType,
-          settings: { ...a.settings, biome: a.settings.biome ?? a.biome },
-        });
+        let next: Arc;
+        try {
+          // Resimulé avec les réglages enregistrés : refusé si le combat diffère de la ligne du scout.
+          next = freezeEpisode(a, n, seed, { recipient: recipient.value, options: optionSelects.map((s) => s.value) }, data, row).arc;
+        } catch (e) {
+          return message(box, `Refusé : ${(e as Error).message}.`, false);
+        }
         scoutRows = [];
         picked = undefined;
         if (await saveArc(next, box, `Épisode ${n} figé : l'enregistrement s'ouvre dans un nouvel onglet.`)) {
@@ -535,6 +587,8 @@ function endSection(a: Arc): HTMLElement {
   s.append(
     button("Créer l'arc", async () => {
       if (arcs.some((x) => x.id === id.value)) return message(s, 'Cet identifiant existe déjà.', false);
+      const open = arcs.filter((x) => x.status === 'open');
+      if (open.length) return message(s, `Clore d'abord l'arc ouvert (${open.map((x) => x.title).join(', ')}).`, false);
       const next = { id: id.value, title: title.value || id.value, heroes: boxes.filter((b) => b.c.checked).map((b) => b.id), status: 'open', settings: { biome: biome.value }, episodes: [] };
       if (await saveArc(next as Arc, s, 'Arc créé.')) arcSelect.value = id.value;
     }),

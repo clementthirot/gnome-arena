@@ -204,10 +204,12 @@ const SpawnEffect = z.object({
   units: z.record(TeamId, id),
   /** Nombre d'unités par camp concerné. */
   count: z.number().int().positive(),
-  /** Camps qui reçoivent des renforts : l'un, l'autre, les deux, ou celui qui est mené. */
-  team: z.enum(['gnomes', 'goblins', 'both', 'losing']),
+  /** Camps qui reçoivent des renforts : l'un, l'autre, les deux, celui qui est mené, ou celui du lanceur (upgrade). */
+  team: z.enum(['gnomes', 'goblins', 'both', 'losing', 'self']),
   /** Hauteur du saut par-dessus le muret (px/s). */
   jump: z.number().min(0).default(140),
+  /** Effet visuel joué sur le lanceur (coup de sifflet…) ; aucun par défaut. */
+  visual: visualKey.optional(),
 });
 
 export type EffectDef =
@@ -281,6 +283,8 @@ export const EquipmentSchema = z.object({
   short: z.string().max(14),
   /** Accessoire superposé au héros par le rendu (clé du manifeste, section accessories). */
   visual: visualKey,
+  /** Rôles (roles.json) auxquels l'upgrade peut être proposée au vote ; absent = tous. */
+  roles: z.array(id).min(1).optional(),
   stats: z
     .object({
       hp: positive.default(1),
@@ -305,6 +309,8 @@ export const ArenaEventSchema = z.object({
   from: z.number().min(0).default(0),
   /** Plus après ce moment (s) : par exemple, pas de renforts juste avant la fin. */
   until: z.number().positive().optional(),
+  /** Incident désactivé : il ne compte pas dans le tirage (les seeds existantes restent identiques). */
+  enabled: z.boolean().default(true),
   /** Où l'incident tombe. */
   target: z.enum(['random_point', 'densest', 'random_unit', 'hero']),
   /** Avertissement visible avant l'impact (s) : ombre au sol, zone qui clignote. */
@@ -704,6 +710,7 @@ export const GameDataSchema = z
     });
     if (!data.biomes.some((b) => b.id === data.battle.biome)) issue(['battle', 'biome'], `biome inconnu : ${data.battle.biome}`);
     const equipment = new Set(data.equipment.map((e) => e.id));
+    data.equipment.forEach((e, i) => e.roles?.forEach((r, j) => roles.has(r) || issue(['equipment', i, 'roles', j], `rôle inconnu : ${r}`)));
     data.heroes.forEach((h, i) => {
       if (h.rival && !data.heroes.some((o) => o.id === h.rival)) issue(['heroes', i, 'rival'], `rival inconnu : ${h.rival}`);
       h.upgrades.forEach((up, j) => {

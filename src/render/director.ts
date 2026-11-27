@@ -2,6 +2,7 @@
 // sur l'arène entière. Uniquement visuel : le combat simulé ne change pas.
 import type Phaser from 'phaser';
 import type { Staging } from './manifest';
+import { SAFE } from './safeZone';
 
 type Moment = 'heroDeath' | 'heroDuel' | 'heroCharge' | 'misfire' | 'lastStand' | 'bigImpact';
 
@@ -11,9 +12,13 @@ interface Shot {
   /** Fin du plan, en secondes de combat. */
   until: number;
   priority: number;
+  /** Zoom propre au plan (ralenti de cinéma), sinon celui du manifeste. */
+  zoom?: number;
 }
 
 const PRIORITY: Record<Moment, number> = { misfire: 1, heroCharge: 1, bigImpact: 2, heroDuel: 2, heroDeath: 3, lastStand: 4 };
+/** Plans de cinéma (ralenti du dernier K.O., plan du vainqueur) : rien ne les interrompt. */
+const CINEMA = 5;
 
 export class Director {
   private shot: Shot | null = null;
@@ -26,9 +31,12 @@ export class Director {
     private readonly config: Staging['camera'],
     private readonly width: number,
     private readonly height: number,
+    /** Plafond de durée d'un gros plan (s de combat) : un plan rapproché reste un plan court. */
+    private readonly maxShot = 1.5,
   ) {
     this.x = width / 2;
     this.y = height / 2;
+    // Bornée au monde : au-delà, il n'y a pas de décor (bord noir pendant les zooms).
     cam.setBounds(0, 0, width, height);
   }
 
@@ -38,7 +46,22 @@ export class Director {
     const priority = PRIORITY[moment];
     if (this.shot && this.shot.priority >= priority) return;
     if (!this.shot && now < this.readyAt && priority < PRIORITY.lastStand) return;
-    this.shot = { target, until: now + hold, priority };
+    this.shot = { target, until: now + Math.min(hold, this.maxShot), priority };
+  }
+
+  /** Plan imposé (ralenti, vainqueur) : zoom et durée propres, au-dessus de tout autre plan. */
+  cinema(target: () => { x: number; y: number }, now: number, hold: number, zoom: number): void {
+    if (!this.config.enabled) return;
+    this.shot = { target, until: now + hold, priority: CINEMA, zoom };
+  }
+
+  /**
+   * Contrechamp bref (l'empereur qui tombe dans sa loge) : passe outre le temps de repos et les
+   * gros plans ordinaires, jamais un plan de cinéma ni un dernier carré.
+   */
+  cutaway(target: () => { x: number; y: number }, now: number, hold: number, zoom: number): void {
+    if (!this.config.enabled || (this.shot && this.shot.priority >= PRIORITY.lastStand)) return;
+    this.shot = { target, until: now + hold, priority: PRIORITY.lastStand - 0.5, zoom };
   }
 
   /** Retour immédiat au plan large (fin de combat, cartons). */
@@ -53,8 +76,13 @@ export class Director {
       this.readyAt = now + this.config.cooldown;
     }
     const wide = { x: this.width / 2, y: this.height / 2 };
-    const focus = this.shot ? this.shot.target() : wide;
-    const zoom = this.shot ? this.config.zoom : 1;
+    const zoom = this.shot ? (this.shot.zoom ?? this.config.zoom) : 1;
+    let focus = wide;
+    if (this.shot) {
+      // La cible apparaît au centre de la zone utile (y 860), pas au milieu du canvas (960).
+      const t = this.shot.target();
+      focus = { x: t.x, y: t.y + (this.height / 2 - SAFE.centerY) / zoom };
+    }
     const k = this.config.follow;
     this.x += (focus.x - this.x) * k;
     this.y += (focus.y - this.y) * k;

@@ -22,10 +22,14 @@ import { decodePng, encodePng, encodeRgba, pngSize, type Rgba } from './lib/png'
 
 const ROOT = join(import.meta.dirname, '..');
 const MANIFEST = join(ROOT, 'src/render/assets.manifest.json');
-const SPRITES = join(ROOT, 'public/sprites');
-const GENERATED = join(SPRITES, 'generated');
 const [command = 'check', ...args] = process.argv.slice(2);
-const useGenerated = !args.includes('--no-generated');
+/** --theme=noel : sprites dans public/sprites/themes/noel/, entrées écrites dans src/render/themes/noel.json. */
+const THEME = args.find((a) => a.startsWith('--theme='))?.slice(8);
+const THEME_FILE = THEME && join(ROOT, `src/render/themes/${THEME}.json`);
+const SPRITES_URL = THEME ? `sprites/themes/${THEME}` : 'sprites';
+const SPRITES = join(ROOT, 'public', SPRITES_URL);
+const GENERATED = join(ROOT, 'public/sprites/generated');
+const useGenerated = !THEME && !args.includes('--no-generated');
 
 type Json = Record<string, any>;
 const manifest: Json = JSON.parse(readFileSync(MANIFEST, 'utf8'));
@@ -66,12 +70,12 @@ function generate() {
 interface Found {
   url: string;
   path: string;
-  source: 'perso' | 'remplacement';
+  source: string;
 }
 
 function find(key: string): Found | undefined {
   const own = join(SPRITES, `${key}.png`);
-  if (existsSync(own)) return { url: `sprites/${key}.png`, path: own, source: 'perso' };
+  if (existsSync(own)) return { url: `${SPRITES_URL}/${key}.png`, path: own, source: THEME ? `thème ${THEME}` : 'perso' };
   const gen = join(GENERATED, `${key}.png`);
   if (useGenerated && existsSync(gen)) return { url: `sprites/generated/${key}.png`, path: gen, source: 'remplacement' };
   return undefined;
@@ -242,11 +246,17 @@ function importSprites(write: boolean) {
   const problems: string[] = [];
   const report: string[] = [];
   const known = new Set<string>();
+  // Avec --theme, seules les entrées trouvées dans le dossier du thème sont écrites (le reste vient de la base).
+  const themed: Json = { assets: {}, accessories: {} };
 
   for (const [key, entry] of Object.entries<Json>(manifest.assets)) {
     known.add(key);
     const found = find(key);
     const shape = shapeOf(entry);
+    if (!found && THEME) {
+      report.push(`  ${key.padEnd(16)} base`);
+      continue;
+    }
     if (!found) {
       // Plus de PNG : on revient à la silhouette.
       if (entry.type === 'spritesheet' && shape) manifest.assets[key] = { type: 'placeholder', ...shape, ...(entry.bricks?.death === 'stay' ? {} : entry.bricks ? { bricks: entry.bricks } : {}) };
@@ -269,6 +279,7 @@ function importSprites(write: boolean) {
       ...(Object.keys(bricks).length ? { bricks } : {}),
       ...(shape ? { placeholder: shape } : {}),
     };
+    themed.assets[key] = manifest.assets[key];
     report.push(`  ${key.padEnd(16)} ${found.source.padEnd(12)} ${sheet.frameWidth}×${sheet.frameHeight}${sheet.directions ? ' · 8 directions' : ''} · ${Object.keys(sheet.animations).join(', ')}`);
   }
 
@@ -276,6 +287,10 @@ function importSprites(write: boolean) {
     known.add(key);
     const found = find(key);
     const shape = accessoryShapeOf(entry);
+    if (!found && THEME) {
+      report.push(`  ${key.padEnd(16)} base`);
+      continue;
+    }
     if (!found) {
       if (entry.type === 'image' && shape) manifest.accessories[key] = { type: 'placeholder', ...shape, anchor: entry.anchor };
       report.push(`  ${key.padEnd(16)} placeholder`);
@@ -283,6 +298,7 @@ function importSprites(write: boolean) {
     }
     const { height } = pngSize(readFileSync(found.path));
     manifest.accessories[key] = { type: 'image', url: found.url, size: height, anchor: entry.anchor, ...(shape ? { placeholder: shape } : {}) };
+    themed.accessories[key] = manifest.accessories[key];
     report.push(`  ${key.padEnd(16)} ${found.source.padEnd(12)} ${height} px`);
   }
 
@@ -294,7 +310,15 @@ function importSprites(write: boolean) {
 
   console.log(report.join('\n'));
   if (problems.length) console.log(`\n${problems.length} problème(s) :\n${problems.map((p) => `  - ${p}`).join('\n')}`);
-  if (write) {
+  if (write && THEME_FILE) {
+    const file: Json = existsSync(THEME_FILE) ? JSON.parse(readFileSync(THEME_FILE, 'utf8')) : { name: THEME };
+    file.manifest ??= {};
+    for (const part of ['assets', 'accessories'] as const) {
+      if (Object.keys(themed[part]).length) file.manifest[part] = { ...(file.manifest[part] ?? {}), ...themed[part] };
+    }
+    writeFileSync(THEME_FILE, JSON.stringify(file, null, 2) + '\n');
+    console.log(`\nThème ${THEME} mis à jour (src/render/themes/${THEME}.json).`);
+  } else if (write) {
     writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n');
     console.log('\nManifeste mis à jour.');
   }

@@ -4,7 +4,7 @@ import type Phaser from 'phaser';
 import type { BeamSegment, Projectile } from '../sim/types';
 import type { Particle } from './animations';
 import { effectVisual, type EffectVisual } from './manifest';
-import { rand } from './random';
+import { noise, rand } from './random';
 
 interface Lasting {
   visual: EffectVisual;
@@ -48,6 +48,20 @@ export class FxLayer {
     if (v.kind === 'ring' && radius >= 25) this.burst(x, y, v, 40, 150);
     this.lasting.push({ visual: v, x, y, radius: r, age: 0, life: v.duration, seed: rand() * 1000 });
     if (v.decal) this.lasting.push({ visual: effectVisual(v.decal), x, y, radius: r * 0.75, age: 0, life: effectVisual(v.decal).duration, seed: 0 });
+    this.spriteFx(key, v, x, y, radius);
+  }
+
+  /** Image PixelLab facultative (manifeste effects.<clé>.sprite) : grossit puis s'efface, par-dessus le dessin. */
+  private spriteFx(key: string, v: EffectVisual, x: number, y: number, radius: number): void {
+    const scene = this.g.scene;
+    const tex = `fx_img_${key}`;
+    if (!v.sprite || !scene.textures.exists(tex)) return;
+    const S = this.scale;
+    const img = scene.add.image(x * S, y * S, tex).setDepth(this.g.depth + 1);
+    if (v.sprite.anchor === 'bottom') img.setOrigin(0.5, 1);
+    const target = (Math.max(v.sprite.size, radius * 2) * S) / Math.max(img.width, img.height);
+    img.setScale(target * 0.6).setRotation(v.sprite.anchor === 'bottom' ? 0 : (rand() - 0.5) * 0.6);
+    scene.tweens.add({ targets: img, scale: target * 1.1, alpha: 0, duration: Math.max(250, v.duration * 1000), ease: 'Quad.easeIn', onComplete: () => img.destroy() });
   }
 
   beam(key: string, fromX: number, fromY: number, toX: number, toY: number, width?: number): void {
@@ -222,14 +236,14 @@ export class FxLayer {
         if (v.size >= 10) {
           g.fillStyle(accent, 0.25).fillCircle(x, y, r * 1.8);
           for (let i = 0; i < 3; i++) {
-            this.particles.push({ x: p.x + (rand() - 0.5) * v.size * 0.6, y: p.y - lift + (rand() - 0.5) * v.size * 0.6, vx: (rand() - 0.5) * 30, vy: -40 - rand() * 40, life: 0.5, maxLife: 0.5, color: i % 2 ? color : accent, size: 2 });
+            this.particles.push({ x: p.x + (noise() - 0.5) * v.size * 0.6, y: p.y - lift + (noise() - 0.5) * v.size * 0.6, vx: (noise() - 0.5) * 30, vy: -40 - noise() * 40, life: 0.5, maxLife: 0.5, color: i % 2 ? color : accent, size: 2 });
           }
         }
         // Ombre au sol pour lire la cloche.
         if (p.arc > 0) this.ground.fillStyle(0x000000, 0.25).fillEllipse(x, p.y * S, r * 2, r);
         g.fillStyle(color, 1).fillCircle(x, y, r);
         g.fillStyle(accent, 1).fillRect(x - r * 0.5, y - r * 0.6, Math.max(S, r * 0.5), Math.max(S, r * 0.5));
-        if (rand() < 0.5) this.particles.push({ x: p.x, y: p.y - lift, vx: 0, vy: -10, life: 0.25, maxLife: 0.25, color: accent, size: 1 });
+        if (noise() < 0.5) this.particles.push({ x: p.x, y: p.y - lift, vx: 0, vy: -10, life: 0.25, maxLife: 0.25, color: accent, size: 1 });
         break;
       }
       default:

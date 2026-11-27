@@ -2,6 +2,7 @@
 // Le moteur ne connaît que les clés ; seul le rendu sait à quoi elles ressemblent.
 import { z } from 'zod';
 import raw from './assets.manifest.json';
+import { overlay, theme } from './themes';
 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
@@ -79,7 +80,7 @@ const SpriteSheetSchema = z.object({
 
 /** Accessoire d'upgrade superposé au héros, sans régénérer le personnage. */
 const AccessoryShapeSchema = z.object({
-  kind: z.enum(['goggles', 'sword', 'grenades', 'jar', 'chicken', 'pot']),
+  kind: z.enum(['goggles', 'sword', 'grenades', 'jar', 'chicken', 'pot', 'pie', 'umbrella', 'whistle']),
   color,
   accent: color,
 });
@@ -101,6 +102,38 @@ const AccessorySchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+/**
+ * Visuels de mise en scène du lot réalisation (aura du mini-boss, couronne, confettis du public,
+ * accessoires du spectateur récurrent) : placeholder dessiné par code (eggs.ts), ou image.
+ */
+export const OVERLAY_KINDS = ['aura', 'crown', 'confetti', 'tophat', 'helmet', 'umbrella', 'flower', 'viking', 'propeller', 'duck'] as const;
+const OverlayShapeSchema = z.object({ kind: z.enum(OVERLAY_KINDS), color, accent: color });
+const OverlaySchema = z.discriminatedUnion('type', [
+  OverlayShapeSchema.extend({ type: z.literal('placeholder') }),
+  z.object({
+    type: z.literal('image'),
+    url: z.string(),
+    /** Hauteur d'affichage en px monde. */
+    size: z.number().positive(),
+    placeholder: OverlayShapeSchema.optional(),
+  }),
+]);
+export type OverlayEntry = z.infer<typeof OverlaySchema>;
+
+/** Un moment de cinéma : ralenti, zoom et bandes noires (qui tombent dans les zones d'overlay). */
+const CinemaMomentSchema = z.object({
+  enabled: z.boolean().default(true),
+  /** Facteur appliqué au temps du combat pendant le ralenti. */
+  slowmo: z.number().min(0.05).max(1).default(0.3),
+  /** Durée du ralenti (ms, temps réel à vitesse 1). */
+  ms: z.number().min(0).default(900),
+  zoom: z.number().min(1).max(3).default(2),
+  letterbox: z.boolean().default(true),
+});
+
+/** Easter egg rare : éligibilité tirée de la seed (chance), puis au plus `cap` fois par épisode. */
+const EggSchema = z.object({ chance: z.number().min(0).max(1), cap: z.number().int().min(0).default(1) });
+
 /** Rendu d'un effet, d'un projectile ou d'un incident, désigné par la clé "visual" des données. */
 const EffectVisualSchema = z.object({
   kind: z.enum(['arrow', 'line', 'ball', 'ring', 'puddle', 'bolt', 'spark', 'swirl']),
@@ -114,6 +147,16 @@ const EffectVisualSchema = z.object({
   duration: z.number().positive().default(0.35),
   /** Trace laissée au sol après l'effet (clé d'un autre effet, en général une flaque) : cratère… */
   decal: z.string().optional(),
+  /** Image facultative (PixelLab) jouée par-dessus le dessin par code : grossit puis s'efface. */
+  sprite: z
+    .object({
+      url: z.string(),
+      /** Taille minimale en px monde (plus grand côté) ; un gros rayon d'effet l'agrandit. */
+      size: z.number().positive().default(16),
+      /** center : centrée sur l'impact ; bottom : posée sur l'impact (éclair qui tombe). */
+      anchor: z.enum(['center', 'bottom']).default('center'),
+    })
+    .optional(),
 });
 
 /** Mise en scène : caméra, présentation des héros, tirs perdus dans le public. */
@@ -142,6 +185,36 @@ const StagingSchema = z.object({
       .default({}),
   }),
   heroIntro: z.object({ enabled: z.boolean().default(true), duration: z.number().positive().default(2.8) }),
+  /** Ouverture : « quick » (titre en surimpression, révélation du vote, combat en ≤ 4,5 s) ou « classic » (roster des héros, prono, 3-2-1). */
+  intro: z.enum(['quick', 'classic']).default('quick'),
+  /** Révélation du vote précédent, écran de fin et carte de vote (textes : {hero}, {upgrade}, {pct}, {team}, {n}…). */
+  reveal: z.object({
+    episode: z.string().default('ÉP. {n}'),
+    /** Accroche lisible sans le son dès la première image (épisode avec vote précédent). */
+    hook: z.string().default('{hero} A UN NOUVEAU JOUET. ÇA SUFFIRA ?'),
+    /** Accroche propre à une upgrade (clé : id de l'équipement), à la place de `hook`. */
+    hooks: z.record(z.string(), z.string()).default({}),
+    /** Accroche sans vote précédent. */
+    hookFirst: z.string().default('{gnomes} GNOMES vs {goblins} GOBELINS'),
+    chose: z.string().default('LE PUBLIC A CHOISI…'),
+    gets: z.string().default('POUR {hero} !'),
+    share: z.string().default('{pct} % DES VOIX'),
+    newTag: z.string().default('NOUVEAU'),
+    /** Durée de l'étiquette « NOUVEAU » au-dessus du héros, une fois le combat lancé (s). */
+    newTagSeconds: z.number().min(0).default(4),
+    /** Réservé (l'empereur ne parle plus pendant la révélation : le titre le dit déjà). */
+    emperor: z.boolean().default(true),
+    victory: z.string().default('VICTOIRE DES {team}'),
+    draw: z.string().default('MATCH NUL'),
+    postponed: z.string().default('LE VOTE EST REPORTÉ'),
+    mvp: z.string().default('MVP'),
+    voteFor: z.string().default('RECEVRA LA PROCHAINE UPGRADE'),
+    voteCall: z.string().default('VOTE 1, 2 OU 3 EN COMMENTAIRE'),
+    /** Cadre du rouleau : placeholder dessiné ; `url` (optionnelle) le remplace par une image, clé ui_slot_frame. */
+    slot: z.object({ frame: color.default('#c8902a'), window: color.default('#14101c'), light: color.default('#ffe14a'), url: z.string().optional() }).default({}),
+    /** Confettis de l'accrochage de l'accessoire. */
+    confetti: z.array(color).min(1).default(['#ffe14a', '#ff5a8a', '#7fb0ff', '#9be05a', '#ffffff']),
+  }).default({}),
   /** Projection : le personnage se détache de son ombre et suit son arc. Purement visuel. */
   flight: z.object({
     /** Hauteur affichée = hauteur simulée × ce facteur. */
@@ -180,6 +253,8 @@ const StagingSchema = z.object({
     ventRate: z.number().min(0).default(3),
     /** Durée de vie d'une bouffée (s). */
     puffLife: z.number().positive().default(3),
+    /** Images de bouffée (PixelLab) ; sans elles, des disques de couleur. */
+    sprites: z.array(z.string()).default([]),
     banner: z.string().default('GAZ TOXIQUE !'),
   }),
   /** Morts plus trash : gouttes et flaque sous les corps, qui sèche et vire au brun. */
@@ -245,6 +320,45 @@ const StagingSchema = z.object({
     stars: z.boolean().default(true),
     sweat: z.boolean().default(true),
   }),
+  /** Ralentis « bullet time » et plan du vainqueur. */
+  cinema: z
+    .object({
+      heroDeath: CinemaMomentSchema.default({ slowmo: 0.35, ms: 700, zoom: 1.9 }),
+      lastKO: CinemaMomentSchema.default({ slowmo: 0.25, ms: 1300, zoom: 2.1 }),
+      /** Hauteur des bandes noires (px écran) : haut, et bas à partir du bas de la zone d'action. */
+      letterboxTop: z.number().min(0).default(170),
+      /** Plafond de durée d'un gros plan (s de combat). */
+      maxShot: z.number().positive().default(1.5),
+      /** Plan du vainqueur (MVP) après le dernier K.O. */
+      winner: z.object({ enabled: z.boolean().default(true), zoom: z.number().min(1).max(3).default(1.8), hold: z.number().positive().default(1.5), label: z.string().default('MVP') }).default({}),
+      /** Le dernier K.O. s'écrit à l'écran (lecture sans le son). */
+      lastKOText: z.string().default('DERNIER K.O. !'),
+    })
+    .default({}),
+  /** Easter eggs rares et déterministes (tirés de la seed). */
+  easterEggs: z
+    .object({
+      /** Une explosion touche les gradins : un bloc de spectateurs part en confettis, puis revient sonné. */
+      crowdBurst: EggSchema.extend({ visual: z.string().default('fx_crowd_burst'), respawnMs: z.number().min(0).default(2600), line: z.string().default('OUPS...') }).default({ chance: 0.35, cap: 1 }),
+      /** Ola des gradins lors d'un retournement. */
+      wave: EggSchema.default({ chance: 1, cap: 1 }),
+      /** L'empereur tombe de son trône sur un énorme coup (rayon d'effet minimal, px monde). */
+      emperorFall: EggSchema.extend({ minRadius: z.number().positive().default(30), line: z.string().default('MON TRÔNE !') }).default({ chance: 0.4, cap: 1 }),
+      /** Le spectateur récurrent porte un accessoire différent à chaque épisode (clés de `overlays`). */
+      gagAccessories: z.array(z.string()).default([]),
+    })
+    .default({}),
+  /** Mini-boss à l'image : le héros grossit avec ses upgrades (rendu seulement). */
+  miniBoss: z
+    .object({
+      perUpgrade: z.number().min(0).default(0.08),
+      max: z.number().min(1).default(1.3),
+      /** Nombre d'upgrades à partir duquel il reçoit l'aura et la couronne. */
+      auraFrom: z.number().int().min(1).default(3),
+      aura: z.string().default('boss_aura'),
+      crown: z.string().default('boss_crown'),
+    })
+    .default({}),
   strayShots: z.object({
     /** Probabilité qu'une flèche ratée près du bord file dans les gradins. */
     chance: z.number().min(0).max(1).default(0.35),
@@ -254,12 +368,42 @@ const StagingSchema = z.object({
 });
 export type Staging = z.infer<typeof StagingSchema>;
 
-const ManifestSchema = z.object({
+export const ManifestSchema = z.object({
   defaults: z.object({ bricks: BricksSchema }),
   assets: z.record(z.string(), z.discriminatedUnion('type', [PlaceholderSchema, SpriteSheetSchema])),
   accessories: z.record(z.string(), AccessorySchema),
   effects: z.record(z.string(), EffectVisualSchema),
   staging: StagingSchema,
+  overlays: z.record(z.string(), OverlaySchema).default({}),
+  /** Illustrations PixelLab facultatives ; sans elles, titre en texte et sol dessiné par code. */
+  art: z
+    .object({
+      /** Logo du titre d'ouverture (remplace « GNOMES vs GOBELINS » en texte). */
+      title: z.string().optional(),
+      /** Tuile de sol répétée sur le terrain, par id de biome. */
+      grounds: z.record(z.string(), z.string()).default({}),
+      /** Texture des gradins, répétée et teintée aux couleurs du biome (sinon rangées dessinées). */
+      stands: z.string().optional(),
+      /** Roi et son trône dans la loge (sinon l'empereur en pixel art ASCII). */
+      king: z.string().optional(),
+      throne: z.string().optional(),
+      /**
+       * Écran de fin : motif de fond qui défile en diagonale, cadre des cartes de vote et plaque du titre
+       * (agrandis en 9-slice), couronne posée sur la plaque. Sans fichier, fond rayé et rectangles.
+       */
+      menu: z
+        .object({
+          pattern: z.string().optional(),
+          card: z.string().optional(),
+          plaque: z.string().optional(),
+          crown: z.string().optional(),
+          /** Défilement du motif, en px écran par seconde (vers le bas à droite). */
+          scroll: z.number().default(40),
+          patternAlpha: z.number().min(0).max(1).default(0.6),
+        })
+        .default({}),
+    })
+    .default({}),
 });
 
 export type AccessoryEntry = z.infer<typeof AccessorySchema>;
@@ -270,7 +414,8 @@ export type SpriteSheetAsset = z.infer<typeof SpriteSheetSchema>;
 export type AssetEntry = PlaceholderAsset | SpriteSheetAsset;
 export type Manifest = z.infer<typeof ManifestSchema>;
 
-export const manifest: Manifest = ManifestSchema.parse(raw);
+/** Manifeste de base, avec le thème choisi (?theme=…) superposé. */
+export const manifest: Manifest = ManifestSchema.parse(overlay(raw, theme.manifest));
 
 /** Une sheet qui n'a pas chargé retombe sur sa silhouette de secours. */
 export function asPlaceholder(entry: SpriteSheetAsset): PlaceholderAsset | undefined {

@@ -1101,14 +1101,21 @@ export class Battle implements EffectHost {
       const sb = this.strength('goblins');
       if (sg === sb) return;
       teams = [sg < sb ? 'gnomes' : 'goblins'];
+    } else if (effect.team === 'self') {
+      // Sifflet à supporters : les fans du lanceur sautent des gradins, à sa hauteur.
+      // Raté (le tir n'épargne plus personne) : ce sont les supporters d'en face qui répondent.
+      if (!ctx.source) return;
+      teams = [ctx.team === null ? other(ctx.source.team) : ctx.source.team];
+      if (effect.visual) this.events.push({ type: 'effect', visual: effect.visual, x: ctx.source.x, y: ctx.source.y, radius: 0, source: ctx.source.index });
     } else teams = [effect.team];
+    const centerX = effect.team === 'self' && ctx.source ? ctx.source.x : ctx.x;
     const f = this.field;
     for (const team of teams) {
       const def = this.unitDef(effect.units[team]!);
       // Les gnomes descendent des gradins du bas, les gobelins de ceux du haut.
       const fromBottom = team === 'gnomes';
       for (let i = 0; i < effect.count; i++) {
-        const x = Math.min(f.x + f.width - 8, Math.max(f.x + 8, ctx.x + this.rng.range(-30, 30)));
+        const x = Math.min(f.x + f.width - 8, Math.max(f.x + 8, centerX + this.rng.range(-30, 30)));
         const y = fromBottom ? f.y + f.height - def.radius - 1 : f.y + def.radius + 1;
         this.createUnit(team, def, x, y);
         const u = this.units[this.units.length - 1];
@@ -1197,7 +1204,7 @@ export class Battle implements EffectHost {
     if (this.nextIncidentAt < 0) this.nextIncidentAt = cfg.firstAt + this.rng.range(0, interval);
 
     if (this.time >= this.nextIncidentAt) {
-      const eligible = this.data.events.filter((e) => e.from <= this.time && (e.until === undefined || this.time < e.until));
+      const eligible = this.data.events.filter((e) => e.enabled && e.from <= this.time && (e.until === undefined || this.time < e.until));
       if (eligible.length > 0) {
         const boost = this.biome.physics.eventWeights;
         const weights = Object.fromEntries(eligible.map((e) => [e.id, e.weight * (boost[e.id] ?? 1)]).filter(([, w]) => (w as number) > 0));

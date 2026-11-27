@@ -25,6 +25,23 @@ export class BootScene extends Phaser.Scene {
     for (const [key, entry] of Object.entries(manifest.accessories)) {
       if (entry.type === 'image') this.load.image(`acc_img_${key}`, entry.url);
     }
+    for (const [key, entry] of Object.entries(manifest.overlays)) {
+      if (entry.type === 'image') this.load.image(`ovl_img_${key}`, entry.url);
+    }
+    // Illustrations PixelLab facultatives (titre, sols, effets) : repli sur le dessin par code.
+    if (manifest.art.title) this.load.image('art_title', manifest.art.title);
+    for (const [biome, url] of Object.entries(manifest.art.grounds)) this.load.image(`art_ground_${biome}`, url);
+    if (manifest.art.stands) this.load.image('art_stands', manifest.art.stands);
+    if (manifest.art.king) this.load.image('art_king', manifest.art.king);
+    if (manifest.art.throne) this.load.image('art_throne', manifest.art.throne);
+    for (const k of ['pattern', 'card', 'plaque', 'crown'] as const) {
+      const url = manifest.art.menu[k];
+      if (url) this.load.image(`ui_${k}`, url);
+    }
+    for (const [key, entry] of Object.entries(manifest.effects)) if (entry.sprite) this.load.image(`fx_img_${key}`, entry.sprite.url);
+    manifest.staging.gas.sprites.forEach((url, i) => this.load.image(`gas_puff_${i}`, url));
+    // Cadre de la machine à sous : image facultative, sinon dessiné par slotMachine.ts.
+    if (manifest.staging.reveal.slot.url) this.load.image('ui_slot_frame', manifest.staging.reveal.slot.url);
   }
 
   create(params: ArenaParams): void {
