@@ -32,6 +32,7 @@ export class BootScene extends Phaser.Scene {
     if (manifest.art.title) this.load.image('art_title', manifest.art.title);
     for (const [biome, url] of Object.entries(manifest.art.grounds)) this.load.image(`art_ground_${biome}`, url);
     for (const [key, entry] of Object.entries(manifest.effects)) if (entry.sprite) this.load.image(`fx_img_${key}`, entry.sprite.url);
+    manifest.staging.gas.sprites.forEach((url, i) => this.load.image(`gas_puff_${i}`, url));
     // Cadre de la machine à sous : image facultative, sinon dessiné par slotMachine.ts.
     if (manifest.staging.reveal.slot.url) this.load.image('ui_slot_frame', manifest.staging.reveal.slot.url);
   }

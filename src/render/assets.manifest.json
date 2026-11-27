@@ -304,17 +304,74 @@
       "size": 30,
       "directions": 8,
       "animations": {
-        "attack": {
+        "getup": {
           "frames": [
             1,
             2,
             3,
             4,
-            5,
-            6
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
           ],
           "fps": 14,
           "hit": 5
+        },
+        "death": {
+          "frames": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "fps": 10
+        },
+        "hurt": {
+          "frames": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "fps": 16
+        },
+        "kick": {
+          "frames": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "fps": 14,
+          "hit": 3
+        },
+        "walk": {
+          "frames": [
+            32,
+            33,
+            34,
+            35,
+            36,
+            37
+          ],
+          "fps": 10
         },
         "idle": {
           "frames": [
@@ -322,6 +379,9 @@
           ],
           "fps": 1
         }
+      },
+      "bricks": {
+        "death": "stay"
       },
       "placeholder": {
         "body": "goblin",
@@ -339,17 +399,74 @@
       "size": 30,
       "directions": 8,
       "animations": {
-        "attack": {
+        "getup": {
           "frames": [
             1,
             2,
             3,
             4,
-            5,
-            6
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
           ],
           "fps": 14,
           "hit": 5
+        },
+        "death": {
+          "frames": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "fps": 10
+        },
+        "hurt": {
+          "frames": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "fps": 16
+        },
+        "kick": {
+          "frames": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "fps": 14,
+          "hit": 3
+        },
+        "walk": {
+          "frames": [
+            32,
+            33,
+            34,
+            35,
+            36,
+            37
+          ],
+          "fps": 10
         },
         "idle": {
           "frames": [
@@ -357,6 +474,9 @@
           ],
           "fps": 1
         }
+      },
+      "bricks": {
+        "death": "stay"
       },
       "placeholder": {
         "body": "goblin",
@@ -374,17 +494,74 @@
       "size": 35,
       "directions": 8,
       "animations": {
-        "attack": {
+        "getup": {
           "frames": [
             1,
             2,
             3,
             4,
-            5,
-            6
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
           ],
           "fps": 14,
           "hit": 5
+        },
+        "death": {
+          "frames": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "fps": 10
+        },
+        "hurt": {
+          "frames": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "fps": 16
+        },
+        "kick": {
+          "frames": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "fps": 14,
+          "hit": 3
+        },
+        "walk": {
+          "frames": [
+            32,
+            33,
+            34,
+            35,
+            36,
+            37
+          ],
+          "fps": 10
         },
         "idle": {
           "frames": [
@@ -392,6 +569,9 @@
           ],
           "fps": 1
         }
+      },
+      "bricks": {
+        "death": "stay"
       },
       "placeholder": {
         "body": "goblin",
@@ -595,17 +775,74 @@
       "size": 55,
       "directions": 8,
       "animations": {
-        "attack": {
+        "getup": {
           "frames": [
             1,
             2,
             3,
             4,
-            5,
-            6
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
           ],
           "fps": 14,
           "hit": 5
+        },
+        "death": {
+          "frames": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "fps": 10
+        },
+        "hurt": {
+          "frames": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "fps": 16
+        },
+        "kick": {
+          "frames": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "fps": 14,
+          "hit": 3
+        },
+        "walk": {
+          "frames": [
+            32,
+            33,
+            34,
+            35,
+            36,
+            37
+          ],
+          "fps": 10
         },
         "idle": {
           "frames": [
@@ -613,6 +850,9 @@
           ],
           "fps": 1
         }
+      },
+      "bricks": {
+        "death": "stay"
       },
       "placeholder": {
         "body": "goblin",
@@ -631,17 +871,74 @@
       "size": 50,
       "directions": 8,
       "animations": {
-        "attack": {
+        "getup": {
           "frames": [
             1,
             2,
             3,
             4,
-            5,
-            6
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
           ],
           "fps": 14,
           "hit": 5
+        },
+        "death": {
+          "frames": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "fps": 10
+        },
+        "hurt": {
+          "frames": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "fps": 16
+        },
+        "kick": {
+          "frames": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "fps": 14,
+          "hit": 3
+        },
+        "walk": {
+          "frames": [
+            32,
+            33,
+            34,
+            35,
+            36,
+            37
+          ],
+          "fps": 10
         },
         "idle": {
           "frames": [
@@ -649,6 +946,9 @@
           ],
           "fps": 1
         }
+      },
+      "bricks": {
+        "death": "stay"
       },
       "placeholder": {
         "body": "goblin",
@@ -667,17 +967,74 @@
       "size": 50,
       "directions": 8,
       "animations": {
-        "attack": {
+        "getup": {
           "frames": [
             1,
             2,
             3,
             4,
-            5,
-            6
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
           ],
           "fps": 14,
           "hit": 5
+        },
+        "death": {
+          "frames": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "fps": 10
+        },
+        "hurt": {
+          "frames": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "fps": 16
+        },
+        "kick": {
+          "frames": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "fps": 14,
+          "hit": 3
+        },
+        "walk": {
+          "frames": [
+            32,
+            33,
+            34,
+            35,
+            36,
+            37
+          ],
+          "fps": 10
         },
         "idle": {
           "frames": [
@@ -685,6 +1042,9 @@
           ],
           "fps": 1
         }
+      },
+      "bricks": {
+        "death": "stay"
       },
       "placeholder": {
         "body": "goblin",
@@ -798,17 +1158,74 @@
       "size": 25,
       "directions": 8,
       "animations": {
-        "attack": {
+        "getup": {
           "frames": [
             1,
             2,
             3,
             4,
-            5,
-            6
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
           ],
           "fps": 14,
           "hit": 5
+        },
+        "death": {
+          "frames": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "fps": 10
+        },
+        "hurt": {
+          "frames": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "fps": 16
+        },
+        "kick": {
+          "frames": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "fps": 14,
+          "hit": 3
+        },
+        "walk": {
+          "frames": [
+            32,
+            33,
+            34,
+            35,
+            36,
+            37
+          ],
+          "fps": 10
         },
         "idle": {
           "frames": [
@@ -816,6 +1233,9 @@
           ],
           "fps": 1
         }
+      },
+      "bricks": {
+        "death": "stay"
       },
       "placeholder": {
         "body": "goblin",
@@ -928,17 +1348,74 @@
       "size": 30,
       "directions": 8,
       "animations": {
-        "attack": {
+        "getup": {
           "frames": [
             1,
             2,
             3,
             4,
-            5,
-            6
+            5
+          ],
+          "fps": 10
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
           ],
           "fps": 14,
           "hit": 5
+        },
+        "death": {
+          "frames": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "fps": 10
+        },
+        "hurt": {
+          "frames": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "fps": 16
+        },
+        "kick": {
+          "frames": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "fps": 14,
+          "hit": 3
+        },
+        "walk": {
+          "frames": [
+            32,
+            33,
+            34,
+            35,
+            36,
+            37
+          ],
+          "fps": 10
         },
         "idle": {
           "frames": [
@@ -946,6 +1423,9 @@
           ],
           "fps": 1
         }
+      },
+      "bricks": {
+        "death": "stay"
       },
       "placeholder": {
         "body": "goblin",
@@ -960,7 +1440,7 @@
     "acc_goggles": {
       "type": "image",
       "url": "sprites/generated/acc_goggles.png",
-      "size": 4,
+      "size": 15,
       "anchor": [
         0.18,
         -0.22
@@ -974,7 +1454,7 @@
     "acc_sword": {
       "type": "image",
       "url": "sprites/generated/acc_sword.png",
-      "size": 10,
+      "size": 32,
       "anchor": [
         0.48,
         0
@@ -988,7 +1468,7 @@
     "acc_grenades": {
       "type": "image",
       "url": "sprites/generated/acc_grenades.png",
-      "size": 4.5,
+      "size": 15,
       "anchor": [
         0,
         0.22
@@ -1002,7 +1482,7 @@
     "acc_glue": {
       "type": "image",
       "url": "sprites/generated/acc_glue.png",
-      "size": 5,
+      "size": 28,
       "anchor": [
         -0.42,
         0.1
@@ -1016,7 +1496,7 @@
     "acc_chicken": {
       "type": "image",
       "url": "sprites/generated/acc_chicken.png",
-      "size": 6,
+      "size": 31,
       "anchor": [
         -0.4,
         -0.15
@@ -1030,7 +1510,7 @@
     "acc_pot": {
       "type": "image",
       "url": "sprites/generated/acc_pot.png",
-      "size": 6,
+      "size": 25,
       "anchor": [
         0,
         -0.38
@@ -1044,27 +1524,51 @@
     "acc_pie": {
       "type": "image",
       "url": "sprites/generated/acc_pie.png",
-      "size": 6,
-      "anchor": [0.42, 0.05],
-      "placeholder": { "kind": "pie", "color": "#fff4e0", "accent": "#c8823a" }
+      "size": 27,
+      "anchor": [
+        0.42,
+        0.05
+      ],
+      "placeholder": {
+        "kind": "pie",
+        "color": "#fff4e0",
+        "accent": "#c8823a"
+      }
     },
     "acc_umbrella": {
       "type": "image",
       "url": "sprites/generated/acc_umbrella.png",
-      "size": 11,
-      "anchor": [-0.4, -0.28],
-      "placeholder": { "kind": "umbrella", "color": "#3a4ab8", "accent": "#fff7a8" }
+      "size": 32,
+      "anchor": [
+        -0.4,
+        -0.28
+      ],
+      "placeholder": {
+        "kind": "umbrella",
+        "color": "#3a4ab8",
+        "accent": "#fff7a8"
+      }
     },
     "acc_whistle": {
       "type": "image",
       "url": "sprites/generated/acc_whistle.png",
-      "size": 5,
-      "anchor": [0.34, -0.26],
-      "placeholder": { "kind": "whistle", "color": "#d8d8e0", "accent": "#e83a2a" }
+      "size": 31,
+      "anchor": [
+        0.34,
+        -0.26
+      ],
+      "placeholder": {
+        "kind": "whistle",
+        "color": "#d8d8e0",
+        "accent": "#e83a2a"
+      }
     },
     "giant_chicken": {
       "type": "placeholder",
-      "anchor": [0, 0],
+      "anchor": [
+        0,
+        0
+      ],
       "kind": "chicken",
       "color": "#ffffff",
       "accent": "#ff8a00"
@@ -1082,16 +1586,42 @@
   },
   "upgradeFx": {
     "$comment": "Lot D : onomatopées des upgrades (src/render/upgradeFx.ts). Texte >= 26 px.",
-    "potBong": { "text": "BONG !", "color": "#d8dce8", "size": 44, "minGap": 1.5, "equipment": "iron_pot" },
+    "potBong": {
+      "text": "BONG !",
+      "color": "#d8dce8",
+      "size": 44,
+      "minGap": 1.5,
+      "equipment": "iron_pot"
+    },
     "specials": {
-      "fan_whistle": { "text": "TUUUT !", "color": "#ffe14a", "size": 40 },
-      "storm_umbrella": { "text": "ZZZAP !", "color": "#bfe0ff", "size": 40 }
+      "fan_whistle": {
+        "text": "TUUUT !",
+        "color": "#ffe14a",
+        "size": 40
+      },
+      "storm_umbrella": {
+        "text": "ZZZAP !",
+        "color": "#bfe0ff",
+        "size": 40
+      }
     },
     "effects": {
-      "cream_splat": { "text": "SPLOTCH !", "color": "#fffaf0", "size": 40 }
+      "cream_splat": {
+        "text": "SPLOTCH !",
+        "color": "#fffaf0",
+        "size": 40
+      }
     },
     "runners": {
-      "giant_chicken": { "accessory": "giant_chicken", "size": 26, "word": { "text": "COT COT !!", "color": "#ffffff", "size": 48 } }
+      "giant_chicken": {
+        "accessory": "giant_chicken",
+        "size": 26,
+        "word": {
+          "text": "COT COT !!",
+          "color": "#ffffff",
+          "size": 48
+        }
+      }
     }
   },
   "effects": {
@@ -1157,7 +1687,10 @@
       "accent": "#fff2b0",
       "size": 2,
       "duration": 0.4,
-      "sprite": { "url": "sprites/fx/explosion.png", "size": 22 }
+      "sprite": {
+        "url": "sprites/fx/explosion.png",
+        "size": 22
+      }
     },
     "dust": {
       "kind": "ring",
@@ -1165,7 +1698,10 @@
       "accent": "#e0c590",
       "size": 2,
       "duration": 0.45,
-      "sprite": { "url": "sprites/fx/dust.png", "size": 20 }
+      "sprite": {
+        "url": "sprites/fx/dust.png",
+        "size": 20
+      }
     },
     "lightning": {
       "kind": "bolt",
@@ -1173,7 +1709,11 @@
       "accent": "#9fd8ff",
       "size": 2,
       "duration": 0.25,
-      "sprite": { "url": "sprites/fx/lightning.png", "size": 30, "anchor": "bottom" }
+      "sprite": {
+        "url": "sprites/fx/lightning.png",
+        "size": 30,
+        "anchor": "bottom"
+      }
     },
     "glue": {
       "kind": "puddle",
@@ -1215,7 +1755,10 @@
       "size": 4,
       "duration": 0.7,
       "decal": "crater",
-      "sprite": { "url": "sprites/fx/explosion.png", "size": 40 }
+      "sprite": {
+        "url": "sprites/fx/explosion.png",
+        "size": 40
+      }
     },
     "crater": {
       "kind": "puddle",
@@ -1269,12 +1812,55 @@
       "size": 2,
       "duration": 0.45
     },
-    "cream_pie": { "kind": "ball", "color": "#fff4e0", "accent": "#c8823a", "size": 4 },
-    "cream_splat": { "kind": "puddle", "color": "#fffaf0", "accent": "#ffd0e0", "size": 1, "duration": 2, "sprite": { "url": "sprites/fx/cream_splat.png", "size": 14 } },
-    "storm_bolt": { "kind": "bolt", "color": "#e8f4ff", "accent": "#6a8aff", "size": 2.5, "duration": 0.3, "sprite": { "url": "sprites/fx/lightning.png", "size": 30, "anchor": "bottom" } },
-    "whistle_blow": { "kind": "ring", "color": "#ffe14a", "accent": "#ffffff", "size": 2, "duration": 0.5 },
-    "giant_chicken": { "kind": "line", "color": "#c8a46c", "accent": "#e0c590", "size": 6, "duration": 0.6 },
-    "giant_chicken_body": { "kind": "ball", "color": "#ffffff", "accent": "#ff8a00", "size": 22 }
+    "cream_pie": {
+      "kind": "ball",
+      "color": "#fff4e0",
+      "accent": "#c8823a",
+      "size": 4
+    },
+    "cream_splat": {
+      "kind": "puddle",
+      "color": "#fffaf0",
+      "accent": "#ffd0e0",
+      "size": 1,
+      "duration": 2,
+      "sprite": {
+        "url": "sprites/fx/cream_splat.png",
+        "size": 14
+      }
+    },
+    "storm_bolt": {
+      "kind": "bolt",
+      "color": "#e8f4ff",
+      "accent": "#6a8aff",
+      "size": 2.5,
+      "duration": 0.3,
+      "sprite": {
+        "url": "sprites/fx/lightning.png",
+        "size": 30,
+        "anchor": "bottom"
+      }
+    },
+    "whistle_blow": {
+      "kind": "ring",
+      "color": "#ffe14a",
+      "accent": "#ffffff",
+      "size": 2,
+      "duration": 0.5
+    },
+    "giant_chicken": {
+      "kind": "line",
+      "color": "#c8a46c",
+      "accent": "#e0c590",
+      "size": 6,
+      "duration": 0.6
+    },
+    "giant_chicken_body": {
+      "kind": "ball",
+      "color": "#ffffff",
+      "accent": "#ff8a00",
+      "size": 22
+    }
   },
   "staging": {
     "camera": {
@@ -1330,7 +1916,13 @@
         "window": "#14101c",
         "light": "#ffe14a"
       },
-      "confetti": ["#ffe14a", "#ff5a8a", "#7fb0ff", "#9be05a", "#ffffff"]
+      "confetti": [
+        "#ffe14a",
+        "#ff5a8a",
+        "#7fb0ff",
+        "#9be05a",
+        "#ffffff"
+      ]
     },
     "strayShots": {
       "chance": 0.6,
@@ -1353,6 +1945,10 @@
       "accent": "#b8f070",
       "ventRate": 3,
       "puffLife": 3,
+      "sprites": [
+        "sprites/fx/gas_1.png",
+        "sprites/fx/gas_2.png"
+      ],
       "banner": "GAZ TOXIQUE !"
     },
     "gore": {
@@ -1416,18 +2012,57 @@
       "ejectOnHit": true
     },
     "cinema": {
-      "heroDeath": { "enabled": true, "slowmo": 0.35, "ms": 700, "zoom": 1.9, "letterbox": true },
-      "lastKO": { "enabled": true, "slowmo": 0.25, "ms": 1300, "zoom": 2.1, "letterbox": true },
+      "heroDeath": {
+        "enabled": true,
+        "slowmo": 0.35,
+        "ms": 700,
+        "zoom": 1.9,
+        "letterbox": true
+      },
+      "lastKO": {
+        "enabled": true,
+        "slowmo": 0.25,
+        "ms": 1300,
+        "zoom": 2.1,
+        "letterbox": true
+      },
       "letterboxTop": 170,
       "maxShot": 1.5,
-      "winner": { "enabled": true, "zoom": 1.8, "hold": 1.5, "label": "MVP" },
+      "winner": {
+        "enabled": true,
+        "zoom": 1.8,
+        "hold": 1.5,
+        "label": "MVP"
+      },
       "lastKOText": "DERNIER K.O. !"
     },
     "easterEggs": {
-      "crowdBurst": { "chance": 0.35, "cap": 1, "visual": "fx_crowd_burst", "respawnMs": 2600, "line": "OUPS..." },
-      "wave": { "chance": 1, "cap": 1 },
-      "emperorFall": { "chance": 0.4, "cap": 1, "minRadius": 30, "line": "MON TRÔNE !" },
-      "gagAccessories": ["gag_tophat", "gag_helmet", "gag_umbrella", "gag_flower", "gag_viking", "gag_propeller", "gag_duck"]
+      "crowdBurst": {
+        "chance": 0.35,
+        "cap": 1,
+        "visual": "fx_crowd_burst",
+        "respawnMs": 2600,
+        "line": "OUPS..."
+      },
+      "wave": {
+        "chance": 1,
+        "cap": 1
+      },
+      "emperorFall": {
+        "chance": 0.4,
+        "cap": 1,
+        "minRadius": 30,
+        "line": "MON TRÔNE !"
+      },
+      "gagAccessories": [
+        "gag_tophat",
+        "gag_helmet",
+        "gag_umbrella",
+        "gag_flower",
+        "gag_viking",
+        "gag_propeller",
+        "gag_duck"
+      ]
     },
     "miniBoss": {
       "perUpgrade": 0.08,
@@ -1438,15 +2073,69 @@
     }
   },
   "overlays": {
-    "boss_aura": { "type": "placeholder", "kind": "aura", "color": "#ffd23a", "accent": "#ff8a2a" },
-    "boss_crown": { "type": "image", "url": "sprites/generated/boss_crown.png", "size": 6, "placeholder": { "kind": "crown", "color": "#ffd23a", "accent": "#e83a5a" } },
-    "fx_crowd_burst": { "type": "placeholder", "kind": "confetti", "color": "#ffe14a", "accent": "#ff5aa8" },
-    "gag_tophat": { "type": "placeholder", "kind": "tophat", "color": "#ffe14a", "accent": "#d83b3b" },
-    "gag_helmet": { "type": "placeholder", "kind": "helmet", "color": "#b8c0cc", "accent": "#5a6270" },
-    "gag_umbrella": { "type": "placeholder", "kind": "umbrella", "color": "#e83a5a", "accent": "#ffffff" },
-    "gag_flower": { "type": "placeholder", "kind": "flower", "color": "#ff7ab8", "accent": "#ffe14a" },
-    "gag_viking": { "type": "placeholder", "kind": "viking", "color": "#9a9aa8", "accent": "#f4f0e0" },
-    "gag_propeller": { "type": "placeholder", "kind": "propeller", "color": "#3a8ae8", "accent": "#e83a3a" },
-    "gag_duck": { "type": "placeholder", "kind": "duck", "color": "#ffd23a", "accent": "#ff8a2a" }
+    "boss_aura": {
+      "type": "placeholder",
+      "kind": "aura",
+      "color": "#ffd23a",
+      "accent": "#ff8a2a"
+    },
+    "boss_crown": {
+      "type": "image",
+      "url": "sprites/generated/boss_crown.png",
+      "size": 6,
+      "placeholder": {
+        "kind": "crown",
+        "color": "#ffd23a",
+        "accent": "#e83a5a"
+      }
+    },
+    "fx_crowd_burst": {
+      "type": "placeholder",
+      "kind": "confetti",
+      "color": "#ffe14a",
+      "accent": "#ff5aa8"
+    },
+    "gag_tophat": {
+      "type": "placeholder",
+      "kind": "tophat",
+      "color": "#ffe14a",
+      "accent": "#d83b3b"
+    },
+    "gag_helmet": {
+      "type": "placeholder",
+      "kind": "helmet",
+      "color": "#b8c0cc",
+      "accent": "#5a6270"
+    },
+    "gag_umbrella": {
+      "type": "placeholder",
+      "kind": "umbrella",
+      "color": "#e83a5a",
+      "accent": "#ffffff"
+    },
+    "gag_flower": {
+      "type": "placeholder",
+      "kind": "flower",
+      "color": "#ff7ab8",
+      "accent": "#ffe14a"
+    },
+    "gag_viking": {
+      "type": "placeholder",
+      "kind": "viking",
+      "color": "#9a9aa8",
+      "accent": "#f4f0e0"
+    },
+    "gag_propeller": {
+      "type": "placeholder",
+      "kind": "propeller",
+      "color": "#3a8ae8",
+      "accent": "#e83a3a"
+    },
+    "gag_duck": {
+      "type": "placeholder",
+      "kind": "duck",
+      "color": "#ffd23a",
+      "accent": "#ff8a2a"
+    }
   }
 }

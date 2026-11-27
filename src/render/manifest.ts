@@ -252,6 +252,8 @@ const StagingSchema = z.object({
     ventRate: z.number().min(0).default(3),
     /** Durée de vie d'une bouffée (s). */
     puffLife: z.number().positive().default(3),
+    /** Images de bouffée (PixelLab) ; sans elles, des disques de couleur. */
+    sprites: z.array(z.string()).default([]),
     banner: z.string().default('GAZ TOXIQUE !'),
   }),
   /** Morts plus trash : gouttes et flaque sous les corps, qui sèche et vire au brun. */

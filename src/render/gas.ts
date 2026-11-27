@@ -22,6 +22,8 @@ interface Puff {
   age: number;
   life: number;
   tone: number;
+  spin: number;
+  image?: Phaser.GameObjects.Image;
 }
 
 const hex = (c: string) => parseInt(c.slice(1), 16);
@@ -30,6 +32,8 @@ export class GasLayer {
   private readonly vents: Vent[];
   private puffs: Puff[] = [];
   private emitDebt = 0;
+  /** Textures de bouffée chargées (gas_puff_<i>) ; vide = disques dessinés. */
+  private readonly textures: string[];
 
   constructor(
     private readonly g: Phaser.GameObjects.Graphics,
@@ -49,6 +53,7 @@ export class GasLayer {
       { x: f.x + f.width, y: f.y + f.height * 0.35, nx: -1, ny: 0 },
       { x: f.x + f.width, y: f.y + f.height * 0.65, nx: -1, ny: 0 },
     ];
+    this.textures = config.sprites.map((_, i) => `gas_puff_${i}`).filter((k) => g.scene.textures.exists(k));
     this.drawPipes();
   }
 
@@ -98,6 +103,7 @@ export class GasLayer {
           age: 0,
           life: this.config.puffLife * (0.7 + rand() * 0.6),
           tone: rand(),
+          spin: (rand() - 0.5) * 1.2,
         });
       }
     }
@@ -121,12 +127,19 @@ export class GasLayer {
       const inside = p.x > zone.x + 3 && p.x < zone.x + zone.width - 3 && p.y > zone.y + 3 && p.y < zone.y + zone.height - 3;
       if (inside) p.age += dt * 4;
       if (p.age >= p.life) {
+        p.image?.destroy();
         this.puffs.splice(i, 1);
         continue;
       }
       const k = p.age / p.life;
-      const alpha = 0.32 * Math.min(1, k * 4) * (1 - k);
-      g.fillStyle(p.tone < 0.5 ? color : accent, alpha).fillCircle(p.x * S, p.y * S, p.r * S);
+      const alpha = Math.min(1, k * 4) * (1 - k);
+      if (this.textures.length) {
+        // Bouffée PixelLab : grossit, tourne lentement, s'efface.
+        p.image ??= g.scene.add.image(0, 0, this.textures[Math.floor(p.tone * this.textures.length)]).setDepth(g.depth).setFlipX(p.spin < 0);
+        p.image.setPosition(p.x * S, p.y * S).setDisplaySize(p.r * 2.4 * S, p.r * 2.4 * S).setRotation(p.spin * p.age).setAlpha(0.6 * alpha);
+      } else {
+        g.fillStyle(p.tone < 0.5 ? color : accent, 0.32 * alpha).fillCircle(p.x * S, p.y * S, p.r * S);
+      }
     }
   }
 }
