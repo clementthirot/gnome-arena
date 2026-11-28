@@ -17,10 +17,12 @@ export type SoundKind =
   | 'tick'
   | 'ding'
   | 'arrow'
-  | 'splat';
+  | 'splat'
+  | 'wind'
+  | 'hail';
 
 /** Écart minimal entre deux sons identiques (ms), pour ne pas saturer pendant la mêlée. */
-const GAP: Partial<Record<SoundKind, number>> = { hit: 45, heavy: 80, arrow: 60, whoosh: 90, land: 70, tick: 30, cheer: 600, ooh: 900 };
+const GAP: Partial<Record<SoundKind, number>> = { hit: 45, heavy: 80, arrow: 60, whoosh: 90, land: 70, tick: 30, cheer: 600, ooh: 900, wind: 900, hail: 55 };
 
 export class Sound {
   private ctx: AudioContext | null = null;
@@ -174,6 +176,14 @@ export class Sound {
         break;
       case 'splat':
         this.burst(0.15, 0.25, 'lowpass', 1500, 300);
+        break;
+      case 'wind':
+        // Hurlement de rafale : bruit filtré dont la bande monte puis retombe.
+        this.burst(0.7, 0.14, 'bandpass', 380, 900);
+        this.burst(0.9, 0.1, 'bandpass', 900, 420, 0.5);
+        break;
+      case 'hail':
+        this.burst(0.03, 0.12, 'highpass', 5200, 3800);
         break;
     }
   }

@@ -92,9 +92,9 @@ interface DirectionalSidecar {
   animations: Json;
 }
 
-type AnimName = 'idle' | 'walk' | 'attack' | 'kick' | 'hurt' | 'getup' | 'death';
+type AnimName = 'idle' | 'guard' | 'stroll' | 'walk' | 'attack' | 'kick' | 'hurt' | 'getup' | 'death';
 /** Cadence par défaut des animations qui n'existent pas dans la disposition standard. */
-const EXTRA_FPS: Record<string, number> = { kick: 14, hurt: 16, getup: 10 };
+const EXTRA_FPS: Record<string, number> = { kick: 14, hurt: 16, getup: 10, stroll: 8, guard: 8 };
 
 /** Noms d'animations PixelLab reconnus, vers les animations du jeu (l'ordre des tests compte). */
 function animationFor(name: string): AnimName | undefined {
@@ -104,7 +104,9 @@ function animationFor(name: string): AnimName | undefined {
   if (/taking|hurt|hit.?react|damage|flinch/.test(n)) return 'hurt';
   if (/kick/.test(n)) return 'kick';
   if (/punch|attack|slash|strike|swing|jab/.test(n)) return 'attack';
-  if (/walk|run/.test(n)) return 'walk';
+  if (/fight|stance|guard/.test(n)) return 'guard';
+  if (/run|sprint/.test(n)) return 'walk';
+  if (/walk/.test(n)) return 'stroll';
   if (/idle|breath/.test(n)) return 'idle';
   return undefined;
 }

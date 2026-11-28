@@ -63,6 +63,11 @@ const SpriteSheetSchema = z.object({
   directions: z.literal(8).optional(),
   animations: z.object({
     idle: AnimationSchema,
+    /** Garde de combat en boucle, à l'arrêt face à un adversaire ; à défaut, la pose fixe (idle). */
+    guard: AnimationSchema.optional(),
+    /** Marche (au contact, déplacements lents) ; à défaut, la course (walk) ralentie. */
+    stroll: AnimationSchema.optional(),
+    /** Course. */
     walk: AnimationSchema.optional(),
     attack: AnimationSchema.optional(),
     /** Attaque secondaire (coup de pied) ; à défaut, l'attaque principale est rejouée. */
@@ -271,6 +276,10 @@ const StagingSchema = z.object({
     /** Images de bouffée (PixelLab) ; sans elles, des disques de couleur. */
     sprites: z.array(z.string()).default([]),
     banner: z.string().default('GAZ TOXIQUE !'),
+    /** gas : nuage craché par des conduits ; blizzard : tempête de neige et de grêle qui cingle la bande extérieure. */
+    style: z.enum(['gas', 'blizzard']).default('gas'),
+    /** Blizzard : teinte du ciel bouché hors zone (sombre, pour que la neige blanche ressorte même sur un sol enneigé). */
+    shade: color.default('#26344f'),
   }),
   /** Morts plus trash : gouttes et flaque sous les corps, qui sèche et vire au brun. */
   gore: z.object({

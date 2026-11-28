@@ -86,7 +86,7 @@ export class GasLayer {
    * Les conduits crachent dès que la zone se resserre, de plus en plus fort. Appelé à chaque tick de
    * simulation (pas à chaque image) : les bouffées tirées ne dépendent ni du framerate ni de ?speed.
    */
-  emit(dt: number, zoneScale: number): void {
+  emit(dt: number, zoneScale: number, _zone?: FieldRect): void {
     if (zoneScale < 1 && dt > 0) {
       this.emitDebt += dt * this.config.ventRate * this.vents.length * (1 + (1 - zoneScale) * 2);
       while (this.emitDebt >= 1) {
