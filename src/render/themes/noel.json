@@ -2299,7 +2299,7 @@
       "acc_goggles": {
         "type": "image",
         "url": "sprites/themes/noel/acc/star.png",
-        "size": 12,
+        "size": 7,
         "anchor": [
           0,
           -0.62
@@ -2308,7 +2308,7 @@
       "acc_sword": {
         "type": "image",
         "url": "sprites/themes/noel/acc/candycane.png",
-        "size": 30,
+        "size": 18,
         "anchor": [
           0.48,
           0
@@ -2317,7 +2317,7 @@
       "acc_grenades": {
         "type": "image",
         "url": "sprites/themes/noel/acc/crackers.png",
-        "size": 15,
+        "size": 9,
         "anchor": [
           0,
           0.22
@@ -2326,7 +2326,7 @@
       "acc_glue": {
         "type": "image",
         "url": "sprites/themes/noel/acc/marshmallow.png",
-        "size": 20,
+        "size": 12,
         "anchor": [
           -0.42,
           0.1
@@ -2335,7 +2335,7 @@
       "acc_chicken": {
         "type": "image",
         "url": "sprites/themes/noel/acc/turkey.png",
-        "size": 18,
+        "size": 11,
         "anchor": [
           -0.4,
           -0.15
@@ -2344,7 +2344,7 @@
       "acc_pot": {
         "type": "image",
         "url": "sprites/themes/noel/acc/sweater.png",
-        "size": 16,
+        "size": 10,
         "anchor": [
           0,
           0.18
@@ -2353,7 +2353,7 @@
       "acc_snowball": {
         "type": "image",
         "url": "sprites/themes/noel/acc/snowball.png",
-        "size": 14,
+        "size": 8,
         "anchor": [
           0.38,
           0.12
@@ -2362,7 +2362,7 @@
       "acc_bells": {
         "type": "image",
         "url": "sprites/themes/noel/acc/bells.png",
-        "size": 13,
+        "size": 8,
         "anchor": [
           0.32,
           0.06
@@ -2389,6 +2389,22 @@
           "color": "#2a2630",
           "accent": "#6a5a78"
         }
+      },
+      "boss_crown": {
+        "type": "image",
+        "url": "sprites/themes/noel/fx/boss_crown.png",
+        "size": 9,
+        "placeholder": {
+          "kind": "crown",
+          "color": "#3a9a4a",
+          "accent": "#d83b3b"
+        }
+      },
+      "boss_aura": {
+        "type": "placeholder",
+        "kind": "aura",
+        "color": "#bfe8ff",
+        "accent": "#ffffff"
       }
     },
     "effects": {
