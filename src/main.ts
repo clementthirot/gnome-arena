@@ -5,7 +5,7 @@
 //   ?up=bob:magic_sword+grenades,snik:laser_goggles   équipe des héros à la main (essais ; s'ajoute aux upgrades de l'arc)
 //   ?prev=kevin:laser_goggles:120,340,95   simule le vote de l'épisode précédent (révélation), avec ou sans arc
 //   ?speed=2            accélère l'affichage (touches 1, 2, 3, 4, 8 en cours de combat)
-//   (barre du bas)      tête de lecture : lecture/pause, vitesse ×1 à ×4, aller à un moment (flèches : ±5 s) ; ?scrub=0 la masque
+//   (barre du bas)      tête de lecture, au toucher ou à la souris, cachée après 3 s : lecture/pause, vitesse ×1 à ×4, aller à un moment (flèches : ±5 s) ; ?scrub=0 la masque
 //   ?mode=bench         mode accéléré sans rendu (Web Worker) : durée moyenne, victoires, retournements
 //   ?intro=0            passe l'intro (aperçus rapides de la régie)
 //   ?draft=<json>       réglages d'arc en brouillon, pour un épisode pas encore figé (aperçu de la régie)

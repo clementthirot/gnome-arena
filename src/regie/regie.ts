@@ -114,6 +114,16 @@ try {
 }
 setView(savedView === 'regie' ? 'regie' : 'arena');
 viewToggle.onclick = () => setView(document.body.classList.contains('view-arena') ? 'regie' : 'arena');
+// Barre de lecture de l'arène (dans l'iframe) : ses boutons Rejouer et Régie agissent ici.
+const phoneLayout = window.matchMedia('(max-width: 820px), (pointer: coarse) and (max-width: 1100px)');
+const sendLayout = () => frame.contentWindow?.postMessage({ type: 'regie-layout', phone: phoneLayout.matches }, '*');
+phoneLayout.addEventListener('change', sendLayout);
+window.addEventListener('message', (e) => {
+  if (e.source !== frame.contentWindow || e.data?.type !== 'arena-bar') return;
+  if (e.data.action === 'hello') sendLayout();
+  else if (e.data.action === 'replay' && previewTarget) preview(previewTarget);
+  else if (e.data.action === 'regie') setView('regie');
+});
 document.getElementById('viewReplay')!.onclick = () => previewTarget && preview(previewTarget);
 document.getElementById('replay')!.onclick = () => previewTarget && preview(previewTarget);
 // Nouvelle seed au hasard pour le prochain épisode (la sélection du scout est abandonnée).
