@@ -195,7 +195,9 @@ Brief : doc Claude « Pack Noël — Calendrier de l'Avent ». Même moteur, mê
 
 Paramètres communs : `view: "low top-down"`, 8 directions, template `mannequin`, `outline: single color black outline`.
 Animations par template (1 génération par direction) : `running-6-frames`, `cross-punch`, `falling-back-death`.
-Import : `npm run sprites -- pixellab <dossier dézippé> <clé> --theme=noel --scale=1.25 --hit=attack:5`.
+Import : `npm run sprites -- pixellab <dossier dézippé>/Idle <clé> --theme=noel --scale=1.25 --hit=attack:3` (invocations : `--scale=1`).
+La mort sud-ouest de Mère Noël n'a pas été générée : c'est le miroir de la sud-est (à régénérer si besoin).
+Gros Glaçon : `shrinkWithHp: 0.6` (rapetisse avec ses PV) et `rollOnCharge` (roule pendant sa charge).
 
 | Clé | Taille / seed | character_id | Prompt |
 | --- | --- | --- | --- |
