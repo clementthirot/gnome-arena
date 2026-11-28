@@ -80,8 +80,9 @@ le plus petit numéro gagne. Un match nul ne donne pas d'upgrade : choisir une a
 
 Dans la vidéo de l'épisode N, l'ouverture révèle le vote de l'épisode N-1 (machine à sous qui s'arrête sur l'upgrade gagnante,
 pourcentage des voix, l'accessoire qui vole jusqu'au héros, étiquette « NOUVEAU »), puis le combat démarre vers 4 s.
-La fin montre le vainqueur et le MVP, puis la carte de vote seule, dans la zone sûre, et se fond dans la première image
-pour boucler. L'ancienne intro longue reste disponible avec `staging.intro: "classic"` dans le manifeste.
+La fin : le rideau se ferme sur l'arène (« ET LE MVP EST... »), se rouvre sur le vainqueur et le MVP, puis le titre de la
+partie vote (`staging.reveal.giftsTitle`, « LES CADEAUX DU PUBLIC » en thème Noël) et la carte de vote seule, dans la zone sûre,
+avec le temps de lire les upgrades. Un dernier rideau se ferme et se rouvre sur la première image : la vidéo boucle. L'ancienne intro longue reste disponible avec `staging.intro: "classic"` dans le manifeste.
 
 Les arcs sont des fichiers JSON dans `src/data/arcs/` : l'état des héros à l'épisode N se reconstruit à
 partir des votes précédents, donc chaque épisode publié reste rejouable à l'identique.

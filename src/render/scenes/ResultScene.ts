@@ -1,11 +1,13 @@
-// Écran de fin en deux temps, tout dans la zone sûre des réseaux sociaux :
-//   0 - 2,5 s  « VICTOIRE DES GNOMES » (ou « MATCH NUL ») et le MVP ;
-//   2,5 s - …  la carte de vote seule : héros bénéficiaire, « VOTE 1, 2 OU 3 », 3 cartes à rouleaux ;
-//   fin        fondu vers la première image de la vidéo (même fond, même titre) : elle boucle.
+// Écran de fin, tout dans la zone sûre des réseaux sociaux. Le rideau (fermé sur l'arène, « ET LE MVP EST... »)
+// se rouvre sur :
+//   0 - 3,5 s    « VICTOIRE DES GNOMES » (ou « MATCH NUL ») et le MVP ;
+//   3,5 - 5 s    titre de la partie vote (« LES CADEAUX DU PUBLIC ») ;
+//   5 s - …      la carte de vote : héros bénéficiaire, options dévoilées une à une, appel au vote, temps de lecture ;
+//   fin          un rideau nu se ferme puis se rouvre sur la première image de la vidéo : elle boucle.
 // Pas de boutons : rejouer ou changer de seed se fait depuis la régie. En enregistrement, la fin du fondu clôt la vidéo.
 import Phaser from 'phaser';
 import type { TeamId } from '../../data/schema';
-import { openCurtain } from '../curtain';
+import { closeCurtain, openCurtain } from '../curtain';
 import { FRAME_INSET, FRAME_SCALE, goldFrame, hasGoldFrame } from '../frame';
 import { manifest } from '../manifest';
 import { drawOpeningTitle, fill, lastOpeningTitle, OPENING_FRAME } from '../reveal';
@@ -28,14 +30,21 @@ export interface ResultData {
   curtain?: boolean;
 }
 
-/** Durée d'affichage de l'écran de fin avant la fin d'un enregistrement (ms), avec carte de vote. */
-export const RESULT_HOLD_MS = 9000;
-/** Sans carte de vote (aperçu, seed simple, match nul) : un seul temps, plus court. */
-export const RESULT_HOLD_NO_VOTE_MS = 5000;
-/** Fin du premier temps (vainqueur + MVP), début de la carte de vote (ms). */
-const VERDICT_MS = 2500;
-/** Durée du fondu de boucle vers la première image (ms). */
-const LOOP_FADE_MS = 700;
+/** Fin du premier temps (vainqueur + MVP), début du titre de la partie vote (ms). */
+const VERDICT_MS = 3500;
+/** Titre de la partie vote seul à l'écran (ms). */
+const GIFTS_TITLE_MS = 1500;
+/** Carte de vote : dévoilement des options (≈ 3 s) puis temps pour lire les upgrades (ms). */
+const VOTE_MS = 7500;
+/** Rideau de boucle : fermeture, pause fermée, réouverture sur la première image (ms). */
+const LOOP_CLOSE_MS = 700;
+const LOOP_HOLD_MS = 350;
+const LOOP_OPEN_MS = 600;
+const LOOP_MS = LOOP_CLOSE_MS + LOOP_HOLD_MS + 120 + LOOP_OPEN_MS;
+/** Durée de l'écran de fin jusqu'à la dernière image (ms), avec carte de vote. */
+export const RESULT_HOLD_MS = VERDICT_MS + GIFTS_TITLE_MS + VOTE_MS + LOOP_MS;
+/** Sans carte de vote (aperçu, seed simple, match nul) : vainqueur et MVP seulement. */
+export const RESULT_HOLD_NO_VOTE_MS = 5000 + LOOP_MS;
 
 const CX = SAFE.centered.x + SAFE.centered.w / 2;
 
@@ -86,13 +95,17 @@ export class ResultScene extends Phaser.Scene {
     if (vote) {
       this.time.delayedCall(VERDICT_MS, () => {
         this.tweens.add({ targets: verdict, alpha: 0, duration: 220, onComplete: () => verdict.forEach((o) => o.destroy()) });
-        this.voteCard(vote);
+        const title = this.giftsTitle();
+        this.time.delayedCall(GIFTS_TITLE_MS, () => {
+          this.tweens.add({ targets: title, alpha: 0, duration: 200, onComplete: () => title.forEach((o) => o.destroy()) });
+          this.voteCard(vote);
+        });
       });
     }
     else this.celebrate(r);
     if (r.curtain) openCurtain(this, 250, 450);
     const hold = vote ? RESULT_HOLD_MS : RESULT_HOLD_NO_VOTE_MS;
-    this.time.delayedCall(hold - LOOP_FADE_MS, () => this.loopToFirstFrame());
+    this.time.delayedCall(hold - LOOP_MS, () => this.loopToFirstFrame());
 
     if (r.params.record) this.time.delayedCall(hold, () => this.game.events.emit('episode-finished'));
   }
@@ -149,6 +162,16 @@ export class ResultScene extends Phaser.Scene {
     group.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0));
     this.tweens.add({ targets: group, alpha: 1, duration: 250, delay: this.tweens.stagger(120, { start: 700 }) });
     return [...items, ...group];
+  }
+
+  /** Entre le MVP et la carte de vote : « LES CADEAUX DU PUBLIC » seul, dans son cadre. */
+  private giftsTitle(): Phaser.GameObjects.GameObject[] {
+    const y = 700;
+    const text = this.add.text(CX, y, manifest.staging.reveal.giftsTitle, textStyle(64, '#ffe14a', { align: 'center', lineSpacing: 18 })).setOrigin(0.5).setScale(0.4).setAlpha(0);
+    const items = [...this.plaque(y, text.height + 140), text];
+    if (!hasGoldFrame(this) && manifest.staging.reveal.textBacking) items.unshift(this.backing(CX, y, SAFE.centered.w, text.height + 100));
+    this.tweens.add({ targets: text, alpha: 1, scale: 1, duration: 350, ease: 'Back.easeOut' });
+    return items;
   }
 
   /** Second temps : « Kevin recevra la prochaine upgrade — vote 1, 2 ou 3 en commentaire ». */
@@ -244,24 +267,32 @@ export class ResultScene extends Phaser.Scene {
     return items;
   }
 
-  /** Fondu vers la première image (photographiée à l'ouverture, sinon redessinée) : la vidéo boucle. */
+  /**
+   * Boucle : un rideau nu se ferme sur l'écran de fin, la première image (photographiée à l'ouverture, sinon
+   * redessinée) se pose derrière, puis le rideau se rouvre dessus. La vidéo finit sur sa première image.
+   */
   private loopToFirstFrame(): void {
     const { width: w, height: h } = this.scale;
-    const items: Phaser.GameObjects.GameObject[] = [];
-    if (this.textures.exists(OPENING_FRAME)) {
-      items.push(this.add.image(0, 0, OPENING_FRAME).setOrigin(0).setDisplaySize(w, h).setDepth(5000));
-    } else {
-      // Sans écran d'ouverture (aperçu sans intro), pas de première image à rejoindre : on reste sur la fin
-      // plutôt que de finir sur une arène vide.
-      const title = lastOpeningTitle(this);
-      if (!title) return;
-      const bg = this.textures.getTextureKeys().find((k) => k.startsWith('arena_bg_'));
-      if (bg) items.push(this.add.image(0, 0, bg).setOrigin(0).setDisplaySize(w, h).setDepth(5000));
-      items.push(...drawOpeningTitle(this, title, 5001));
-    }
-    items.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0));
-    // Le voile du titre garde son opacité de remplissage : l'alpha de l'objet ne fait que la moduler.
-    this.tweens.add({ targets: items, alpha: 1, duration: LOOP_FADE_MS - 100 });
+    closeCurtain(
+      this,
+      LOOP_CLOSE_MS,
+      (closed) => {
+        if (this.textures.exists(OPENING_FRAME)) {
+          this.add.image(0, 0, OPENING_FRAME).setOrigin(0).setDisplaySize(w, h).setDepth(5000);
+        } else {
+          // Sans écran d'ouverture (aperçu sans intro), on redessine le titre sur le fond de l'arène s'il existe.
+          const title = lastOpeningTitle(this);
+          const bg = this.textures.getTextureKeys().find((k) => k.startsWith('arena_bg_'));
+          if (bg) this.add.image(0, 0, bg).setOrigin(0).setDisplaySize(w, h).setDepth(5000);
+          if (title) drawOpeningTitle(this, title, 5001);
+        }
+        // Rideau identique qui se rouvre, posé par-dessus le premier : on peut retirer celui qui s'est fermé.
+        openCurtain(this, 0, LOOP_OPEN_MS, { title: null });
+        closed.parts.forEach((p) => p.destroy());
+      },
+      { title: null },
+      LOOP_HOLD_MS,
+    );
   }
 
   /** Fin sans carte de vote : la fin reste vivante (confettis du vainqueur, titre qui respire). */

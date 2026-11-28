@@ -1,6 +1,6 @@
-// Rideau de transition vers la roulette des upgrades : il se ferme sur l'arène, puis se rouvre
-// sur la carte de vote. La même composition est rejouée dans les deux scènes pour que le passage
-// soit continu à l'écran.
+// Rideau de transition. Il se ferme sur l'arène pour annoncer le MVP, puis se rouvre sur l'écran de fin
+// (même composition rejouée dans les deux scènes, pour un passage continu à l'écran). En toute fin, un rideau
+// sans titre se ferme sur la carte de vote et se rouvre sur la première image : la vidéo boucle.
 import type Phaser from 'phaser';
 import { goldFrame } from './frame';
 import { manifest } from './manifest';
@@ -51,20 +51,34 @@ function reelTextures(scene: Phaser.Scene): string[] {
   });
 }
 
-function build(scene: Phaser.Scene, closed: boolean): Curtain {
+export interface CurtainOptions {
+  /** Titre sur la plaque ; null = rideau nu (boucle de fin). Par défaut staging.reveal.curtainTitle. */
+  title?: string | null;
+  /** Trois rouleaux (ou cadeaux) sous le titre. */
+  icons?: boolean;
+}
+
+function build(scene: Phaser.Scene, closed: boolean, opts: CurtainOptions = {}): Curtain {
+  const text = opts.title === undefined ? manifest.staging.reveal.curtainTitle : opts.title;
   const { width: w, height: h } = scene.scale;
   const top = panel(scene, closed ? 0 : -h / 2, w, h / 2);
   const bottom = panel(scene, closed ? h / 2 : h, w, h / 2);
   const title: Phaser.GameObjects.GameObject[] = [];
-  const plaque = goldFrame(scene, w / 2, h / 2 - 170, 640, 250);
+  const plaqueY = opts.icons ? h / 2 - 170 : h / 2;
+  const plaque = text === null ? undefined : goldFrame(scene, w / 2, plaqueY, 640, 250);
   if (plaque) {
     // Même cadre doré que l'écran de fin derrière le titre, couronne au sommet.
     title.push(plaque.setDepth(DEPTH + 1));
-    if (scene.textures.exists('ui_crown')) title.push(scene.add.image(w / 2, h / 2 - 170 - 125 + 6, 'ui_crown').setOrigin(0.5, 1).setScale(2.25).setDepth(DEPTH + 1));
+    if (scene.textures.exists('ui_crown')) title.push(scene.add.image(w / 2, plaqueY - 125 + 6, 'ui_crown').setOrigin(0.5, 1).setScale(2.25).setDepth(DEPTH + 1));
   }
-  title.push(scene.add.text(w / 2, h / 2 - 170, manifest.staging.reveal.curtainTitle, textStyle(64, '#ffe14a', { align: 'center' })).setOrigin(0.5).setDepth(DEPTH + 2));
+  if (text !== null) {
+    const t = scene.add.text(w / 2, plaqueY, text, textStyle(64, '#ffe14a', { align: 'center', lineSpacing: 12 })).setOrigin(0.5).setDepth(DEPTH + 2);
+    // Le titre tient dans la plaque, bords compris.
+    if (t.width > 540) t.setScale(540 / t.width);
+    title.push(t);
+  }
   // Cadres dorés des rouleaux, comme la machine à sous du verdict.
-  for (const k of [-1, 0, 1]) {
+  for (const k of opts.icons ? [-1, 0, 1] : []) {
     const f = goldFrame(scene, w / 2 + k * 220, h / 2 + 90, 190, 190);
     if (f) title.push(f.setDepth(DEPTH + 1));
   }
@@ -72,7 +86,7 @@ function build(scene: Phaser.Scene, closed: boolean): Curtain {
   // Thème « cadeaux » : trois paquets qui gigotent au lieu des rouleaux qui défilent.
   const gifts = manifest.staging.reveal.style === 'gifts';
   const textures = gifts ? [] : reelTextures(scene);
-  const reels = [-1, 0, 1].map((k) => {
+  const reels = (opts.icons ? [-1, 0, 1] : []).map((k) => {
     const img = scene.add
       .image(w / 2 + k * 220, h / 2 + 90, gifts ? giftTexture(scene) : textures[(k + 1) % Math.max(1, textures.length)])
       .setDepth(DEPTH + 2)
@@ -97,19 +111,19 @@ function build(scene: Phaser.Scene, closed: boolean): Curtain {
 }
 
 /** Ferme le rideau (fin du combat), puis appelle done. */
-export function closeCurtain(scene: Phaser.Scene, durationMs: number, done: () => void): void {
+export function closeCurtain(scene: Phaser.Scene, durationMs: number, done: (curtain: Curtain) => void, opts?: CurtainOptions, holdMs = 450): void {
   const { height: h } = scene.scale;
-  const c = build(scene, false);
+  const c = build(scene, false, opts);
   scene.tweens.add({ targets: c.top, y: 0, duration: durationMs, ease: 'Bounce.easeOut' });
   scene.tweens.add({ targets: c.bottom, y: h / 2, duration: durationMs, ease: 'Bounce.easeOut' });
   scene.tweens.add({ targets: [...c.title, ...c.reels], alpha: 1, delay: durationMs * 0.6, duration: 200 });
-  scene.time.delayedCall(durationMs + 450, done);
+  scene.time.delayedCall(durationMs + holdMs, () => done(c));
 }
 
-/** Rouvre le rideau sur l'écran de vote. */
-export function openCurtain(scene: Phaser.Scene, delayMs: number, durationMs: number): void {
+/** Rouvre le rideau (sur l'écran de fin, ou sur la première image pour boucler). */
+export function openCurtain(scene: Phaser.Scene, delayMs: number, durationMs: number, opts?: CurtainOptions): void {
   const { height: h } = scene.scale;
-  const c = build(scene, true);
+  const c = build(scene, true, opts);
   scene.tweens.add({ targets: [...c.title, ...c.reels], alpha: 0, delay: delayMs, duration: 180 });
   scene.tweens.add({ targets: c.top, y: -h / 2, delay: delayMs + 120, duration: durationMs, ease: 'Quad.easeIn' });
   scene.tweens.add({ targets: c.bottom, y: h, delay: delayMs + 120, duration: durationMs, ease: 'Quad.easeIn', onComplete: () => c.parts.forEach((p) => p.destroy()) });

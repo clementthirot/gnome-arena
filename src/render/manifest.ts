@@ -228,8 +228,10 @@ const StagingSchema = z.object({
     style: z.enum(['slots', 'gifts']).default('slots'),
     /** Aplat (couleur) sous les textes de l'écran de fin posés sur le motif : numéro d'épisode, bloc MVP. */
     textBacking: color.optional(),
-    /** Titre du rideau qui précède la carte de vote. */
-    curtainTitle: z.string().default('ROULETTE\nDES UPGRADES'),
+    /** Titre du rideau qui ferme l'arène et annonce le MVP. */
+    curtainTitle: z.string().default('ET LE MVP\nEST...'),
+    /** Titre qui ouvre la partie vote, après le MVP. */
+    giftsTitle: z.string().default('ROULETTE\nDES UPGRADES'),
     /** Cadre du rouleau : placeholder dessiné ; `url` (optionnelle) le remplace par une image, clé ui_slot_frame. */
     slot: z.object({ frame: color.default('#c8902a'), window: color.default('#14101c'), light: color.default('#ffe14a'), url: z.string().optional() }).default({}),
     /** Confettis de l'accrochage de l'accessoire. */
