@@ -1,5 +1,5 @@
 {
-  "$comment": "Thème de Noël (?theme=noel) : mêmes règles, autres assets. Seul ce qui change est listé ; le reste vient de assets.manifest.json. Sprites du thème dans public/sprites/themes/noel/ (npm run sprites -- pixellab <dossier> <clés…> --theme=noel les ajoute ici). Pack « Calendrier de l'Avent » : brief dans le Claude Doc de Clément ; assets et prompts dans docs/sprites.md (Pack Noël).",
+  "$comment": "Thème de Noël (?theme=noel) : mêmes règles, autres assets. Seul ce qui change est listé ; le reste vient de assets.manifest.json. Sprites du thème dans public/sprites/themes/noel/ (npm run sprites -- pixellab <dossier> <clés…> --theme=noel les ajoute ici). Pack « Calendrier de l'Avent » : brief dans le Claude Doc de Clément ; assets et prompts dans docs/sprites.md (Pack Noël). Héros de base (arcs ouverts avant le pack) : en thème noel, ils portent les skins des héros de Noël du même rôle (Bob → Marcel, Kevin → Mère Noël, Gertrude → Papy Boulon, Grok → Gros Glaçon, Snik → Père Fouettard, Morva → Gobbo Claus) ; noms et règles inchangés.",
   "name": "Lutins vs Vilains — Calendrier de l'Avent",
   "teams": {
     "gnomes": {
