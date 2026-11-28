@@ -24,22 +24,9 @@ import { BootScene } from './render/scenes/BootScene';
 import { ResultScene } from './render/scenes/ResultScene';
 import { startBenchPage } from './tools/benchPage';
 import { applyThemeLabels, theme, themeId } from './render/themes';
+import { findArc } from './regie/store';
 
 const params = new URLSearchParams(location.search);
-// En production, les arcs sont embarqués ; en développement, la régie les sert à jour (sans recharger la page).
-const arcFiles = import.meta.glob('./data/arcs/*.json', { import: 'default' });
-
-async function loadArc(id: string): Promise<unknown> {
-  try {
-    const res = await fetch('./__regie/arcs');
-    if (res.ok) return ((await res.json()) as { id: string }[]).find((a) => a.id === id);
-  } catch {
-    // pas de régie (build de production)
-  }
-  const loader = Object.entries(arcFiles).find(([path]) => path.endsWith(`/${id}.json`))?.[1];
-  return loader ? loader() : undefined;
-}
-
 async function main() {
   if (theme.name) document.title = theme.name;
   await document.fonts.load('16px "Press Start 2P"');
@@ -140,7 +127,8 @@ async function arenaParams(data: GameData): Promise<ArenaParams> {
       episode: prev ? { number: Number(params.get('ep')) || 2, previousVote: prev } : undefined,
     };
   }
-  const raw = await loadArc(arcId);
+  // Relais de la régie en développement ; en ligne, version modifiée sur cet appareil ou celle du dépôt.
+  const raw = await findArc(arcId);
   if (!raw) throw new Error(`arc introuvable : ${arcId}`);
   let arc = parseArc(raw, data);
   // Un arc de pack s'ouvre dans son thème : on recharge la page avec ?theme=… s'il manque.
