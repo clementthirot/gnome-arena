@@ -1,6 +1,7 @@
 // Régie : préparer un épisode (scout, héros bénéficiaire, options de vote), régler l'arc
 // (biome, effectifs, incidents, gags), compter les votes, clore un arc. Les arcs sont lus et
-// écrits par le relais du serveur de dev (vite.config.ts), qui les valide avant d'écrire.
+// écrits par le relais du serveur de dev (vite.config.ts), qui les valide avant d'écrire. Sans relais
+// (version en ligne sur GitHub Pages), ils sont gardés dans ce navigateur : voir store.ts.
 import { loadGameData } from '../data';
 import { applyThemeLabels, THEMES, themeId } from '../render/themes';
 import {
@@ -20,6 +21,7 @@ import {
 import type { TeamId } from '../data/schema';
 import { END_LABEL, WINNER_LABEL } from '../tools/metrics';
 import { freezeEpisode } from './freeze';
+import { localArcs, offlineArcs, relayArcs, resetLocalArcs, saveLocalArc } from './store';
 import type { ScoutMessage, ScoutRequest, ScoutRow } from './scout.worker';
 
 // Noms du thème de la régie (?theme=noel) : du texte seulement, les simulations ne changent pas.
@@ -32,6 +34,8 @@ let arcs: Arc[] = [];
 /** Révision de chaque arc au moment de sa lecture (contrôle des écritures concurrentes par le relais). */
 let revisions = new Map<string, string>();
 let arc: Arc | undefined;
+/** Version en ligne : pas de relais, les arcs sont gardés sur cet appareil. */
+let offline = false;
 let scoutRows: ScoutRow[] = [];
 let picked: ScoutRow | undefined;
 let worker: Worker | undefined;
@@ -85,6 +89,10 @@ function previewNext(delay = 600): void {
   }, delay);
 }
 
+// Arène en grand dans un nouvel onglet (téléphone : plein écran, avec le son).
+document.getElementById('fullscreen')!.onclick = () => {
+  if (previewTarget && arc) window.open(previewUrl(previewTarget), '_blank');
+};
 document.getElementById('replay')!.onclick = () => previewTarget && preview(previewTarget);
 // Nouvelle seed au hasard pour le prochain épisode (la sélection du scout est abandonnée).
 document.getElementById('randomSeed')!.onclick = () => {
@@ -200,15 +208,29 @@ const percent = (v: number) => `${(v * 100).toFixed(v < 0.1 ? 1 : 0)} %`;
 // ------------------------------------------------------------ relais serveur
 
 async function fetchArcs(): Promise<void> {
-  const res = await fetch('./__regie/arcs');
-  if (!res.ok) throw new Error('relais de la régie indisponible : lancer « npm run dev »');
-  const raw = (await res.json()) as { id: string; revision?: string }[];
+  const relay = await relayArcs();
+  offline = !relay;
+  const raw = relay ?? offlineArcs();
   revisions = new Map(raw.flatMap((a) => (a.revision ? [[a.id, a.revision] as const] : [])));
   // Tri par identifiant : l'arc ouvert choisi par défaut ne dépend pas de l'ordre des fichiers.
   arcs = raw.map((a) => parseArc(a, data)).sort((x, y) => x.id.localeCompare(y.id));
 }
 
 async function saveArc(next: Arc, status: HTMLElement, okText: string): Promise<boolean> {
+  if (offline) {
+    // Même validation que le relais, puis enregistrement sur cet appareil.
+    try {
+      saveLocalArc(parseArc(structuredClone(next), data) as unknown as { id: string });
+    } catch (e) {
+      message(status, `Refusé : ${(e as Error).message}`, false);
+      return false;
+    }
+    await fetchArcs();
+    arc = arcs.find((a) => a.id === next.id);
+    render();
+    message(app.querySelector('section') ?? app, okText, true);
+    return true;
+  }
   const headers = { 'Content-Type': 'application/json', 'X-Arc-Revision': revisions.get(next.id) ?? 'new' };
   const res = await fetch(`./__regie/arcs/${next.id}`, { method: 'PUT', body: JSON.stringify(next), headers });
   const body = await res.json();
@@ -618,6 +640,83 @@ function endSection(a: Arc): HTMLElement {
   return s;
 }
 
+// ------------------------------------------------------------ thème et version en ligne
+
+const themeSelect = document.getElementById('theme') as HTMLSelectElement;
+themeSelect.replaceChildren(el('option', { value: '' }, 'Gnomes vs Gobelins'), ...Object.keys(THEMES).map((t) => el('option', { value: t }, THEMES[t].name ?? t)));
+themeSelect.value = themeId ?? '';
+/** Change le thème de la régie et de l'aperçu (rechargement : les noms du thème sont lus au démarrage). */
+themeSelect.onchange = () => {
+  const q = new URLSearchParams(location.search);
+  if (themeSelect.value) q.set('theme', themeSelect.value);
+  else q.delete('theme');
+  if (arc) q.set('arc', arc.id);
+  location.replace(`${location.pathname}?${q}`);
+};
+
+function download(name: string, text: string): void {
+  const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'application/json' })), download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+}
+
+/** Version en ligne : rappel que tout reste sur cet appareil, export / import / retour au dépôt. */
+function offlineSection(): HTMLElement {
+  const s = el('section', { class: 'wide offline' }, el('h2', {}, 'VERSION EN LIGNE'));
+  const changed = Object.keys(localArcs());
+  s.append(
+    el(
+      'p',
+      { class: 'muted' },
+      changed.length
+        ? `Modifications gardées sur cet appareil seulement (${changed.join(', ')}). Exporter l'arc pour le partager ou le remettre dans le dépôt (src/data/arcs).`
+        : 'Arcs du dépôt. Ce que tu enregistres ici reste sur cet appareil ; exporte un arc pour le partager.',
+    ),
+  );
+  const file = el('input', { type: 'file', accept: 'application/json,.json' });
+  file.style.display = 'none';
+  file.onchange = async () => {
+    const f = file.files?.[0];
+    file.value = '';
+    if (!f) return;
+    try {
+      const raw = JSON.parse(await f.text());
+      const parsed = parseArc(raw, data);
+      saveLocalArc(parsed as unknown as { id: string });
+      await fetchArcs();
+      arc = arcs.find((a) => a.id === parsed.id);
+      render();
+      message(app.querySelector('section') ?? app, `Arc ${parsed.id} importé.`, true);
+    } catch (e) {
+      message(s, `Import refusé : ${(e as Error).message}`, false);
+    }
+  };
+  const actions = el('div', { class: 'row' });
+  if (arc) actions.append(button(`Exporter ${arc.id}.json`, () => download(`${arc!.id}.json`, JSON.stringify(arc, null, 2) + '\n')));
+  actions.append(button('Importer un arc', () => file.click()));
+  if (changed.length) {
+    actions.append(
+      button(
+        'Revenir aux arcs du dépôt',
+        async () => {
+          if (!confirm('Oublier les modifications faites sur cet appareil ?')) return;
+          resetLocalArcs();
+          await fetchArcs();
+          arc = arcs.find((a) => a.id === arc?.id) ?? arcs.find((a) => a.status === 'open') ?? arcs[0];
+          scoutRows = [];
+          picked = undefined;
+          render();
+          previewNext(0);
+        },
+        'danger',
+      ),
+    );
+  }
+  s.append(actions, file);
+  return s;
+}
+
 // ------------------------------------------------------------ rendu
 
 /** Un arc de pack s'affiche avec les noms de son thème : la régie se recharge dans ce thème si besoin. */
@@ -636,6 +735,10 @@ function render(): void {
   arcSelect.replaceChildren(...arcs.map((a) => el('option', { value: a.id }, `${a.title}${a.status === 'closed' ? ' (clos)' : ''}`)));
   if (arc) arcSelect.value = arc.id;
   app.replaceChildren();
+  // Un arc de pack impose son thème : le menu le montre sans permettre d'en changer.
+  themeSelect.disabled = !!arc?.theme;
+  themeSelect.title = arc?.theme ? `Thème imposé par l'arc ${arc.id}` : 'Thème de la régie et de l’aperçu';
+  if (offline) app.append(offlineSection());
   if (!arc) {
     app.append(endSection({ id: 'arc', title: '', heroes: [], status: 'closed', settings: {}, episodes: [] } as Arc));
     return;
