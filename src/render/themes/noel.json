@@ -1976,7 +1976,11 @@
         "accent": "#ffffff",
         "sprites": [],
         "banner": "BLIZZARD !",
-        "style": "blizzard"
+        "style": "blizzard",
+        "freeze": {
+          "after": 4,
+          "sprite": "sprites/themes/noel/fx/ice_block.png"
+        }
       },
       "koSplash": {
         "words": [
