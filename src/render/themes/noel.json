@@ -857,7 +857,7 @@
         "url": "sprites/themes/noel/hero_marcel.png",
         "frameWidth": 64,
         "frameHeight": 64,
-        "size": 28,
+        "size": 32,
         "directions": 8,
         "animations": {
           "attack": {
@@ -919,7 +919,7 @@
         "url": "sprites/themes/noel/hero_papy_boulon.png",
         "frameWidth": 64,
         "frameHeight": 64,
-        "size": 27,
+        "size": 32,
         "directions": 8,
         "animations": {
           "walk": {
@@ -981,7 +981,7 @@
         "url": "sprites/themes/noel/hero_glacon.png",
         "frameWidth": 64,
         "frameHeight": 64,
-        "size": 29,
+        "size": 36,
         "directions": 8,
         "animations": {
           "walk": {
@@ -1045,7 +1045,7 @@
         "url": "sprites/themes/noel/hero_fouettard.png",
         "frameWidth": 64,
         "frameHeight": 64,
-        "size": 16,
+        "size": 34,
         "directions": 8,
         "animations": {
           "walk": {
@@ -1106,7 +1106,7 @@
         "url": "sprites/themes/noel/hero_gobbo.png",
         "frameWidth": 64,
         "frameHeight": 64,
-        "size": 26,
+        "size": 32,
         "directions": 8,
         "animations": {
           "attack": {
@@ -1168,7 +1168,7 @@
         "url": "sprites/themes/noel/toy_soldier.png",
         "frameWidth": 32,
         "frameHeight": 32,
-        "size": 11,
+        "size": 13,
         "directions": 8,
         "animations": {
           "death": {
@@ -1229,7 +1229,7 @@
         "url": "sprites/themes/noel/mimic_gift.png",
         "frameWidth": 32,
         "frameHeight": 32,
-        "size": 11,
+        "size": 13,
         "directions": 8,
         "animations": {
           "attack": {
@@ -1290,7 +1290,7 @@
         "url": "sprites/themes/noel/hero_mere_noel.png",
         "frameWidth": 64,
         "frameHeight": 64,
-        "size": 16,
+        "size": 32,
         "directions": 8,
         "animations": {
           "attack": {

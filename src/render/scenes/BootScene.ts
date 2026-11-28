@@ -63,6 +63,13 @@ export class BootScene extends Phaser.Scene {
       const rows = entry.directions ? Array.from({ length: entry.directions }, (_, d) => d) : [undefined];
       for (const [name, anim] of Object.entries(entry.animations)) {
         if (!anim) continue;
+        // Une image hors de la sheet donnerait une animation vide, qui plante au premier affichage.
+        const total = this.textures.get(texture).frameTotal - 1; // sans l'image __BASE
+        const lastRow = rows.length - 1;
+        if (anim.frames.some((f) => f < 0 || (entry.directions && f >= columns) || f + lastRow * columns >= total)) {
+          console.warn(`Animation ${key}.${name} : images hors de la sheet (${columns} colonnes), ignorée.`);
+          continue;
+        }
         for (const d of rows) {
           this.anims.create({
             key: d === undefined ? `${texture}_${name}` : `${texture}_${name}_${d}`,
