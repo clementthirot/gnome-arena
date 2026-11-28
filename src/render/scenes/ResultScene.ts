@@ -1,9 +1,9 @@
-// Écran de fin, tout dans la zone sûre des réseaux sociaux. Le rideau (fermé sur l'arène, « ET LE MVP EST... »)
-// se rouvre sur :
-//   0 - 3,5 s    « VICTOIRE DES GNOMES » (ou « MATCH NUL ») et le MVP ;
-//   3,5 - 5 s    titre de la partie vote (« LES CADEAUX DU PUBLIC ») ;
-//   5 s - …      la carte de vote : héros bénéficiaire, options dévoilées une à une, appel au vote, temps de lecture ;
-//   fin          un rideau nu se ferme puis se rouvre sur la première image de la vidéo : elle boucle.
+// Fin de vidéo en 4 temps : (1) victoire et célébration dans l'arène (ArenaScene), puis le rideau se ferme
+// (« LE MEILLEUR ET LE PIRE... ») et se rouvre sur cet écran, tout dans la zone sûre des réseaux sociaux :
+//   0 - 4 s      (2) le MVP à gauche qui fête, le pire à droite qui boude, côte à côte ;
+//   4 - 5,5 s    (3) titre de la partie vote (« LES CADEAUX DU PUBLIC ») ;
+//   5,5 s - …    la carte de vote : le pire reçoit le prochain cadeau, options dévoilées une à une, appel au vote, temps de lecture ;
+//   fin          (4) un rideau nu se ferme puis se rouvre sur la première image de la vidéo : elle boucle.
 // Pas de boutons : rejouer ou changer de seed se fait depuis la régie. En enregistrement, la fin du fondu clôt la vidéo.
 import Phaser from 'phaser';
 import type { TeamId } from '../../data/schema';
@@ -26,12 +26,14 @@ export interface ResultData {
   /** Meilleur raté de l'épisode : héros et nombre d'alliés touchés. */
   friendlyFire?: [number, number];
   friendlyFireName?: string;
+  /** MVP désigné dans l'arène (plan du vainqueur), repris tel quel sur l'écran de fin. */
+  mvpName?: string;
   /** Arrivée depuis le rideau de la roulette : il se rouvre sur l'écran. */
   curtain?: boolean;
 }
 
 /** Fin du premier temps (vainqueur + MVP), début du titre de la partie vote (ms). */
-const VERDICT_MS = 3500;
+const VERDICT_MS = 4000;
 /** Titre de la partie vote seul à l'écran (ms). */
 const GIFTS_TITLE_MS = 1500;
 /** Carte de vote : dévoilement des options (≈ 3 s) puis temps pour lire les upgrades (ms). */
@@ -44,7 +46,7 @@ const LOOP_MS = LOOP_CLOSE_MS + LOOP_HOLD_MS + 120 + LOOP_OPEN_MS;
 /** Durée de l'écran de fin jusqu'à la dernière image (ms), avec carte de vote. */
 export const RESULT_HOLD_MS = VERDICT_MS + GIFTS_TITLE_MS + VOTE_MS + LOOP_MS;
 /** Sans carte de vote (aperçu, seed simple, match nul) : vainqueur et MVP seulement. */
-export const RESULT_HOLD_NO_VOTE_MS = 5000 + LOOP_MS;
+export const RESULT_HOLD_NO_VOTE_MS = 5500 + LOOP_MS;
 
 const CX = SAFE.centered.x + SAFE.centered.w / 2;
 
@@ -91,7 +93,7 @@ export class ResultScene extends Phaser.Scene {
       for (let y = 0; y < h; y += 36) this.add.rectangle(0, y, w, 32, y % 72 ? 0x241f31 : 0x211c2d).setOrigin(0).setDepth(-19);
     }
 
-    const verdict = this.verdict(r, !vote);
+    const verdict = this.duel(r, vote, !vote);
     if (vote) {
       this.time.delayedCall(VERDICT_MS, () => {
         this.tweens.add({ targets: verdict, alpha: 0, duration: 220, onComplete: () => verdict.forEach((o) => o.destroy()) });
@@ -107,11 +109,17 @@ export class ResultScene extends Phaser.Scene {
     const hold = vote ? RESULT_HOLD_MS : RESULT_HOLD_NO_VOTE_MS;
     this.time.delayedCall(hold - LOOP_MS, () => this.loopToFirstFrame());
 
-    if (r.params.record) this.time.delayedCall(hold, () => this.game.events.emit('episode-finished'));
+    // Marge après la réouverture du rideau : l'enregistreur rend ses dernières images avec un peu de retard,
+    // et la vidéo doit finir sur la première image, rideau ouvert.
+    if (r.params.record) this.time.delayedCall(hold + 1500, () => this.game.events.emit('episode-finished'));
   }
 
-  /** Premier temps : vainqueur (ou match nul) et MVP. */
-  private verdict(r: ResultData, postponed: boolean): Phaser.GameObjects.GameObject[] {
+  /**
+   * Deuxième temps : deux cartes côte à côte. À gauche le MVP (meilleur héros du camp vainqueur) qui saute de joie
+   * sous les confettis ; à droite le pire (le héros qui recevra le cadeau quand il y a un vote, sinon le moins bon
+   * du camp perdant) qui boude sous sa petite pluie.
+   */
+  private duel(r: ResultData, vote: Vote | undefined, postponed: boolean): Phaser.GameObjects.GameObject[] {
     const cfg = manifest.staging.reveal;
     const items: Phaser.GameObjects.GameObject[] = [];
     const ep = r.params.episode;
@@ -122,46 +130,81 @@ export class ResultScene extends Phaser.Scene {
       items.push(label);
     }
     const draw = r.winner === 'draw';
-    const title = draw ? cfg.draw : fill(cfg.victory, { team: TEAM_COLORS[r.winner as TeamId].label });
-    const color = draw ? '#ffffff' : TEAM_COLORS[r.winner as TeamId].main;
-    // Le titre tient dans la plaque (bords dorés compris) quand elle est là.
-    const plaqueArt = hasGoldFrame(this);
-    const big = this.add.text(CX, 525, title, textStyle(draw ? 96 : 80, color, { wordWrap: { width: SAFE.centered.w - (plaqueArt ? 150 : 20) }, lineSpacing: 24, align: 'center' })).setOrigin(0.5).setScale(0.3);
-    // Titre long (« VICTOIRE DES GOBELINS ») : on réduit la police jusqu'à tenir sur deux lignes,
-    // au-dessus du MVP (et du « vote reporté » en cas de nul).
-    const maxH = draw && postponed && ep ? 180 : 300;
-    for (let size = draw ? 96 : 80; big.height > maxH && size > 56; ) {
-      size -= 4;
-      big.setFontSize(size);
-    }
-    this.tweens.add({ targets: big, scale: 1, duration: 400, ease: 'Back.easeOut' });
-    items.push(...this.plaque(525, big.height + 110), big);
+    const rank = (a: ResultData['heroes'][number], b: ResultData['heroes'][number]) => b.kills - a.kills || Number(b.alive) - Number(a.alive) || b.hp - a.hp;
+    const winners = r.heroes.filter((e) => draw || e.team === r.winner);
+    const mvp = winners.find((e) => e.name === r.mvpName) ?? [...winners].sort(rank)[0];
+    const losers = r.heroes.filter((e) => e !== mvp && (draw || e.team !== r.winner));
+    const worst = (vote && r.heroes.find((e) => e.name === vote.recipient)) ?? [...losers].sort(rank).at(-1);
+    const gap = 16;
+    const cardW = (SAFE.centered.w - gap) / 2;
+    const top = 370;
+    const cardH = 840;
+    const cards: [typeof mvp | undefined, 'best' | 'worst', number][] = [
+      [mvp, 'best', SAFE.centered.x + cardW / 2],
+      [worst, 'worst', SAFE.centered.x + cardW + gap + cardW / 2],
+    ];
+    cards.forEach(([hero, kind, x], i) => {
+      if (!hero) return;
+      const best = kind === 'best';
+      const y = top + cardH / 2;
+      const card = this.add.container(x, y).setScale(0);
+      card.add(goldFrame(this, 0, 0, cardW, cardH) ?? this.add.rectangle(0, 0, cardW, cardH, 0x3d3555).setStrokeStyle(6, 0x000000));
+      const inner = cardW - 2 * FRAME_INSET.x - 16;
+      card.add(this.fitWidth(this.add.text(0, -cardH / 2 + 80, best ? cfg.mvp : cfg.worst, textStyle(best ? 56 : 44, best ? '#ffe14a' : '#a8b0c8')).setOrigin(0.5), inner));
+      const def = (r.params.heroes ?? r.params.data.heroes).find((e) => e.name === hero.name);
+      const tex = def && `unit_${def.visual}`;
+      let portrait: Phaser.GameObjects.Image | undefined;
+      if (tex && this.textures.exists(tex)) {
+        portrait = this.add.image(0, -20, tex, 0);
+        fitIcon(portrait, Math.min(300, inner));
+        if (!best) portrait.setTint(0x9aa0b8);
+        card.add(portrait);
+      }
+      // Un mot par ligne (« MARCEL / L'ENCLUME »), jamais coupé au milieu ; réduit s'il déborde encore.
+      card.add(this.fitWidth(this.add.text(0, 220, hero.name.toUpperCase().replace(/ /g, '\n'), textStyle(36, TEAM_COLORS[hero.team].main, { align: 'center', lineSpacing: 10 })).setOrigin(0.5), inner));
+      card.add(this.add.text(0, 330, `${hero.kills} K.O.`, textStyle(36, best ? '#ffffff' : '#a8b0c8')).setOrigin(0.5));
+      items.push(card);
+      const delay = 250 + i * 350;
+      this.tweens.add({ targets: card, scale: 1, duration: 360, delay, ease: 'Back.easeOut' });
+      if (!portrait) return;
+      const p = portrait;
+      const y0 = p.y;
+      if (best) {
+        // Fête : il saute en boucle, un peu plus gros à chaque appui, sous les confettis de son camp.
+        this.tweens.add({ targets: p, y: y0 - 46, duration: 260, yoyo: true, repeat: -1, ease: 'Quad.easeOut', delay: delay + 300 });
+        this.tweens.add({ targets: p, angle: { from: -6, to: 6 }, duration: 260, yoyo: true, repeat: -1, delay: delay + 300 });
+        const colors = [Number.parseInt(TEAM_COLORS[hero.team].main.slice(1), 16), 0xffe14a, 0xffffff];
+        for (let k = 0; k < 26; k++) {
+          const bx = x + (hash01(k * 7 + 1) - 0.5) * cardW * 0.9;
+          const bit = this.add.rectangle(bx, top + 20, 10, 6, colors[k % colors.length]).setDepth(5).setAngle(hash01(k * 7 + 2) * 180).setAlpha(0);
+          items.push(bit);
+          this.tweens.add({ targets: bit, alpha: 1, duration: 80, delay: delay + 300 + hash01(k * 7 + 3) * 1500 });
+          this.tweens.add({ targets: bit, y: top + cardH - 30, angle: bit.angle + 360, duration: 1400 + hash01(k * 7 + 4) * 900, delay: delay + 300 + hash01(k * 7 + 3) * 1500, repeat: -1 });
+        }
+      } else {
+        // Défaite : il s'affaisse, penche la tête et soupire, sous un petit nuage qui pleut.
+        this.tweens.add({ targets: p, y: y0 + 18, scaleY: p.scaleY * 0.9, angle: 10, duration: 500, delay: delay + 400, ease: 'Quad.easeOut' });
+        this.tweens.add({ targets: p, angle: { from: 10, to: 4 }, duration: 900, yoyo: true, repeat: -1, delay: delay + 900, ease: 'Sine.easeInOut' });
+        const cloudY = top + 190;
+        const cloud = this.add.ellipse(x, cloudY, 150, 54, 0x6a6f86).setStrokeStyle(4, 0x000000).setDepth(5).setAlpha(0);
+        const cloud2 = this.add.ellipse(x - 30, cloudY - 22, 80, 50, 0x6a6f86).setDepth(5).setAlpha(0);
+        items.push(cloud2, cloud);
+        this.tweens.add({ targets: [cloud, cloud2], alpha: 1, duration: 300, delay: delay + 500 });
+        this.tweens.add({ targets: [cloud, cloud2], x: '+=10', duration: 700, yoyo: true, repeat: -1, delay: delay + 500 });
+        for (let k = 0; k < 10; k++) {
+          const drop = this.add.rectangle(x - 55 + k * 12, cloudY + 30, 4, 14, 0x7fb0ff).setDepth(5).setAlpha(0);
+          items.push(drop);
+          this.tweens.add({ targets: drop, alpha: { from: 1, to: 0.2 }, y: cloudY + 200, duration: 650, delay: delay + 700 + hash01(k + 31) * 650, repeat: -1 });
+        }
+      }
+    });
     // Égalité d'épisode sans vote : la série continue, le vote est reporté.
     if (draw && postponed && ep) {
-      const p = this.add.text(CX, 630, cfg.postponed, textStyle(40, '#ffe14a', { wordWrap: { width: SAFE.centered.w - 40 } })).setOrigin(0.5).setAlpha(0);
-      this.tweens.add({ targets: p, alpha: 1, duration: 250, delay: 500 });
+      const p = this.add.text(CX, top + cardH + 50, cfg.postponed, textStyle(36, '#ffe14a', { wordWrap: { width: SAFE.centered.w - 40 } })).setOrigin(0.5).setAlpha(0);
+      this.tweens.add({ targets: p, alpha: 1, duration: 250, delay: 900 });
       items.push(p);
     }
-
-    // MVP : le héros du camp vainqueur (ou de tous en cas d'égalité) qui a fait le plus de K.O.
-    const pool = r.heroes.filter((e) => draw || e.team === r.winner);
-    const mvp = [...pool].sort((a, b) => b.kills - a.kills || Number(b.alive) - Number(a.alive) || b.hp - a.hp)[0];
-    if (!mvp) return items;
-    const def = (r.params.heroes ?? r.params.data.heroes).find((e) => e.name === mvp.name);
-    const group: Phaser.GameObjects.GameObject[] = [];
-    if (cfg.textBacking) group.push(goldFrame(this, CX, 935, SAFE.centered.w * 0.8, 500)?.setDepth(-1) ?? this.backing(CX, 935, SAFE.centered.w * 0.8, 500));
-    group.push(this.add.text(CX, 730, cfg.mvp, textStyle(48, '#ffe14a')).setOrigin(0.5));
-    const portrait = def && `unit_${def.visual}`;
-    if (portrait && this.textures.exists(portrait)) {
-      const img = this.add.image(CX, 880, portrait, 0);
-      fitIcon(img, 240);
-      group.push(img);
-    }
-    group.push(this.fitWidth(this.add.text(CX, 1040, mvp.name.toUpperCase(), textStyle(64, TEAM_COLORS[mvp.team].main)).setOrigin(0.5), SAFE.centered.w * 0.8 - 2 * FRAME_INSET.x - 20));
-    group.push(this.add.text(CX, 1130, `${mvp.kills} K.O.`, textStyle(48, '#ffffff')).setOrigin(0.5));
-    group.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0));
-    this.tweens.add({ targets: group, alpha: 1, duration: 250, delay: this.tweens.stagger(120, { start: 700 }) });
-    return [...items, ...group];
+    return items;
   }
 
   /** Entre le MVP et la carte de vote : « LES CADEAUX DU PUBLIC » seul, dans son cadre. */
@@ -305,11 +348,6 @@ export class ResultScene extends Phaser.Scene {
       const bit = this.add.rectangle(x, SAFE.top - 40, size, size * 0.6, colors[i % colors.length]).setDepth(10).setAngle(hash01(i * 5 + 3) * 180);
       const fall = 2600 + hash01(i * 5 + 4) * 1600;
       this.tweens.add({ targets: bit, y: 1400, x: x + (hash01(i * 5 + 5) - 0.5) * 160, angle: bit.angle + 540, duration: fall, delay: 300 + hash01(i + 77) * 1800, repeat: -1 });
-    }
-    // Le gros titre respire un peu (hors mode match nul : on reste sobre).
-    if (!draw) {
-      const big = this.children.list.find((o) => o instanceof Phaser.GameObjects.Text && o.y === 525) as Phaser.GameObjects.Text | undefined;
-      if (big) this.tweens.add({ targets: big, scale: { from: 1, to: 1.06 }, duration: 600, yoyo: true, repeat: -1, delay: 500 });
     }
   }
 

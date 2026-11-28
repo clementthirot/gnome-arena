@@ -1476,6 +1476,8 @@ export class ArenaScene extends Phaser.Scene {
     // Transition vers la roulette : le rideau se ferme, l'écran de vote s'ouvre derrière.
     this.time.delayedCall(cfg.finale * 1000, () => {
       sound.play('gong');
+      // Même MVP que l'étiquette posée dans l'arène par le plan du vainqueur.
+      if (this.mvpLabel) result.mvpName = this.battle.units[this.mvpLabel.index].hero?.name;
       closeCurtain(this, cfg.curtain * 1000, () => this.scene.start('result', { ...result, curtain: true }));
     });
   }

@@ -219,6 +219,8 @@ const StagingSchema = z.object({
     draw: z.string().default('MATCH NUL'),
     postponed: z.string().default('LE VOTE EST REPORTÉ'),
     mvp: z.string().default('MVP'),
+    /** Carte de droite de l'écran de fin : le héros qui a le moins brillé (il reçoit le cadeau). */
+    worst: z.string().default('LE PIRE'),
     voteFor: z.string().default('RECEVRA LA PROCHAINE UPGRADE'),
     voteCall: z.string().default('VOTE 1, 2 OU 3 EN COMMENTAIRE'),
     /**
@@ -228,8 +230,8 @@ const StagingSchema = z.object({
     style: z.enum(['slots', 'gifts']).default('slots'),
     /** Aplat (couleur) sous les textes de l'écran de fin posés sur le motif : numéro d'épisode, bloc MVP. */
     textBacking: color.optional(),
-    /** Titre du rideau qui ferme l'arène et annonce le MVP. */
-    curtainTitle: z.string().default('ET LE MVP\nEST...'),
+    /** Titre du rideau qui ferme l'arène et annonce le MVP et le pire. */
+    curtainTitle: z.string().default('LE MEILLEUR\nET LE PIRE...'),
     /** Titre qui ouvre la partie vote, après le MVP. */
     giftsTitle: z.string().default('ROULETTE\nDES UPGRADES'),
     /** Cadre du rouleau : placeholder dessiné ; `url` (optionnelle) le remplace par une image, clé ui_slot_frame. */
