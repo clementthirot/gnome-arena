@@ -238,6 +238,10 @@ Commun : `no_background: true`, `outline: single color black outline`, `detail: 
 | fx/poof.png | `effects.poof_*` | 48 / 5233, lineless | white and pale pink smoke puff |
 | fx/rolling_pin.png | `effects.rolling_pin`, `snowball_roll` | 32 / 5401 | giant wooden rolling pin |
 | fx/coal_sack.png | `effects.sack_spit` | 32 / 5402 | big brown burlap sack |
+| fx/boss_crown.png | `overlays.boss_crown` (mini-boss) | 32 / 6201 | small royal crown made of green holly leaves and red berries with a golden star on top |
+
+Mini-boss : couronne de houx, aura givrée (`overlays.boss_aura`, couleurs du thème), accessoires à 0,6 fois leur taille de base (héros Noël plus petits que ceux de base).
+Les héros de base (Bob, Kevin…) prennent les planches des héros Noël du même rôle quand un arc sans thème est joué en `?theme=noel`.
 
 Sol : `sprites/arena/ground_neige.png` du lot G. Chute de neige : ambiance du biome `noel`.
 Tempête : `staging.gas.style: "blizzard"` (dans `noel.json`) remplace le gaz par `src/render/storm.ts` : neige
