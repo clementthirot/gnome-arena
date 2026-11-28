@@ -280,6 +280,17 @@ const StagingSchema = z.object({
     style: z.enum(['gas', 'blizzard']).default('gas'),
     /** Blizzard : teinte du ciel bouché hors zone (sombre, pour que la neige blanche ressorte même sur un sol enneigé). */
     shade: color.default('#26344f'),
+    /**
+     * Blizzard : un mort resté `after` secondes dans la tempête gèle et finit pris dans un bloc de glace
+     * (`sprite`, PixelLab ; sans image, le corps bleuit seulement). Rendu seulement.
+     */
+    freeze: z
+      .object({
+        enabled: z.boolean().default(true),
+        after: z.number().positive().default(4),
+        sprite: z.string().optional(),
+      })
+      .default({}),
   }),
   /** Morts plus trash : gouttes et flaque sous les corps, qui sèche et vire au brun. */
   gore: z.object({

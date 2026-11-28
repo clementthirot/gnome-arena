@@ -243,6 +243,16 @@ Sol : `sprites/arena/ground_neige.png` du lot G. Chute de neige : ambiance du bi
 Tempête : `staging.gas.style: "blizzard"` (dans `noel.json`) remplace le gaz par `src/render/storm.ts` : neige
 cinglante poussée par un vent à rafales, grêlons qui tombent en biais et éclatent au sol, nuages de rafale, ciel
 assombri hors zone (`staging.gas.shade`) et congère le long de la limite. Rendu seulement, les dégâts restent ceux du moteur.
+Depuis le 28/11/2026 : le ciel bouché et la congère sont peints sous le public et les unités (les sprites passent
+par-dessus la limite), la tempête souffle aussi sur les gradins, monte en ~18 s jusqu'à devenir intense et retombe
+en quelques secondes quand le combat est fini. Un mort resté `staging.gas.freeze.after` secondes (4) dans la
+tempête bleuit puis gèle dans un bloc de glace :
+
+| Fichier | Clé | Taille / seed | Prompt |
+| --- | --- | --- | --- |
+| sprites/themes/noel/fx/ice_block.png | `staging.gas.freeze.sprite` | 48 / 6101 (`create-image-pixen`, `view: low top-down`, sans fond ; 3 essais 6101-6103) | block of clear pale blue ice lying flat on the ground, jagged frozen icicles on top, frosty white highlights, translucent glassy ice, empty inside |
+
+Posé à 80 % d'opacité sur le corps teinté bleu glacier (on devine le mort dedans). Sans l'image, le corps bleuit seulement.
 
 ## Allures : marche et garde de combat (PixelLab, 28/11/2026)
 

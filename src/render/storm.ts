@@ -1,5 +1,7 @@
 // Blizzard : la zone qui se resserre devient une tempête de neige et de grêle qui cingle tout ce qui est
-// dehors. Même rôle que le gaz (gas.ts), autre habillage, choisi par staging.gas.style = "blizzard".
+// dehors, gradins compris. Même rôle que le gaz (gas.ts), autre habillage, choisi par staging.gas.style = "blizzard".
+// La tempête monte peu à peu jusqu'à devenir intense, puis s'estompe quand le combat est fini.
+// Le ciel bouché et la congère sont peints sous les unités (calque `ground`), la neige et la grêle par-dessus.
 // Purement visuel : les dégâts hors zone restent ceux du moteur.
 import type Phaser from 'phaser';
 import type { FieldRect } from '../sim/types';
@@ -68,15 +70,29 @@ export class BlizzardLayer {
   /** Horloge de combat de la tempête (s), pour les rafales. */
   private clock = 0;
   private strength = 0;
+  /** Temps écoulé depuis le début du resserrement (s) : la tempête monte avec lui. */
+  private elapsed = 0;
   /** Givre accumulé hors zone (0 à 1) : le sol blanchit à mesure que la tempête dure. */
   private frost = 0;
 
+  /**
+   * @param g calque au-dessus des unités (neige, grêle, rafales)
+   * @param ground calque sous les unités (ciel bouché, congère le long de la limite)
+   * @param field terrain de combat ; @param world toute l'arène, gradins compris (la tempête y souffle aussi)
+   */
   constructor(
     private readonly g: Phaser.GameObjects.Graphics,
+    private readonly ground: Phaser.GameObjects.Graphics,
     private readonly field: FieldRect,
+    private readonly world: FieldRect,
     private readonly config: Staging['gas'],
     private readonly scale: number,
   ) {}
+
+  /** Force actuelle de la tempête (0 = calme, ~1,3 = au plus fort). */
+  get intensity(): number {
+    return this.strength;
+  }
 
   /** Direction du vent (unitaire) et force des rafales à l'instant t : le vent tourne un peu et souffle par à-coups. */
   private wind(t: number): { x: number; y: number; gust: number } {
@@ -85,9 +101,9 @@ export class BlizzardLayer {
     return { x: Math.cos(a), y: Math.sin(a), gust };
   }
 
-  /** Point au hasard dans la bande hors zone (rejet simple : la zone ne couvre qu'une partie du terrain). */
+  /** Point au hasard hors zone, gradins compris (rejet simple : la zone ne couvre qu'une partie de l'arène). */
   private outside(zone: FieldRect): { x: number; y: number } | null {
-    const f = this.field;
+    const f = this.world;
     for (let k = 0; k < 6; k++) {
       const x = f.x + rand() * f.width;
       const y = f.y + rand() * f.height;
@@ -104,21 +120,26 @@ export class BlizzardLayer {
    * Tire les flocons, grêlons et rafales. Appelé à chaque tick de simulation : le tirage ne dépend ni du
    * framerate ni de ?speed, comme le gaz.
    */
-  emit(dt: number, zoneScale: number, zone?: FieldRect): void {
+  emit(dt: number, zoneScale: number, zone?: FieldRect, over = false): void {
     if (dt <= 0) return;
     this.clock += dt;
-    // Montée en puissance rapide dès que la zone bouge, puis la tempête redouble à mesure qu'elle se resserre.
-    const target = zoneScale < 1 ? 0.55 + (1 - zoneScale) * 0.6 : 0;
-    this.strength += (target - this.strength) * Math.min(1, dt * 1.5);
-    if (zoneScale < 1) this.frost = Math.min(1, this.frost + dt * 0.06);
+    if (zoneScale < 1) this.elapsed += dt;
+    // Quelques flocons quand la zone bouge, puis la tempête forcit pendant ~18 s et redouble à mesure que la
+    // zone se resserre. Combat fini : elle retombe en quelques secondes.
+    const ramp = Math.min(1, this.elapsed / 18);
+    const target = over || zoneScale >= 1 ? 0 : Math.min(1.3, 0.12 + ramp * ramp * 0.75 + (1 - zoneScale) * 0.45);
+    const rate = over ? 0.7 : target > this.strength ? 0.8 : 1.5;
+    this.strength += (target - this.strength) * Math.min(1, dt * rate);
+    if (zoneScale < 1 && !over) this.frost = Math.min(1, this.frost + dt * 0.05 * Math.min(1, this.strength));
+    if (over) this.frost = Math.max(0, this.frost - dt * 0.2);
     if (this.strength < 0.02 || !zone) return;
-    const f = this.field;
+    const f = this.world;
     const band = 1 - (zone.width * zone.height) / (f.width * f.height);
     const w = this.wind(this.clock);
     const speed = 260 * w.gust * (0.8 + this.strength * 0.4);
-    const rate = this.config.ventRate / 3;
+    const flow = this.config.ventRate / 3;
 
-    this.flakeDebt += dt * 1100 * band * this.strength * rate;
+    this.flakeDebt += dt * 1100 * band * this.strength * flow;
     while (this.flakeDebt >= 1 && this.flakes.length < 1400) {
       this.flakeDebt -= 1;
       const p = this.outside(zone);
@@ -138,7 +159,7 @@ export class BlizzardLayer {
       });
     }
 
-    this.hailDebt += dt * 110 * band * this.strength * rate;
+    this.hailDebt += dt * 110 * band * this.strength * flow;
     while (this.hailDebt >= 1 && this.hail.length < 160) {
       this.hailDebt -= 1;
       const p = this.outside(zone);
@@ -168,30 +189,33 @@ export class BlizzardLayer {
   update(dt: number, zone: FieldRect): void {
     const g = this.g;
     const S = this.scale;
-    const f = this.field;
+    const f = this.world;
     g.clear();
-    if (this.strength < 0.02 && !this.flakes.length && !this.hail.length) return;
+    this.ground.clear();
+    if (this.strength < 0.02 && !this.flakes.length && !this.hail.length && !this.gusts.length) return;
     const color = hex(this.config.color);
     const accent = hex(this.config.accent);
     const w = this.wind(this.clock);
     const inside = (x: number, y: number) => this.inZone(zone, x, y);
 
-    // Ciel bouché hors zone : la bande s'assombrit (la neige blanche ressort même sur un sol enneigé),
-    // plus fort pendant les rafales et à mesure que la tempête dure.
+    // Ciel bouché hors zone, gradins compris : le sol s'assombrit (la neige blanche ressort même sur un sol
+    // enneigé), plus fort pendant les rafales et à mesure que la tempête dure. Peint sous les unités : les
+    // combattants et le public restent nets par-dessus.
     const veil = Math.min(0.6, (0.28 + this.frost * 0.14 + (w.gust - 0.75) * 0.3) * Math.min(1, this.strength * 1.6));
-    if (veil > 0 && zone.width < f.width) {
-      g.fillStyle(hex(this.config.shade), veil);
-      g.fillRect(f.x * S, f.y * S, f.width * S, (zone.y - f.y) * S);
-      g.fillRect(f.x * S, (zone.y + zone.height) * S, f.width * S, (f.y + f.height - zone.y - zone.height) * S);
-      g.fillRect(f.x * S, zone.y * S, (zone.x - f.x) * S, zone.height * S);
-      g.fillRect((zone.x + zone.width) * S, zone.y * S, (f.x + f.width - zone.x - zone.width) * S, zone.height * S);
+    if (veil > 0 && zone.width < this.field.width) {
+      const gr = this.ground;
+      gr.fillStyle(hex(this.config.shade), veil);
+      gr.fillRect(f.x * S, f.y * S, f.width * S, (zone.y - f.y) * S);
+      gr.fillRect(f.x * S, (zone.y + zone.height) * S, f.width * S, (f.y + f.height - zone.y - zone.height) * S);
+      gr.fillRect(f.x * S, zone.y * S, (zone.x - f.x) * S, zone.height * S);
+      gr.fillRect((zone.x + zone.width) * S, zone.y * S, (f.x + f.width - zone.x - zone.width) * S, zone.height * S);
       // Congère le long de la limite : liseré de neige tassée contre le mur invisible.
-      g.fillStyle(accent, Math.min(0.85, veil * 1.8));
+      gr.fillStyle(accent, Math.min(0.85, veil * 1.8));
       const t = 3 * S;
-      g.fillRect(zone.x * S - t, zone.y * S - t, zone.width * S + 2 * t, t);
-      g.fillRect(zone.x * S - t, (zone.y + zone.height) * S, zone.width * S + 2 * t, t);
-      g.fillRect(zone.x * S - t, zone.y * S, t, zone.height * S);
-      g.fillRect((zone.x + zone.width) * S, zone.y * S, t, zone.height * S);
+      gr.fillRect(zone.x * S - t, zone.y * S - t, zone.width * S + 2 * t, t);
+      gr.fillRect(zone.x * S - t, (zone.y + zone.height) * S, zone.width * S + 2 * t, t);
+      gr.fillRect(zone.x * S - t, zone.y * S, t, zone.height * S);
+      gr.fillRect((zone.x + zone.width) * S, zone.y * S, t, zone.height * S);
     }
 
     // Rafales : grands nuages blancs qui ne pénètrent pas dans la zone saine.

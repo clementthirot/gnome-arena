@@ -41,6 +41,7 @@ export class BootScene extends Phaser.Scene {
     }
     for (const [key, entry] of Object.entries(manifest.effects)) if (entry.sprite) this.load.image(`fx_img_${key}`, entry.sprite.url);
     manifest.staging.gas.sprites.forEach((url, i) => this.load.image(`gas_puff_${i}`, url));
+    if (manifest.staging.gas.freeze.sprite) this.load.image('ice_block', manifest.staging.gas.freeze.sprite);
     // Cadre de la machine à sous : image facultative, sinon dessiné par slotMachine.ts.
     if (manifest.staging.reveal.slot.url) this.load.image('ui_slot_frame', manifest.staging.reveal.slot.url);
   }

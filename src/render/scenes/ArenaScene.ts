@@ -24,6 +24,7 @@ import { overlayRects, SAFE } from '../safeZone';
 import { bossScale, Eggs, overlayColors, overlayTexture } from '../eggs';
 import { TEAM_COLORS, TEXT, textStyle } from '../text';
 import { upgradeFx } from '../upgradeFx';
+import { attachScrubber } from '../scrubber';
 import type { ResultData } from './ResultScene';
 
 /** Monde 270 x 480 affiché en 1080 x 1920. */
@@ -32,6 +33,10 @@ export const SCALE = 4;
 const TITLE_MS = 1700;
 const GO_MS = 900;
 const MAX_STEPS_PER_FRAME = 12;
+/** Tête de lecture : temps de calcul accordé au rattrapage à chaque image (ms). */
+const SEEK_BUDGET_MS = 40;
+/** Durée de chaque combat déjà calculée (seed + réglages), pour ne pas la recalculer à chaque saut. */
+const durations = new Map<string, number>();
 /** Au-dessus de cette profondeur, un objet appartient à l'interface : la caméra de jeu ne le zoome pas. */
 const UI_DEPTH = 9900;
 
@@ -60,6 +65,8 @@ export interface ArenaParams {
   biome?: string;
   /** Enregistrement : pas d'interaction, la fin de l'écran de vote clôt la vidéo. */
   record?: boolean;
+  /** Tête de lecture : démarre le combat directement à ce moment (s), rattrapé en accéléré et sans son. */
+  seek?: number;
 }
 
 interface Accessory {
@@ -215,6 +222,12 @@ export class ArenaScene extends Phaser.Scene {
   private confettiDebt = 0;
   private confettiColors: number[] = [];
   private mvpLabel?: { text: Phaser.GameObjects.Text; index: number };
+  /** Blizzard : secondes passées par chaque mort dans la tempête, puis son bloc de glace (null sans image). */
+  private frostTime = new Map<number, number>();
+  private iceBlocks = new Map<number, Phaser.GameObjects.Image | null>();
+  /** Tête de lecture : moment visé (s de combat) pendant le rattrapage, vitesse et son à rendre ensuite. */
+  private seekTo?: number;
+  private seekRestore = { speed: 1, muted: false };
 
   constructor() {
     super('arena');
@@ -253,6 +266,10 @@ export class ArenaScene extends Phaser.Scene {
     this.confettiUntil = 0;
     this.confettiDebt = 0;
     this.mvpLabel = undefined;
+    this.frostTime = new Map();
+    this.iceBlocks = new Map();
+    this.seekTo = undefined;
+    this.seekRestore = { speed: params.speed, muted: sound.muted };
   }
 
   /** Exécute fn après `delay` secondes de combat, dans un tick (le hasard du rendu y est déterministe). */
@@ -327,7 +344,8 @@ export class ArenaScene extends Phaser.Scene {
     }
     this.gas =
       manifest.staging.gas.style === 'blizzard'
-        ? new BlizzardLayer(this.add.graphics().setDepth(8500), field, manifest.staging.gas, SCALE)
+        ? // Ciel bouché et congère sous le public et les unités (-950), neige et grêle par-dessus (8500).
+          new BlizzardLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-950), field, { x: 0, y: 0, width, height }, manifest.staging.gas, SCALE)
         : new GasLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-430), field, manifest.staging.gas, SCALE);
     for (const u of this.battle.units) this.createUnitView(u);
     this.prev = this.battle.units.map((u) => ({ x: u.x, y: u.y, z: u.z }));
@@ -342,7 +360,9 @@ export class ArenaScene extends Phaser.Scene {
     this.createLetterbox();
     if (query?.get('safe') === '1') this.drawSafeOverlay();
     this.bindInput();
-    if (this.params.skipIntro) {
+    this.attachScrubber();
+    if (this.params.seek !== undefined) this.startSeek(this.params.seek);
+    if (this.params.skipIntro || this.params.seek !== undefined) {
       this.running = true;
       this.show.start();
       sound.startMusic();
@@ -582,6 +602,9 @@ export class ArenaScene extends Phaser.Scene {
     kb?.on('keydown-SPACE', () => (this.paused = !this.paused));
     kb?.on('keydown-ONE', () => (this.timeScale = 1));
     kb?.on('keydown-TWO', () => (this.timeScale = 2));
+    kb?.on('keydown-THREE', () => (this.timeScale = 3));
+    kb?.on('keydown-LEFT', () => this.seek(this.battle.time - 5));
+    kb?.on('keydown-RIGHT', () => this.seek(this.battle.time + 5));
     kb?.on('keydown-FOUR', () => (this.timeScale = 4));
     kb?.on('keydown-EIGHT', () => (this.timeScale = 8));
   }
@@ -760,23 +783,12 @@ export class ArenaScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     const dtMs = this.battle.dt * 1000;
-    if (this.running && !this.paused) {
+    if (this.seekTo !== undefined && this.running) this.advanceSeek(delta);
+    else if (this.running && !this.paused) {
       if (this.time.now >= this.hitStopUntil) this.accumulator += Math.min(delta, 100) * this.timeScale * this.slowmo;
       let steps = 0;
       while (this.accumulator >= dtMs && steps < MAX_STEPS_PER_FRAME) {
-        for (let i = 0; i < this.battle.units.length; i++) {
-          this.prev[i].x = this.battle.units[i].x;
-          this.prev[i].y = this.battle.units[i].y;
-          this.prev[i].z = this.battle.units[i].z;
-        }
-        // Après la fin, l'arène continue de vivre (épilogue) pendant l'annonce.
-        if (this.battle.result) this.epilogue();
-        else this.battle.step();
-        seedTick(this.battle.tick);
-        seedNoise(this.battle.tick);
-        this.handleEvents(this.battle.events);
-        this.tickVisuals(this.battle.dt);
-        this.runSimTimers();
+        this.tick();
         this.accumulator -= dtMs;
         steps++;
       }
@@ -785,6 +797,7 @@ export class ArenaScene extends Phaser.Scene {
     const alpha = Math.min(1, this.accumulator / dtMs);
     this.drawUnits(alpha, this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale : 0);
     this.drawZone();
+    this.placeIce();
     this.gas.update(this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale * this.slowmo : 0, this.battle.zone);
     this.drawEffects(delta / 1000);
     this.animateCrowd(this.time.now / 1000);
@@ -796,6 +809,110 @@ export class ArenaScene extends Phaser.Scene {
     this.drawStageExtras();
     this.director.update(this.battle.time);
     this.routeCameras();
+  }
+
+  /** Un pas de simulation et tout ce qui en découle (événements, effets tirés au tick, rappels). */
+  private tick(): void {
+    for (let i = 0; i < this.battle.units.length; i++) {
+      this.prev[i].x = this.battle.units[i].x;
+      this.prev[i].y = this.battle.units[i].y;
+      this.prev[i].z = this.battle.units[i].z;
+    }
+    // Après la fin, l'arène continue de vivre (épilogue) pendant l'annonce.
+    if (this.battle.result) this.epilogue();
+    else this.battle.step();
+    seedTick(this.battle.tick);
+    seedNoise(this.battle.tick);
+    this.handleEvents(this.battle.events);
+    this.tickVisuals(this.battle.dt);
+    this.runSimTimers();
+  }
+
+  // ---------------------------------------------------------------- tête de lecture
+
+  /** Durée du combat (s), épilogue compris : rejoué une fois sans rendu (la simulation est déterministe). */
+  private replayDuration(): number {
+    const p = this.params;
+    const key = JSON.stringify([p.seed, p.upgrades, p.heroes?.map((h) => h.id), p.biome]);
+    let d = durations.get(key) ?? p.episode?.expected?.duration;
+    if (d === undefined) {
+      const dry = new Battle(p.data, { seed: p.seed, upgrades: p.upgrades, heroes: p.heroes, biome: p.biome });
+      while (!dry.result && dry.time < 600) dry.step();
+      d = dry.result?.duration ?? dry.time;
+    }
+    durations.set(key, d);
+    return d + manifest.staging.show.finale;
+  }
+
+  private attachScrubber(): void {
+    const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : undefined;
+    if (this.params.record || q?.get('scrub') === '0' || typeof document === 'undefined') return;
+    attachScrubber({
+      time: () => this.seekTo ?? this.battle.time,
+      duration: this.replayDuration(),
+      speed: () => (this.seekTo !== undefined ? this.seekRestore.speed : this.timeScale),
+      paused: () => this.paused,
+      seeking: () => this.seekTo !== undefined,
+      seek: (t) => this.seek(t),
+      setSpeed: (s) => {
+        if (this.seekTo !== undefined) this.seekRestore.speed = s;
+        else this.timeScale = s;
+      },
+      togglePause: () => (this.paused = !this.paused),
+    });
+  }
+
+  /**
+   * Va au moment t du combat. En avant : la scène rattrape t en accéléré. En arrière (ou depuis l'écran de
+   * vote) : le combat repart du début, sans intro, et rattrape t. Mêmes images qu'en lecture normale, le
+   * hasard du rendu étant tiré au tick.
+   */
+  private seek(t: number): void {
+    if (this.params.record) return;
+    t = Math.max(0, t);
+    const live = this.scene.isActive();
+    if (live && this.running && t >= this.battle.time) {
+      this.startSeek(t);
+      return;
+    }
+    const paused = this.paused;
+    const speed = this.seekTo !== undefined ? this.seekRestore.speed : this.timeScale;
+    this.scene.stop('result');
+    this.scene.start('arena', { ...this.params, seek: t, skipIntro: true, speed });
+    // La pause survit au saut : on peut se placer image par image.
+    this.events.once(Phaser.Scenes.Events.CREATE, () => (this.paused = paused));
+  }
+
+  private startSeek(t: number): void {
+    if (this.seekTo === undefined) this.seekRestore = { speed: this.timeScale, muted: sound.muted };
+    this.seekTo = t;
+    sound.muted = true;
+  }
+
+  /**
+   * Rattrapage : autant de pas que le budget de l'image le permet. Les tweens, minuteries et animations
+   * suivent le même facteur d'accélération, pour que l'image d'arrivée soit celle d'une lecture normale.
+   */
+  private advanceSeek(delta: number): void {
+    const target = this.seekTo!;
+    const start = performance.now();
+    let steps = 0;
+    while (this.battle.time + 1e-9 < target && performance.now() - start < SEEK_BUDGET_MS) {
+      this.tick();
+      steps++;
+    }
+    const factor = Math.max(1, (steps * this.battle.dt) / Math.max(0.001, Math.min(delta, 100) / 1000));
+    this.timeScale = factor;
+    this.tweens.timeScale = factor;
+    this.time.timeScale = factor;
+    this.slowmo = 1;
+    if (this.battle.time + 1e-9 < target && this.scene.isActive()) return;
+    this.seekTo = undefined;
+    this.timeScale = this.seekRestore.speed;
+    this.tweens.timeScale = 1;
+    this.time.timeScale = 1;
+    this.accumulator = 0;
+    sound.muted = this.seekRestore.muted;
   }
 
   /**
@@ -1396,7 +1513,8 @@ export class ArenaScene extends Phaser.Scene {
   /** Confettis de la victoire, fond d'ambiance, barre de force : avancés au rythme de la simulation. */
   private tickVisuals(dt: number): void {
     this.ambience(dt);
-    this.gas.emit(dt, this.battle.zoneScale, this.battle.zone);
+    this.gas.emit(dt, this.battle.zoneScale, this.battle.zone, !!this.battle.result);
+    if (this.gas instanceof BlizzardLayer) this.freezeCorpses(dt, this.gas);
     if (this.battle.time < this.confettiUntil) {
       const f = this.battle.field;
       this.confettiDebt += dt * 75;
@@ -1416,6 +1534,69 @@ export class ArenaScene extends Phaser.Scene {
     this.balanceScroll += dt * bal.idle * (target >= 0.5 ? 1 : -1) + step * bal.push;
     this.balanceKick = Math.max(0, this.balanceKick - dt * 3);
     this.balanceFlash = Math.max(0, this.balanceFlash - dt * 2.5);
+  }
+
+  /**
+   * Blizzard : un mort qui reste dans la tempête bleuit peu à peu, puis gèle dans un bloc de glace.
+   * Compté en temps de combat, dans le tick : le moment du gel ne dépend ni du framerate ni de ?speed.
+   * Rendu seulement : la simulation ne sait rien du gel.
+   */
+  private freezeCorpses(dt: number, storm: BlizzardLayer): void {
+    const cfg = manifest.staging.gas.freeze;
+    if (!cfg.enabled || this.battle.result || storm.intensity < 0.3) return;
+    const z = this.battle.zone;
+    for (const u of this.battle.units) {
+      if (u.state !== 'dead' || u.z > 0 || this.iceBlocks.has(u.index)) continue;
+      if (u.x > z.x && u.x < z.x + z.width && u.y > z.y && u.y < z.y + z.height) continue;
+      const t = (this.frostTime.get(u.index) ?? 0) + dt;
+      this.frostTime.set(u.index, t);
+      const sprite = this.views[u.index].sprite;
+      if (t < cfg.after) {
+        // Le givre gagne : du blanc au bleu glacier.
+        const k = Math.min(1, t / cfg.after) * 0.6;
+        const ch = (from: number, to: number) => Math.round(from + (to - from) * k);
+        sprite.setTint((ch(255, 0x9c) << 16) | (ch(255, 0xcf) << 8) | 255);
+      } else this.freezeCorpse(u);
+    }
+  }
+
+  private freezeCorpse(u: Unit): void {
+    const sprite = this.views[u.index].sprite;
+    sprite.setTint(0x8cc4ff);
+    // Craquement de glace : éclats blancs et bleus.
+    for (let k = 0; k < (u.hero ? 10 : 6); k++) {
+      const a = rand() * Math.PI * 2;
+      const v = 20 + rand() * 30;
+      this.particles.push({ x: u.x, y: u.y - 3, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6 - 25, life: 0.45, maxLife: 0.45, color: rand() < 0.5 ? 0xffffff : 0xa8dcff, size: rand() < 0.4 ? 2 : 1 });
+    }
+    sound.play('hail');
+    if (!this.textures.exists('ice_block')) {
+      this.iceBlocks.set(u.index, null);
+      return;
+    }
+    // Bloc à la taille du corps couché : un héros se retrouve dans un gros glaçon.
+    const size = Math.max(sprite.displayWidth * 0.42, u.radius * 2.6 * SCALE);
+    const ice = this.add.image(sprite.x, sprite.y, 'ice_block').setOrigin(0.5, 0.8).setDepth(sprite.depth + 0.002).setAlpha(0.8);
+    const scale = size / ice.width;
+    ice.setScale(scale * 0.3, scale * 0.1);
+    this.tweens.add({ targets: ice, scaleX: scale, scaleY: scale, duration: 280, ease: 'Back.easeOut' });
+    this.iceBlocks.set(u.index, ice);
+  }
+
+  /** Les blocs de glace suivent leur corps (un mort peut encore être projeté) et fondent s'il se relève. */
+  private placeIce(): void {
+    for (const [i, ice] of this.iceBlocks) {
+      if (!ice) continue;
+      const sprite = this.views[i].sprite;
+      if (this.battle.units[i].state !== 'dead') {
+        ice.destroy();
+        sprite.clearTint();
+        this.iceBlocks.delete(i);
+        this.frostTime.delete(i);
+        continue;
+      }
+      ice.setPosition(sprite.x, sprite.y).setDepth(sprite.depth + 0.002);
+    }
   }
 
   /** Easter egg « le public explose » : un bloc de spectateurs part en confettis, puis revient sonné. */
