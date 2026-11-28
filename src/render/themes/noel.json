@@ -1,5 +1,5 @@
 {
-  "$comment": "Thème de Noël (?theme=noel) : mêmes règles, autres assets. Seul ce qui change est listé ; le reste vient de assets.manifest.json. Sprites du thème dans public/sprites/themes/noel/ (npm run sprites -- pixellab <dossier> <clés…> --theme=noel les ajoute ici). Pack « Calendrier de l'Avent » : brief dans le Claude Doc de Clément ; assets et prompts dans docs/sprites.md (Pack Noël).",
+  "$comment": "Thème de Noël (?theme=noel) : mêmes règles, autres assets. Seul ce qui change est listé ; le reste vient de assets.manifest.json. Sprites du thème dans public/sprites/themes/noel/ (npm run sprites -- pixellab <dossier> <clés…> --theme=noel les ajoute ici). Pack « Calendrier de l'Avent » : brief dans le Claude Doc de Clément ; assets et prompts dans docs/sprites.md (Pack Noël). Héros de base (arcs ouverts avant le pack) : en thème noel, ils portent les skins des héros de Noël du même rôle (Bob → Marcel, Kevin → Mère Noël, Gertrude → Papy Boulon, Grok → Gros Glaçon, Snik → Père Fouettard, Morva → Gobbo Claus) ; noms et règles inchangés.",
   "name": "Lutins vs Vilains — Calendrier de l'Avent",
   "teams": {
     "gnomes": {
@@ -1776,6 +1776,522 @@
           "color": "#d83b3b",
           "accent": "#f4f0e0",
           "mark": "staff"
+        }
+      },
+      "hero_bob": {
+        "type": "spritesheet",
+        "url": "sprites/themes/noel/hero_marcel.png",
+        "frameWidth": 64,
+        "frameHeight": 64,
+        "size": 32,
+        "directions": 8,
+        "animations": {
+          "attack": {
+            "frames": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "fps": 14,
+            "hit": 3
+          },
+          "death": {
+            "frames": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13
+            ],
+            "fps": 10
+          },
+          "walk": {
+            "frames": [
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "fps": 10
+          },
+          "idle": {
+            "frames": [
+              0
+            ],
+            "fps": 1
+          },
+          "stroll": {
+            "frames": [
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ],
+            "fps": 8
+          },
+          "guard": {
+            "frames": [
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33
+            ],
+            "fps": 8
+          }
+        },
+        "bricks": {
+          "death": "stay"
+        },
+        "placeholder": {
+          "body": "gnome",
+          "size": 22,
+          "color": "#3fa84a",
+          "accent": "#d83b3b",
+          "mark": "helmet",
+          "outline": "#fff4c2"
+        }
+      },
+      "hero_kevin": {
+        "type": "spritesheet",
+        "url": "sprites/themes/noel/hero_mere_noel.png",
+        "frameWidth": 64,
+        "frameHeight": 64,
+        "size": 32,
+        "directions": 8,
+        "animations": {
+          "attack": {
+            "frames": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "fps": 14,
+            "hit": 3
+          },
+          "walk": {
+            "frames": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "fps": 10
+          },
+          "death": {
+            "frames": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "fps": 10
+          },
+          "idle": {
+            "frames": [
+              0
+            ],
+            "fps": 1
+          },
+          "stroll": {
+            "frames": [
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ],
+            "fps": 8
+          },
+          "guard": {
+            "frames": [
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33
+            ],
+            "fps": 8
+          }
+        },
+        "bricks": {
+          "death": "stay"
+        },
+        "placeholder": {
+          "body": "gnome",
+          "size": 12,
+          "color": "#d83b3b",
+          "accent": "#f4f0e0",
+          "mark": "staff"
+        }
+      },
+      "hero_gertrude": {
+        "type": "spritesheet",
+        "url": "sprites/themes/noel/hero_papy_boulon.png",
+        "frameWidth": 64,
+        "frameHeight": 64,
+        "size": 32,
+        "directions": 8,
+        "animations": {
+          "walk": {
+            "frames": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "fps": 10
+          },
+          "attack": {
+            "frames": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "fps": 14,
+            "hit": 3
+          },
+          "death": {
+            "frames": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "fps": 10
+          },
+          "idle": {
+            "frames": [
+              0
+            ],
+            "fps": 1
+          },
+          "stroll": {
+            "frames": [
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ],
+            "fps": 8
+          },
+          "guard": {
+            "frames": [
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33
+            ],
+            "fps": 8
+          }
+        },
+        "bricks": {
+          "death": "stay"
+        },
+        "placeholder": {
+          "body": "gnome",
+          "size": 20,
+          "color": "#3fa84a",
+          "accent": "#e8b830",
+          "mark": "none",
+          "outline": "#fff4c2"
+        }
+      },
+      "hero_grok": {
+        "type": "spritesheet",
+        "url": "sprites/themes/noel/hero_glacon.png",
+        "frameWidth": 64,
+        "frameHeight": 64,
+        "size": 36,
+        "directions": 8,
+        "animations": {
+          "walk": {
+            "frames": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "fps": 10
+          },
+          "attack": {
+            "frames": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "fps": 14,
+            "hit": 3
+          },
+          "death": {
+            "frames": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "fps": 10
+          },
+          "idle": {
+            "frames": [
+              0
+            ],
+            "fps": 1
+          },
+          "stroll": {
+            "frames": [
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ],
+            "fps": 8
+          },
+          "guard": {
+            "frames": [
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33
+            ],
+            "fps": 8
+          }
+        },
+        "bricks": {
+          "death": "stay"
+        },
+        "placeholder": {
+          "body": "goblin",
+          "size": 22,
+          "color": "#e8f0ff",
+          "accent": "#5a3a8a",
+          "mark": "helmet",
+          "outline": "#fff4c2"
+        },
+        "shrinkWithHp": 0.6,
+        "rollOnCharge": true
+      },
+      "hero_snik": {
+        "type": "spritesheet",
+        "url": "sprites/themes/noel/hero_fouettard.png",
+        "frameWidth": 64,
+        "frameHeight": 64,
+        "size": 34,
+        "directions": 8,
+        "animations": {
+          "walk": {
+            "frames": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "fps": 10
+          },
+          "death": {
+            "frames": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13
+            ],
+            "fps": 10
+          },
+          "attack": {
+            "frames": [
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "fps": 14,
+            "hit": 3
+          },
+          "idle": {
+            "frames": [
+              0
+            ],
+            "fps": 1
+          },
+          "stroll": {
+            "frames": [
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ],
+            "fps": 8
+          },
+          "guard": {
+            "frames": [
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33
+            ],
+            "fps": 8
+          }
+        },
+        "bricks": {
+          "death": "stay"
+        },
+        "placeholder": {
+          "body": "goblin",
+          "size": 12,
+          "color": "#7cc243",
+          "accent": "#8a3ad8",
+          "mark": "staff"
+        }
+      },
+      "hero_morva": {
+        "type": "spritesheet",
+        "url": "sprites/themes/noel/hero_gobbo.png",
+        "frameWidth": 64,
+        "frameHeight": 64,
+        "size": 32,
+        "directions": 8,
+        "animations": {
+          "attack": {
+            "frames": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "fps": 14,
+            "hit": 3
+          },
+          "death": {
+            "frames": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13
+            ],
+            "fps": 10
+          },
+          "walk": {
+            "frames": [
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "fps": 10
+          },
+          "idle": {
+            "frames": [
+              0
+            ],
+            "fps": 1
+          },
+          "stroll": {
+            "frames": [
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ],
+            "fps": 8
+          },
+          "guard": {
+            "frames": [
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33
+            ],
+            "fps": 8
+          }
+        },
+        "bricks": {
+          "death": "stay"
+        },
+        "placeholder": {
+          "body": "goblin",
+          "size": 20,
+          "color": "#d83b3b",
+          "accent": "#f4f0e0",
+          "mark": "none",
+          "outline": "#fff4c2"
         }
       }
     },
