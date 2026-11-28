@@ -2,6 +2,7 @@
 // (biome, effectifs, incidents, gags), compter les votes, clore un arc. Les arcs sont lus et
 // écrits par le relais du serveur de dev (vite.config.ts), qui les valide avant d'écrire.
 import { loadGameData } from '../data';
+import { applyThemeLabels, THEMES, themeId } from '../render/themes';
 import {
   cancelVote,
   canCancelVote,
@@ -21,7 +22,8 @@ import { END_LABEL, WINNER_LABEL } from '../tools/metrics';
 import { freezeEpisode } from './freeze';
 import type { ScoutMessage, ScoutRequest, ScoutRow } from './scout.worker';
 
-const data = loadGameData();
+// Noms du thème de la régie (?theme=noel) : du texte seulement, les simulations ne changent pas.
+const data = applyThemeLabels(loadGameData());
 const app = document.getElementById('app')!;
 const arcSelect = document.getElementById('arc') as HTMLSelectElement;
 const arcInfo = document.getElementById('arcInfo')!;
@@ -58,8 +60,8 @@ function previewUrl(t: PreviewTarget): string {
   if (t.draft) q.set('draft', JSON.stringify(t.draft));
   if (t.vote) q.set('vote', `${t.vote.recipient}:${t.vote.options.join(',')}`);
   q.set('intro', '0');
-  // La régie ouverte avec ?theme=noel prévisualise dans ce thème.
-  const theme = new URLSearchParams(location.search).get('theme');
+  // Thème de l'arc (pack), sinon celui de la régie ouverte avec ?theme=noel.
+  const theme = arc!.theme ?? new URLSearchParams(location.search).get('theme');
   if (theme) q.set('theme', theme);
   return `./?${q}`;
 }
@@ -577,19 +579,39 @@ function endSection(a: Arc): HTMLElement {
   const title = el('input', { placeholder: 'titre' });
   const biome = el('select');
   for (const b of data.biomes) biome.append(el('option', { value: b.id }, b.label));
+  // Pack de thème : son roster, son biome et son pool d'upgrades pré-remplis (régie ouverte avec ?theme=noel).
+  const themeSelect = el('select');
+  themeSelect.append(el('option', { value: '' }, 'aucun (thème de base)'));
+  for (const t of Object.keys(THEMES)) themeSelect.append(el('option', { value: t }, THEMES[t].name ?? t));
+  themeSelect.value = themeId ?? '';
   const boxes = data.heroes.map((h) => {
     const c = el('input', { type: 'checkbox' });
-    c.checked = h.active;
     s.append(el('label', {}, h.name, c));
     return { id: h.id, c };
   });
-  s.append(el('label', {}, 'Identifiant', id), el('label', {}, 'Titre', title), el('label', {}, 'Biome', biome));
+  const applyTheme = () => {
+    const t = THEMES[themeSelect.value];
+    for (const b of boxes) b.c.checked = t?.heroes ? t.heroes.includes(b.id) : !!data.heroes.find((h) => h.id === b.id)?.active;
+    if (t?.biome) biome.value = t.biome;
+  };
+  themeSelect.addEventListener('change', applyTheme);
+  applyTheme();
+  s.append(el('label', {}, 'Identifiant', id), el('label', {}, 'Titre', title), el('label', {}, 'Thème', themeSelect), el('label', {}, 'Biome', biome));
   s.append(
     button("Créer l'arc", async () => {
       if (arcs.some((x) => x.id === id.value)) return message(s, 'Cet identifiant existe déjà.', false);
       const open = arcs.filter((x) => x.status === 'open');
       if (open.length) return message(s, `Clore d'abord l'arc ouvert (${open.map((x) => x.title).join(', ')}).`, false);
-      const next = { id: id.value, title: title.value || id.value, heroes: boxes.filter((b) => b.c.checked).map((b) => b.id), status: 'open', settings: { biome: biome.value }, episodes: [] };
+      const t = THEMES[themeSelect.value];
+      const next = {
+        id: id.value,
+        title: title.value || id.value,
+        heroes: boxes.filter((b) => b.c.checked).map((b) => b.id),
+        ...(t ? { theme: themeSelect.value, ...(t.upgrades ? { upgrades: t.upgrades } : {}) } : {}),
+        status: 'open',
+        settings: { biome: biome.value },
+        episodes: [],
+      };
       if (await saveArc(next as Arc, s, 'Arc créé.')) arcSelect.value = id.value;
     }),
   );
@@ -598,7 +620,19 @@ function endSection(a: Arc): HTMLElement {
 
 // ------------------------------------------------------------ rendu
 
+/** Un arc de pack s'affiche avec les noms de son thème : la régie se recharge dans ce thème si besoin. */
+function followArcTheme(): boolean {
+  // Un arc sans thème garde le thème de la régie (aperçu d'un arc de base dans un autre thème).
+  if (!arc?.theme || arc.theme === themeId) return false;
+  const q = new URLSearchParams(location.search);
+  q.set('theme', arc.theme);
+  q.set('arc', arc.id);
+  location.replace(`${location.pathname}?${q}`);
+  return true;
+}
+
 function render(): void {
+  if (followArcTheme()) return;
   arcSelect.replaceChildren(...arcs.map((a) => el('option', { value: a.id }, `${a.title}${a.status === 'closed' ? ' (clos)' : ''}`)));
   if (arc) arcSelect.value = arc.id;
   app.replaceChildren();
@@ -621,7 +655,8 @@ arcSelect.onchange = () => {
 
 fetchArcs()
   .then(() => {
-    arc = arcs.find((a) => a.status === 'open') ?? arcs[0];
+    const wanted = new URLSearchParams(location.search).get('arc');
+    arc = arcs.find((a) => a.id === wanted) ?? arcs.find((a) => a.status === 'open') ?? arcs[0];
     render();
     previewNext(0);
   })

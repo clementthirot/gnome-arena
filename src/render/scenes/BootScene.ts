@@ -34,7 +34,7 @@ export class BootScene extends Phaser.Scene {
     if (manifest.art.stands) this.load.image('art_stands', manifest.art.stands);
     if (manifest.art.king) this.load.image('art_king', manifest.art.king);
     if (manifest.art.throne) this.load.image('art_throne', manifest.art.throne);
-    for (const k of ['pattern', 'card', 'plaque', 'crown'] as const) {
+    for (const k of ['pattern', 'card', 'plaque', 'crown', 'gift'] as const) {
       const url = manifest.art.menu[k];
       if (url) this.load.image(`ui_${k}`, url);
     }

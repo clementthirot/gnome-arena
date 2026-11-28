@@ -24,6 +24,12 @@ export interface UnitView {
   dir?: number;
   /** Prochain point de la traînée de vol (ms, horloge de la scène). */
   trailAt?: number;
+  /** Apparence de transformation affichée à la place du sprite (pain d'épices, charbon). */
+  skin?: Phaser.GameObjects.Image;
+  /** Le sprite rapetisse avec les PV (part de taille gardée à 0 PV) ; 1 = taille fixe. */
+  shrinkMin?: number;
+  /** Roule sur lui-même pendant ses charges (bonhomme de neige). */
+  rollOnCharge?: boolean;
 }
 
 /** Direction (indice dans DIRECTIONS) la plus proche d'un vecteur écran (y vers le bas). */

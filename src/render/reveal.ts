@@ -8,7 +8,7 @@ import type { Unit } from '../sim/types';
 import { sound } from './audio';
 import { manifest } from './manifest';
 import { SAFE } from './safeZone';
-import { accessoryTexture, fitIcon, spinReel } from './slotMachine';
+import { accessoryTexture, fitIcon, revealOption } from './slotMachine';
 import { TEAM_COLORS, textStyle } from './text';
 
 export type { PreviousVote } from '../data/arc';
@@ -71,6 +71,8 @@ export function drawOpeningTitle(scene: Phaser.Scene, title: OpeningTitle, depth
   }
   if (title.stack) {
     const [a, vs, b] = title.stack;
+    // Avec une phrase d'accroche au-dessus (thème), les effectifs descendent d'un cran.
+    const dy = title.hook ? 140 : 0;
     // Logo PixelLab (manifeste art.title) à la place du texte, effectifs en dessous ; sinon repli texte.
     if (scene.textures.exists('art_title')) {
       const logo = scene.add.image(CX, 680, 'art_title').setDepth(depth + 1);
@@ -78,15 +80,33 @@ export function drawOpeningTitle(scene: Phaser.Scene, title: OpeningTitle, depth
       const [na, nb] = [a, b].map((s) => /\d+/.exec(s)?.[0]);
       if (na && nb) items.push(scene.add.text(CX, 680 + logo.displayHeight / 2 + 50, `${na}  contre  ${nb}`, textStyle(44)).setOrigin(0.5).setDepth(depth + 1));
       items.push(logo);
+      backTexts(scene, items, depth);
       return items;
     }
     items.push(
-      scene.add.text(CX, 600, a, textStyle(76, TEAM_COLORS.gnomes.main)).setOrigin(0.5).setDepth(depth + 1),
-      scene.add.text(CX, 705, vs, textStyle(44)).setOrigin(0.5).setDepth(depth + 1),
-      scene.add.text(CX, 810, b, textStyle(76, TEAM_COLORS.goblins.main)).setOrigin(0.5).setDepth(depth + 1),
+      scene.add.text(CX, 600 + dy, a, textStyle(76, TEAM_COLORS.gnomes.main)).setOrigin(0.5).setDepth(depth + 1),
+      scene.add.text(CX, 705 + dy, vs, textStyle(44)).setOrigin(0.5).setDepth(depth + 1),
+      scene.add.text(CX, 810 + dy, b, textStyle(76, TEAM_COLORS.goblins.main)).setOrigin(0.5).setDepth(depth + 1),
     );
   }
+  backTexts(scene, items, depth);
   return items;
+}
+
+/** Thème avec textBacking : un aplat uni derrière tout le bloc de texte (règle « fond uni sous le texte »). */
+function backTexts(scene: Phaser.Scene, items: Phaser.GameObjects.GameObject[], depth: number) {
+  const color = manifest.staging.reveal.textBacking;
+  const texts = items.filter((o): o is Phaser.GameObjects.Text => o instanceof Phaser.GameObjects.Text);
+  if (!color || !texts.length) return;
+  const b = texts.map((t) => t.getBounds()).reduce((acc, r) => Phaser.Geom.Rectangle.Union(acc, r));
+  const pad = 24;
+  items.push(
+    scene.add
+      .rectangle(b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2, Phaser.Display.Color.HexStringToColor(color).color)
+      .setOrigin(0)
+      .setStrokeStyle(4, 0x000000)
+      .setDepth(depth + 0.5),
+  );
 }
 
 /** Titre de la dernière ouverture jouée (pour le fondu de boucle). */
@@ -120,6 +140,7 @@ export function playOpening(ctx: OpeningContext): void {
   else {
     const parts = fill(cfg.hookFirst, { gnomes: count('gnomes'), goblins: count('goblins') }).split(/ (vs|contre) /);
     title.stack = parts.length === 3 ? [parts[0], parts[1], parts[2]] : [parts.join(' '), '', ''];
+    if (cfg.tagline) title.hook = fill(cfg.tagline, { n: ctx.episode?.number ?? 1 });
   }
   scene.registry.set(REGISTRY_TITLE, title);
   const titleItems = drawOpeningTitle(scene, title, ctx.uiDepth + 50);
@@ -140,7 +161,7 @@ export function playOpening(ctx: OpeningContext): void {
   // Rouleau : défile sur les options de l'épisode précédent et s'arrête sur la gagnante.
   const pool = vote.options.flatMap((o) => accessoryTexture(scene, o.visual) ?? []);
   const target = accessoryTexture(scene, vote.eq.visual) ?? pool[0];
-  const reel = spinReel(scene, { x: CX, y: 830, size: 300, depth: d, pool, target, delay: T.reel + 150, spins: 13, firstStep: 40, stepGrowth: 9 });
+  const reel = revealOption(scene, { x: CX, y: 830, size: 300, depth: d, pool, target, delay: T.reel + 150, spins: 13, firstStep: 40, stepGrowth: 9 });
   reel.container.setScale(0);
   scene.tweens.add({ targets: reel.container, scale: 1, duration: 260, delay: T.reel, ease: 'Back.easeOut' });
   // Le rouleau apparaît, puis défile 150 ms plus tard ; stopsAt compte depuis la première image.

@@ -74,6 +74,10 @@ const SpriteSheetSchema = z.object({
     death: AnimationSchema.optional(),
   }),
   bricks: BricksSchema.partial().optional(),
+  /** Rapetisse visiblement avec les PV : part de la taille gardée à 0 PV (rendu seulement). */
+  shrinkWithHp: z.number().min(0.2).max(1).optional(),
+  /** Roule sur lui-même pendant ses charges (rendu seulement). */
+  rollOnCharge: z.boolean().optional(),
   /** Silhouette de secours si l'image ne charge pas ; sert aussi à générer une sheet de remplacement. */
   placeholder: PlaceholderShapeSchema.optional(),
 });
@@ -106,7 +110,7 @@ const AccessorySchema = z.discriminatedUnion('type', [
  * Visuels de mise en scène du lot réalisation (aura du mini-boss, couronne, confettis du public,
  * accessoires du spectateur récurrent) : placeholder dessiné par code (eggs.ts), ou image.
  */
-export const OVERLAY_KINDS = ['aura', 'crown', 'confetti', 'tophat', 'helmet', 'umbrella', 'flower', 'viking', 'propeller', 'duck'] as const;
+export const OVERLAY_KINDS = ['aura', 'crown', 'confetti', 'tophat', 'helmet', 'umbrella', 'flower', 'viking', 'propeller', 'duck', 'gingerbread', 'coal'] as const;
 const OverlayShapeSchema = z.object({ kind: z.enum(OVERLAY_KINDS), color, accent: color });
 const OverlaySchema = z.discriminatedUnion('type', [
   OverlayShapeSchema.extend({ type: z.literal('placeholder') }),
@@ -153,8 +157,8 @@ const EffectVisualSchema = z.object({
       url: z.string(),
       /** Taille minimale en px monde (plus grand côté) ; un gros rayon d'effet l'agrandit. */
       size: z.number().positive().default(16),
-      /** center : centrée sur l'impact ; bottom : posée sur l'impact (éclair qui tombe). */
-      anchor: z.enum(['center', 'bottom']).default('center'),
+      /** center : centrée sur l'impact ; bottom : posée sur l'impact (éclair qui tombe) ; roll : roule le long d'un rayon (rouleau, boule de neige). */
+      anchor: z.enum(['center', 'bottom', 'roll']).default('center'),
     })
     .optional(),
 });
@@ -196,6 +200,8 @@ const StagingSchema = z.object({
     hooks: z.record(z.string(), z.string()).default({}),
     /** Accroche sans vote précédent. */
     hookFirst: z.string().default('{gnomes} GNOMES vs {goblins} GOBELINS'),
+    /** Phrase d'accroche au-dessus des effectifs quand il n'y a pas de vote à révéler (feuilleton d'un thème). */
+    tagline: z.string().optional(),
     chose: z.string().default('LE PUBLIC A CHOISI…'),
     gets: z.string().default('POUR {hero} !'),
     share: z.string().default('{pct} % DES VOIX'),
@@ -210,6 +216,15 @@ const StagingSchema = z.object({
     mvp: z.string().default('MVP'),
     voteFor: z.string().default('RECEVRA LA PROCHAINE UPGRADE'),
     voteCall: z.string().default('VOTE 1, 2 OU 3 EN COMMENTAIRE'),
+    /**
+     * Dévoilement des options : « slots » (rouleaux de machine à sous) ou « gifts » (un cadeau par option
+     * qui s'ouvre, l'un après l'autre, sur l'option imposée ; image art.menu.gift, sinon cadeau dessiné).
+     */
+    style: z.enum(['slots', 'gifts']).default('slots'),
+    /** Aplat (couleur) sous les textes de l'écran de fin posés sur le motif : numéro d'épisode, bloc MVP. */
+    textBacking: color.optional(),
+    /** Titre du rideau qui précède la carte de vote. */
+    curtainTitle: z.string().default('ROULETTE\nDES UPGRADES'),
     /** Cadre du rouleau : placeholder dessiné ; `url` (optionnelle) le remplace par une image, clé ui_slot_frame. */
     slot: z.object({ frame: color.default('#c8902a'), window: color.default('#14101c'), light: color.default('#ffe14a'), url: z.string().optional() }).default({}),
     /** Confettis de l'accrochage de l'accessoire. */
@@ -359,6 +374,20 @@ const StagingSchema = z.object({
       crown: z.string().default('boss_crown'),
     })
     .default({}),
+  /**
+   * Barre de rapport de force : aplats aux couleurs des camps (défaut), ou rayures façon sucre d'orge
+   * (deux couleurs par camp) qui défilent dans le sens où la jonction se déplace.
+   */
+  balance: z
+    .object({
+      stripes: z.object({ gnomes: z.tuple([color, color]), goblins: z.tuple([color, color]) }).optional(),
+      /** Période des rayures (px écran). */
+      period: z.number().int().min(4).default(28),
+      /** Défilement au repos (px écran par seconde) et gain selon la vitesse de la jonction. */
+      idle: z.number().min(0).default(12),
+      push: z.number().min(0).default(2400),
+    })
+    .default({}),
   strayShots: z.object({
     /** Probabilité qu'une flèche ratée près du bord file dans les gradins. */
     chance: z.number().min(0).max(1).default(0.35),
@@ -397,6 +426,10 @@ export const ManifestSchema = z.object({
           card: z.string().optional(),
           plaque: z.string().optional(),
           crown: z.string().optional(),
+          /** Cadeau du dévoilement des options (staging.reveal.style « gifts »). */
+          gift: z.string().optional(),
+          /** Bords non étirés du cadre (px de l'image) : gauche, droite, haut, bas. */
+          slice: z.tuple([z.number().int().min(1), z.number().int().min(1), z.number().int().min(1), z.number().int().min(1)]).default([20, 20, 22, 22]),
           /** Défilement du motif, en px écran par seconde (vers le bas à droite). */
           scroll: z.number().default(40),
           patternAlpha: z.number().min(0).max(1).default(0.6),

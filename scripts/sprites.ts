@@ -99,7 +99,7 @@ const EXTRA_FPS: Record<string, number> = { kick: 14, hurt: 16, getup: 10 };
 /** Noms d'animations PixelLab reconnus, vers les animations du jeu (l'ordre des tests compte). */
 function animationFor(name: string): AnimName | undefined {
   const n = name.toLowerCase();
-  if (/death|die|dying/.test(n)) return 'death';
+  if (/death|die|dying|fall/.test(n)) return 'death';
   if (/getting.?up|get.?up|stand.?up|rise/.test(n)) return 'getup';
   if (/taking|hurt|hit.?react|damage|flinch/.test(n)) return 'hurt';
   if (/kick/.test(n)) return 'kick';

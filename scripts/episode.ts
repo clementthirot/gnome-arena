@@ -8,7 +8,7 @@
 //   vote   --votes 120,340,95 | --comments export.txt
 //                                           compte le vote et attribue l'upgrade gagnante
 //   unvote [--ep 3]                         annule le dernier vote compté (tant que l'épisode suivant n'est pas figé)
-//   new-arc --id arc2 --title "..." [--heroes bob,kevin,...]   (refusé tant qu'un arc est ouvert)
+//   new-arc --id arc2 --title "..." [--heroes bob,kevin,...] [--theme noel]   (refusé tant qu'un arc est ouvert)
 //   close                                   clôt l'arc en cours
 //
 // --arc arc1 choisit l'arc (par défaut : le seul arc ouvert).
@@ -242,9 +242,15 @@ function newArc() {
   if (existsSync(arcPath(id))) throw new Error(`l'arc ${id} existe déjà`);
   const open = loadArcs().filter((a) => a.status === 'open');
   if (open.length) throw new Error(`l'arc ${open.map((a) => a.id).join(', ')} est encore ouvert : le clore d'abord (npm run episode -- close)`);
-  const heroes = opt('heroes')?.split(',') ?? data.heroes.filter((h) => h.active).map((h) => h.id);
-  saveArc(parseArc({ id, title: opt('title') ?? id, heroes, status: 'open', episodes: [] }, data));
-  console.log(`Arc ${id} créé avec ${heroes.map(heroName).join(', ')}.`);
+  // --theme noel : pack de thème (roster, biome et pool d'upgrades du fichier src/render/themes/noel.json).
+  const themeId = opt('theme');
+  const themePath = themeId && join(import.meta.dirname, `../src/render/themes/${themeId}.json`);
+  if (themePath && !existsSync(themePath)) throw new Error(`thème inconnu : ${themeId} (src/render/themes/${themeId}.json)`);
+  const theme = themePath ? (JSON.parse(readFileSync(themePath, 'utf8')) as { heroes?: string[]; biome?: string; upgrades?: string[] }) : {};
+  const heroes = opt('heroes')?.split(',') ?? theme.heroes ?? data.heroes.filter((h) => h.active).map((h) => h.id);
+  const pack = themeId ? { theme: themeId, ...(theme.upgrades ? { upgrades: theme.upgrades } : {}), ...(theme.biome ? { settings: { biome: theme.biome } } : {}) } : {};
+  saveArc(parseArc({ id, title: opt('title') ?? id, heroes, status: 'open', ...pack, episodes: [] }, data));
+  console.log(`Arc ${id} créé avec ${heroes.map(heroName).join(', ')}${themeId ? ` (thème ${themeId})` : ''}.`);
 }
 
 function close() {

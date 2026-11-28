@@ -55,7 +55,7 @@ export class FxLayer {
   private spriteFx(key: string, v: EffectVisual, x: number, y: number, radius: number): void {
     const scene = this.g.scene;
     const tex = `fx_img_${key}`;
-    if (!v.sprite || !scene.textures.exists(tex)) return;
+    if (!v.sprite || v.sprite.anchor === 'roll' || !scene.textures.exists(tex)) return;
     const S = this.scale;
     const img = scene.add.image(x * S, y * S, tex).setDepth(this.g.depth + 1);
     if (v.sprite.anchor === 'bottom') img.setOrigin(0.5, 1);
@@ -69,6 +69,21 @@ export class FxLayer {
     this.lasting.push({ visual: v, x: fromX, y: fromY, toX, toY, width, radius: 0, age: 0, life: Math.max(0.15, v.duration), seed: rand() * 1000 });
     // Étincelles au point de rebond.
     if (width) this.burst(toX, toY, v, 10, 70);
+    this.rollFx(key, v, fromX, fromY, toX, toY);
+  }
+
+  /** Image qui roule le long d'un rayon (rouleau à pâtisserie, boule de neige géante), en tournant sur elle-même. */
+  private rollFx(key: string, v: EffectVisual, fromX: number, fromY: number, toX: number, toY: number): void {
+    const scene = this.g.scene;
+    const tex = `fx_img_${key}`;
+    if (v.sprite?.anchor !== 'roll' || !scene.textures.exists(tex)) return;
+    const S = this.scale;
+    const img = scene.add.image(fromX * S, fromY * S, tex).setDepth(this.g.depth + 1);
+    img.setScale((v.sprite.size * S) / Math.max(img.width, img.height));
+    const ms = Math.max(250, v.duration * 1000);
+    const turns = Math.hypot(toX - fromX, toY - fromY) / Math.max(4, v.sprite.size * 1.5);
+    scene.tweens.add({ targets: img, x: toX * S, y: toY * S, angle: 360 * turns * (toX >= fromX ? 1 : -1), duration: ms, ease: 'Linear' });
+    scene.tweens.add({ targets: img, alpha: 0, delay: ms * 0.8, duration: ms * 0.3, onComplete: () => img.destroy() });
   }
 
   /** Le rayon se dessine le long de sa trajectoire pendant sa charge, puis frappe. */

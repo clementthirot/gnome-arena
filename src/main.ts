@@ -23,7 +23,7 @@ import { ArenaScene } from './render/scenes/ArenaScene';
 import { BootScene } from './render/scenes/BootScene';
 import { ResultScene } from './render/scenes/ResultScene';
 import { startBenchPage } from './tools/benchPage';
-import { theme } from './render/themes';
+import { applyThemeLabels, theme, themeId } from './render/themes';
 
 const params = new URLSearchParams(location.search);
 // En production, les arcs sont embarqués ; en développement, la régie les sert à jour (sans recharger la page).
@@ -47,7 +47,8 @@ async function main() {
     startBenchPage(document.getElementById('game')!, params);
     return;
   }
-  const data = loadGameData();
+  // Noms du thème (upgrades, unités, incidents) : du texte seulement, la simulation ne change pas.
+  const data = applyThemeLabels(loadGameData());
   const arena = await arenaParams(data);
   if (arena.record) {
     // Le son ne démarre qu'après un geste : on attend un clic pour lancer l'enregistrement.
@@ -120,21 +121,34 @@ async function arenaParams(data: GameData): Promise<ArenaParams> {
   const manual = parseUpgrades(params.get('up'), data);
   const prev = parsePreviousVote(params.get('prev'), data);
   if (!arcId) {
+    // Sans arc, un pack de thème joue avec son propre roster (?theme=noel : les héros de Noël).
+    const heroes = theme.heroes?.map((id) => {
+      const hero = data.heroes.find((h) => h.id === id);
+      if (!hero) throw new Error(`thème ${themeId} : héros inconnu ${id}`);
+      return hero;
+    });
     return {
       data,
+      heroes,
       seed: params.get('seed') ?? String(Math.floor(Math.random() * 100000)),
       speed: record ? 1 : speed,
       record,
       skipIntro: params.get('intro') === '0' && !record,
       // Vote précédent simulé : le héros porte déjà l'upgrade gagnée.
       upgrades: prev ? mergeUpgrades(manual, { [prev.recipient]: [prev.upgrade] }) : manual,
-      biome: params.get('biome') ?? undefined,
+      biome: params.get('biome') ?? theme.biome,
       episode: prev ? { number: Number(params.get('ep')) || 2, previousVote: prev } : undefined,
     };
   }
   const raw = await loadArc(arcId);
   if (!raw) throw new Error(`arc introuvable : ${arcId}`);
   let arc = parseArc(raw, data);
+  // Un arc de pack s'ouvre dans son thème : on recharge la page avec ?theme=… s'il manque.
+  if (arc.theme && arc.theme !== themeId && !params.has('theme')) {
+    params.set('theme', arc.theme);
+    location.replace(`${location.pathname}?${params}`);
+    await new Promise(() => {});
+  }
   const number = Number(params.get('ep') ?? arc.episodes.length + 1);
   const ep = arc.episodes.find((e) => e.number === number);
   // Aperçu de la régie : réglages et vote pas encore enregistrés (seulement pour un épisode non figé).
@@ -230,7 +244,7 @@ function parsePreviousVote(value: string | null, data: GameData): PreviousVote |
   if (votes && (votes.length < 2 || votes.length > 4 || votes.some((v) => !Number.isInteger(v) || v < 0) || !votes.some((v) => v > 0))) {
     throw new Error(`?prev= : voix invalides ${counts} (2 à 4 nombres, au moins une voix)`);
   }
-  const others = data.equipment.map((e) => e.id).filter((id) => id !== upgrade);
+  const others = data.equipment.filter((e) => !e.innate).map((e) => e.id).filter((id) => id !== upgrade);
   const winnerAt = votes ? votes.indexOf(Math.max(...votes)) : 0;
   const options = votes ? votes.map((_, i) => (i === winnerAt ? upgrade : others.shift()!)) : [upgrade];
   return { recipient, team, upgrade, options, votes };

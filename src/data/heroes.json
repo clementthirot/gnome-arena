@@ -176,5 +176,207 @@
         "Debout, si tu peux !"
       ]
     }
+  },
+  {
+    "id": "marcel",
+    "name": "Marcel l'Enclume",
+    "label": "le forgeron",
+    "base": "gnome_charger",
+    "visual": "hero_marcel",
+    "personality": "valiant",
+    "stats": {
+      "hp": 3.2,
+      "damage": 1.6,
+      "speed": 1.05,
+      "size": 1.7,
+      "mass": 2.2
+    },
+    "rival": "glacon",
+    "upgrades": [
+      "forge_slam"
+    ],
+    "active": false,
+    "quotes": {
+      "cry": [
+        "À LA FORGE !",
+        "ÇA VA TAPER !",
+        "BOUM L'ENCLUME !"
+      ],
+      "fear": [
+        "Même pas froid !"
+      ],
+      "win": [
+        "Au suivant !",
+        "Bien forgé !"
+      ]
+    }
+  },
+  {
+    "id": "mere_noel",
+    "name": "Mère Noël",
+    "label": "la magicienne",
+    "base": "gnome_mage",
+    "visual": "hero_mere_noel",
+    "personality": "cautious",
+    "stats": {
+      "hp": 2.8,
+      "damage": 1.8,
+      "speed": 1.05,
+      "size": 1.6,
+      "mass": 1.6
+    },
+    "rival": "fouettard",
+    "upgrades": [
+      "gingerbread_cloud",
+      "rolling_pin"
+    ],
+    "active": false,
+    "quotes": {
+      "cry": [
+        "Au four, les vilains !",
+        "Qui veut du pain d'épices ?"
+      ],
+      "fear": [
+        "Oh, mes biscuits !"
+      ],
+      "win": [
+        "Tout chaud sorti du four !",
+        "Joyeux Noël !"
+      ]
+    },
+    "roleSpell": false
+  },
+  {
+    "id": "papy_boulon",
+    "name": "Papy Boulon",
+    "label": "l'inventeur",
+    "base": "gnome_melee",
+    "visual": "hero_papy_boulon",
+    "personality": "reckless",
+    "stats": {
+      "hp": 3,
+      "damage": 1.7,
+      "speed": 1.05,
+      "size": 1.6,
+      "mass": 1.8
+    },
+    "rival": "gobbo",
+    "upgrades": [
+      "toy_soldiers"
+    ],
+    "active": false,
+    "quotes": {
+      "cry": [
+        "En avant, mes jouets !",
+        "Un tour de clé !"
+      ],
+      "fear": [
+        "Mon dos !"
+      ],
+      "win": [
+        "Encore une invention géniale !"
+      ]
+    }
+  },
+  {
+    "id": "glacon",
+    "name": "Gros Glaçon",
+    "label": "le bonhomme de neige",
+    "base": "goblin_charger",
+    "visual": "hero_glacon",
+    "personality": "reckless",
+    "stats": {
+      "hp": 3.2,
+      "damage": 2.06,
+      "speed": 1.05,
+      "size": 1.75,
+      "mass": 2.3
+    },
+    "rival": "marcel",
+    "upgrades": [
+      "snow_roll"
+    ],
+    "active": false,
+    "quotes": {
+      "cry": [
+        "ÇA VA ROULER !",
+        "AVALANCHE !"
+      ],
+      "fear": [
+        "Je fonds !"
+      ],
+      "win": [
+        "Glacial !",
+        "Trop cool !"
+      ]
+    }
+  },
+  {
+    "id": "fouettard",
+    "name": "Père Fouettard",
+    "label": "le magicien",
+    "base": "goblin_shaman",
+    "visual": "hero_fouettard",
+    "personality": "sneaky",
+    "stats": {
+      "hp": 2.8,
+      "damage": 2.32,
+      "speed": 1.1,
+      "size": 1.6,
+      "mass": 1.5
+    },
+    "rival": "mere_noel",
+    "upgrades": [
+      "coal_cloud",
+      "big_sack"
+    ],
+    "active": false,
+    "quotes": {
+      "cry": [
+        "Du charbon pour tout le monde !",
+        "Dans le sac !"
+      ],
+      "fear": [
+        "Pas le martinet !"
+      ],
+      "win": [
+        "Hé hé hé…",
+        "Pas sages !"
+      ]
+    },
+    "roleSpell": false
+  },
+  {
+    "id": "gobbo",
+    "name": "Gobbo Claus",
+    "label": "le faux Père Noël",
+    "base": "goblin_melee",
+    "visual": "hero_gobbo",
+    "personality": "valiant",
+    "stats": {
+      "hp": 3,
+      "damage": 2.19,
+      "speed": 1.05,
+      "size": 1.6,
+      "mass": 1.8
+    },
+    "rival": "papy_boulon",
+    "upgrades": [
+      "mimic_gifts"
+    ],
+    "active": false,
+    "quotes": {
+      "cry": [
+        "HO HO HO… GRRR !",
+        "Des cadeaux pour vous !"
+      ],
+      "fear": [
+        "Ma fausse barbe !"
+      ],
+      "win": [
+        "C'est moi le vrai !",
+        "Ho ho ho !"
+      ]
+    }
   }
 ]

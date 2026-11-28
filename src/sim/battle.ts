@@ -183,6 +183,8 @@ export class Battle implements EffectHost {
     const personalityId = hero ? hero.personality : this.rng.weighted(def.personalities);
     const personality = this.data.personalities.find((p) => p.id === personalityId)!;
     const role = this.role(def.role);
+    // Un héros peut remplacer le sort de son rôle par ses propres capacités.
+    const spell = hero && !hero.roleSpell ? undefined : role.spell;
     const maxHp = def.hp * (s?.hp ?? 1) * gear('hp');
     const unit: Unit = {
       index: this.units.length,
@@ -201,7 +203,7 @@ export class Battle implements EffectHost {
       // Les upgrades d'abord (même ordre qu'avant), puis le sort éventuel du rôle.
       abilities: [
         ...equipment.map((e) => ({ id: e.id, short: e.short, special: e.special })),
-        ...(role.spell ? [{ id: `${role.id}_sort`, short: role.spell.label, special: role.spell }] : []),
+        ...(spell ? [{ id: `${role.id}_sort`, short: spell.label, special: spell }] : []),
       ],
       x,
       y,
@@ -231,7 +233,9 @@ export class Battle implements EffectHost {
       gagY: 0,
       blockedTime: 0,
       lastGap: Infinity,
-      specialCooldowns: [...equipment, ...(role.spell ? [role.spell] : [])].map(() => this.rng.range(...this.tuning.specialStartCooldown)),
+      specialCooldowns: [...equipment, ...(spell ? [spell] : [])].map(() => this.rng.range(...this.tuning.specialStartCooldown)),
+      transformUntil: 0,
+      transformSkin: '',
       slowUntil: 0,
       slowFactor: 1,
       kills: 0,
@@ -271,6 +275,12 @@ export class Battle implements EffectHost {
       if (u.stunTimer > 0) {
         u.stunTimer -= this.dt;
         u.vx = u.vy = 0;
+        continue;
+      }
+      if (u.transformUntil > this.time) {
+        // Transformé : immobile et inoffensif, mais toujours vulnérable.
+        u.vx = u.vy = 0;
+        u.state = 'choose';
         continue;
       }
       this.think(u);
@@ -402,6 +412,15 @@ export class Battle implements EffectHost {
     u.stunTimer = Math.max(u.stunTimer, duration);
     u.charging = false;
     this.events.push({ type: 'stun', unit: u.index, duration });
+  }
+
+  /** @internal EffectHost */
+  transformUnit(u: Unit, duration: number, skin: string): void {
+    if (u.state === 'dead') return;
+    u.transformUntil = Math.max(u.transformUntil, this.time + duration);
+    u.transformSkin = skin;
+    u.charging = false;
+    this.events.push({ type: 'transform', unit: u.index, skin, duration });
   }
 
   private tickTimers(u: Unit): void {
@@ -555,7 +574,7 @@ export class Battle implements EffectHost {
     }
     this.defer(windup, () => {
       // Interrompu (mort, projeté, sonné) ou cible partie entre-temps : le coup tombe dans le vide.
-      if (u.state === 'dead' || u.z > 0 || u.stunTimer > 0 || target.state === 'dead' || target.z > 0) return;
+      if (u.state === 'dead' || u.z > 0 || u.stunTimer > 0 || u.transformUntil > this.time || target.state === 'dead' || target.z > 0) return;
       const dx = target.x - u.x;
       const dy = target.y - u.y;
       const d = hypot(dx, dy) || 1;
@@ -1110,6 +1129,25 @@ export class Battle implements EffectHost {
     } else teams = [effect.team];
     const centerX = effect.team === 'self' && ctx.source ? ctx.source.x : ctx.x;
     const f = this.field;
+    if (effect.from === 'source' && ctx.source) {
+      // Invocation : les unités surgissent autour du lanceur avec un petit saut.
+      const src = ctx.source;
+      for (const team of teams) {
+        const def = this.unitDef(effect.units[team]!);
+        for (let i = 0; i < effect.count; i++) {
+          const a = this.rng.range(0, Math.PI * 2);
+          const r = src.radius + def.radius + this.rng.range(1, 4);
+          this.createUnit(team, def, src.x + cos(a) * r, src.y + sin(a) * r);
+          const u = this.units[this.units.length - 1];
+          this.clampToField(u);
+          u.kx = cos(a) * 30;
+          u.ky = sin(a) * 30;
+          this.events.push({ type: 'spawn', unit: u.index });
+          this.launchUnit(u, effect.jump * this.rng.range(0.8, 1.2));
+        }
+      }
+      return;
+    }
     for (const team of teams) {
       const def = this.unitDef(effect.units[team]!);
       // Les gnomes descendent des gradins du bas, les gobelins de ceux du haut.

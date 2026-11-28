@@ -20,6 +20,9 @@ const ART: Record<string, string[]> = {
   propeller: ['aaa.aaa', '...o...', '..ccc..', '.ccccc.'],
   duck: ['..cc..', '.ccoca', 'cccc..', 'ccccc.', '.cccc.'],
   confetti: ['ca', 'ac'],
+  // Transformations (pack Noël) : bonhomme en pain d'épices, morceau de charbon.
+  gingerbread: ['..ccc..', '..cac..', 'ccccccc', '..cac..', '..ccc..', '.cc.cc.', 'cc...cc'],
+  coal: ['..ccc..', '.cccac.', 'ccacccc', 'cccccac', '.ccccc.'],
 };
 
 function overlayCanvas(kind: string, color: string, accent: string): HTMLCanvasElement {

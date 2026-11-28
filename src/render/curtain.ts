@@ -5,6 +5,7 @@ import type Phaser from 'phaser';
 import { goldFrame } from './frame';
 import { manifest } from './manifest';
 import { drawAccessory } from './placeholders';
+import { fitIcon, giftTexture } from './slotMachine';
 import { textStyle } from './text';
 
 const DEPTH = 9990;
@@ -61,21 +62,26 @@ function build(scene: Phaser.Scene, closed: boolean): Curtain {
     title.push(plaque.setDepth(DEPTH + 1));
     if (scene.textures.exists('ui_crown')) title.push(scene.add.image(w / 2, h / 2 - 170 - 125 + 6, 'ui_crown').setOrigin(0.5, 1).setScale(2.25).setDepth(DEPTH + 1));
   }
-  title.push(scene.add.text(w / 2, h / 2 - 170, 'ROULETTE\nDES UPGRADES', textStyle(64, '#ffe14a', { align: 'center' })).setOrigin(0.5).setDepth(DEPTH + 2));
+  title.push(scene.add.text(w / 2, h / 2 - 170, manifest.staging.reveal.curtainTitle, textStyle(64, '#ffe14a', { align: 'center' })).setOrigin(0.5).setDepth(DEPTH + 2));
   // Cadres dorés des rouleaux, comme la machine à sous du verdict.
   for (const k of [-1, 0, 1]) {
     const f = goldFrame(scene, w / 2 + k * 220, h / 2 + 90, 190, 190);
     if (f) title.push(f.setDepth(DEPTH + 1));
   }
   title.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(closed ? 1 : 0));
-  const textures = reelTextures(scene);
-  const reels = [-1, 0, 1].map((k) =>
-    scene.add
-      .image(w / 2 + k * 220, h / 2 + 90, textures[(k + 1) % Math.max(1, textures.length)])
-      .setScale(12)
+  // Thème « cadeaux » : trois paquets qui gigotent au lieu des rouleaux qui défilent.
+  const gifts = manifest.staging.reveal.style === 'gifts';
+  const textures = gifts ? [] : reelTextures(scene);
+  const reels = [-1, 0, 1].map((k) => {
+    const img = scene.add
+      .image(w / 2 + k * 220, h / 2 + 90, gifts ? giftTexture(scene) : textures[(k + 1) % Math.max(1, textures.length)])
       .setDepth(DEPTH + 2)
-      .setAlpha(closed ? 1 : 0),
-  );
+      .setAlpha(closed ? 1 : 0);
+    if (!gifts) return img.setScale(12);
+    fitIcon(img, 150);
+    scene.tweens.add({ targets: img, angle: { from: -5, to: 5 }, duration: 160, yoyo: true, repeat: -1, delay: (k + 1) * 90 });
+    return img;
+  });
   // Les rouleaux défilent tant que le rideau est là.
   let i = 0;
   scene.time.addEvent({

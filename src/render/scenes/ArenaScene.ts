@@ -123,8 +123,28 @@ interface Spectator {
   tint?: number;
 }
 
+/** Rayures diagonales en deux couleurs, raccordées verticalement (tuile de la barre sucre d'orge). */
+function stripeCanvas(width: number, period: number, [a, b]: [string, string]): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = period;
+  const ctx = canvas.getContext('2d')!;
+  for (let y = 0; y < period; y++)
+    for (let x = 0; x < width; x++) {
+      ctx.fillStyle = (x + y) % period < period / 2 ? a : b;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  return canvas;
+}
+
 /** Barre de rapport de force verticale, sur le bord gauche (le seul sans overlay). */
 const BALANCE = { x: 18, w: 36, top: 304, bottom: 1160 } as const;
+
+/** Thème avec textBacking : aplat uni derrière le texte (règle « fond uni sous tout texte »). */
+function backed(extra: Phaser.Types.GameObjects.Text.TextStyle, pad: number): Phaser.Types.GameObjects.Text.TextStyle {
+  const color = manifest.staging.reveal.textBacking;
+  return color ? { ...extra, backgroundColor: color, padding: { x: pad * 1.5, y: pad } } : extra;
+}
 
 export class ArenaScene extends Phaser.Scene {
   private params!: ArenaParams;
@@ -157,6 +177,9 @@ export class ArenaScene extends Phaser.Scene {
   private balanceShown = 0.5;
   private balanceKick = 0;
   private balanceFlash = 0;
+  /** Rayures sucre d'orge du thème (staging.balance.stripes) : une bande par camp, et leur défilement. */
+  private balanceStripes?: Record<'gnomes' | 'goblins', Phaser.GameObjects.TileSprite>;
+  private balanceScroll = 0;
   private particles: Particle[] = [];
   private spectators: Spectator[] = [];
   private fx!: Phaser.GameObjects.Graphics;
@@ -345,29 +368,38 @@ export class ArenaScene extends Phaser.Scene {
     if (!this.textures.exists(key) && entry.type === 'placeholder') this.textures.addCanvas(key, drawPlaceholder(entry));
     const sprite = this.add.sprite(u.x * SCALE, u.y * SCALE, this.textures.exists(key) ? key : '__MISSING');
     // Mini-boss à l'image : un héros grossit avec ses upgrades (la simulation, elle, ne change pas).
-    const boss = u.hero ? bossScale(u.equipment.length) : 1;
+    // Les capacités propres d'un héros (innate) ne sont pas des upgrades : ni accessoire, ni taille de mini-boss.
+    const gearList = u.equipment.filter((e) => !e.innate);
+    const boss = u.hero ? bossScale(gearList.length) : 1;
     const baseScale = (entry.type === 'placeholder' ? SCALE : (entry.size * SCALE) / entry.frameHeight) * boss;
     sprite.setScale(baseScale).setOrigin(0.5, 0.75);
     const directional = entry.type === 'spritesheet' && !!entry.directions && this.anims.exists(`${key}_idle_0`);
     if (!directional) sprite.setFlipX(u.facing < 0);
     const view: UnitView = { sprite, bricks: bricksFor(entry), baseScale, offX: 0, offY: 0, squash: 1, facing: u.facing, spin: 0, airDeath: false, whirlUntil: 0, dir: directional ? directionOf(u.facing, 0) : undefined };
+    if (entry.type === 'spritesheet') {
+      view.shrinkMin = entry.shrinkWithHp;
+      view.rollOnCharge = entry.rollOnCharge;
+    }
     if (this.anims.exists(animKey(view, 'idle'))) sprite.play(animKey(view, 'idle'));
     this.views.push(view);
 
     if (u.hero) {
       this.bodies.set(u.index, opaqueBox(sprite.frame));
       const team = TEAM_COLORS[u.team];
-      const name = this.add.text(0, 0, u.hero.name, textStyle(26, team.main)).setOrigin(0.5, 1).setDepth(9800);
+      const name = this.add
+        .text(0, 0, u.hero.name, textStyle(26, team.main, backed({}, 2)))
+        .setOrigin(0.5, 1)
+        .setDepth(9800);
       const bar = this.add.graphics().setDepth(9800);
       this.heroHud.set(u.index, { name, bar });
     }
-    if (u.equipment.length) {
-      const list = u.equipment.map((eq) => this.createAccessory(eq.visual)).filter((a): a is Accessory => !!a);
+    if (gearList.length) {
+      const list = gearList.map((eq) => this.createAccessory(eq.visual)).filter((a): a is Accessory => !!a);
       list.forEach((a) => a.img.setScale(a.img.scaleX * boss));
       this.accessories.set(u.index, list);
     }
     const mb = manifest.staging.miniBoss;
-    if (u.hero && u.equipment.length >= mb.auraFrom) {
+    if (u.hero && gearList.length >= mb.auraFrom) {
       const aura = overlayTexture(this, mb.aura, SCALE * boss);
       const crown = overlayTexture(this, mb.crown, SCALE);
       this.bossFx.set(u.index, {
@@ -460,6 +492,16 @@ export class ArenaScene extends Phaser.Scene {
    */
   private createHud(): void {
     this.balanceBar = this.add.graphics().setDepth(9902);
+    this.balanceStripes = undefined;
+    const stripes = manifest.staging.balance.stripes;
+    if (stripes) {
+      const make = (team: 'gnomes' | 'goblins') => {
+        const key = `balance_stripes_${team}`;
+        if (!this.textures.exists(key)) this.textures.addCanvas(key, stripeCanvas(BALANCE.w, manifest.staging.balance.period, stripes[team]));
+        return this.add.tileSprite(BALANCE.x, BALANCE.top, BALANCE.w, 1, key).setOrigin(0).setDepth(9901);
+      };
+      this.balanceStripes = { goblins: make('goblins'), gnomes: make('gnomes') };
+    }
     const cx = BALANCE.x + BALANCE.w / 2;
     this.hud = {
       // Gobelins en haut de la barre, gnomes en bas.
@@ -658,7 +700,7 @@ export class ArenaScene extends Phaser.Scene {
         const portrait = this.add.sprite(x, y + 40, view.sprite.texture.key, 0).setScale(view.baseScale * 1.6).setDepth(9951).setFlipX(team === 'goblins');
         const name = this.add.text(x, y + 110, u.hero!.name.toUpperCase(), textStyle(34, TEAM_COLORS[team].main)).setOrigin(0.5).setDepth(9951);
         const label = this.add.text(x, y + 150, u.hero!.label, textStyle(20)).setOrigin(0.5).setDepth(9951);
-        const gear = u.equipment.map((e) => e.short).join(' + ');
+        const gear = u.equipment.filter((e) => !e.innate).map((e) => e.short).join(' + ');
         const upgrades = this.add.text(x, y + 182, gear || '—', textStyle(18, gear ? '#ffe14a' : '#a098b0')).setOrigin(0.5).setDepth(9951);
         const group = [portrait, name, label, upgrades];
         group.forEach((o) => o.setAlpha(0));
@@ -683,7 +725,7 @@ export class ArenaScene extends Phaser.Scene {
     void h;
     // Bas de la zone sûre (tiers inférieur, au-dessus de la légende) : le carton ne couvre plus l'action qu'il annonce.
     const t = this.add
-      .text(SAFE.centered.x + SAFE.centered.w / 2, SAFE.captionTop - 110, text, textStyle(52, color, { wordWrap: { width: SAFE.centered.w - 40 }, align: 'center' }))
+      .text(SAFE.centered.x + SAFE.centered.w / 2, SAFE.captionTop - 110, text, textStyle(52, color, backed({ wordWrap: { width: SAFE.centered.w - 40 }, align: 'center' }, 12)))
       .setOrigin(0.5)
       .setDepth(9960);
     this.currentBanner = t;
@@ -695,7 +737,7 @@ export class ArenaScene extends Phaser.Scene {
   /** Annonce discrète en haut de l'écran (incidents d'arène). */
   private toast(text: string): void {
     const t = this.add
-      .text(SAFE.centered.x + SAFE.centered.w / 2, SAFE.top + 20, text, textStyle(TEXT.M - 4, '#ffb347', { wordWrap: { width: SAFE.centered.w - 40 }, align: 'center' }))
+      .text(SAFE.centered.x + SAFE.centered.w / 2, SAFE.top + 20, text, textStyle(TEXT.M - 4, '#ffb347', backed({ wordWrap: { width: SAFE.centered.w - 40 }, align: 'center' }, 8)))
       .setOrigin(0.5)
       .setDepth(9955)
       .setAlpha(0);
@@ -706,7 +748,7 @@ export class ArenaScene extends Phaser.Scene {
   /** Petit texte qui jaillit au-dessus d'une unité (attaque spéciale, raté). */
   private popup(u: Unit, text: string, color: string, size: number): void {
     const v = this.views[u.index];
-    const t = this.add.text(v.sprite.x, v.sprite.y - v.sprite.displayHeight - 40, text, textStyle(Math.max(TEXT.XS + 2, size), color)).setOrigin(0.5, 1).setDepth(9850);
+    const t = this.add.text(v.sprite.x, v.sprite.y - v.sprite.displayHeight - 40, text, textStyle(Math.max(TEXT.XS + 2, size), color, backed({}, 4))).setOrigin(0.5, 1).setDepth(9850);
     this.tweens.add({ targets: t, y: t.y - 40, alpha: 0, delay: 350, duration: 650, onComplete: () => t.destroy() });
   }
 
@@ -1316,7 +1358,11 @@ export class ArenaScene extends Phaser.Scene {
     const sg = this.battle.strength('gnomes');
     const sb = this.battle.strength('goblins');
     const target = sg + sb > 0 ? sg / (sg + sb) : 0.5;
-    this.balanceShown += (target - this.balanceShown) * Math.min(1, dt * 4);
+    const step = (target - this.balanceShown) * Math.min(1, dt * 4);
+    this.balanceShown += step;
+    // Les rayures défilent vers le camp qui gagne du terrain (la jonction monte quand les gnomes gagnent).
+    const bal = manifest.staging.balance;
+    this.balanceScroll += dt * bal.idle * (target >= 0.5 ? 1 : -1) + step * bal.push;
     this.balanceKick = Math.max(0, this.balanceKick - dt * 3);
     this.balanceFlash = Math.max(0, this.balanceFlash - dt * 2.5);
   }
@@ -1501,6 +1547,7 @@ export class ArenaScene extends Phaser.Scene {
         if (hud && u.state !== 'dead') this.drawHeroHud(u, v, hud);
         continue;
       }
+      this.syncSkin(u, v);
       if (u.state === 'dead') continue;
       v.facing = u.facing;
       v.sprite.setDepth(y * 0.01);
@@ -1532,7 +1579,13 @@ export class ArenaScene extends Phaser.Scene {
         const hop = moving || celebrating ? Math.abs(Math.sin(this.time.now / (u.state === 'flee' || celebrating ? 50 : 90) + i)) * (celebrating ? 0.2 : 0.08) : 0;
         v.sprite.setScale(v.baseScale * (2 - v.squash) * (1 - hop * 0.5), v.baseScale * v.squash * (1 + hop));
       }
+      // Bonhomme de neige : il fond à mesure qu'il perd des PV.
+      if (v.shrinkMin !== undefined && v.shrinkMin < 1) {
+        const k = v.shrinkMin + (1 - v.shrinkMin) * Math.max(0, u.hp / u.maxHp);
+        v.sprite.setScale(v.sprite.scaleX * k, v.sprite.scaleY * k);
+      }
       if (v.whirlUntil > this.time.now) v.sprite.setAngle(((v.whirlUntil - this.time.now) * 1.6) % 360);
+      else if (u.charging && v.rollOnCharge) v.sprite.setAngle((this.battle.time * 900 * u.facing) % 360);
       else if (u.gag === 'dance') v.sprite.setAngle(Math.sin(this.time.now / 90) * 22);
       else if (u.stunTimer > 0) v.sprite.setAngle(Math.sin(this.time.now / 40) * 14);
       else if (u.charging) v.sprite.setAngle(u.facing * 12);
@@ -1560,6 +1613,33 @@ export class ArenaScene extends Phaser.Scene {
         hud.name.setPosition(this.nameX(hud.name, this.views[i].sprite.x), this.views[i].sprite.y - 30);
       }
     }
+  }
+
+  /**
+   * Transformation (pain d'épices, charbon) : le sprite laisse la place à l'apparence du thème le temps
+   * de l'effet, puis revient dans un petit nuage. Uniquement visuel : la simulation dit qui est transformé.
+   */
+  private syncSkin(u: Unit, v: UnitView): void {
+    const on = u.state !== 'dead' && u.transformUntil > this.battle.time;
+    if (on) {
+      if (!v.skin) {
+        const tex = overlayTexture(this, u.transformSkin, SCALE);
+        if (!tex) return;
+        v.skin = this.add.image(0, 0, tex.key).setScale(tex.scale).setOrigin(0.5, 0.75);
+        this.tweens.add({ targets: v.skin, scale: { from: tex.scale * 1.6, to: tex.scale }, duration: 220, ease: 'Back.easeOut' });
+      }
+      v.sprite.setVisible(false);
+      // Petit tremblement de biscuit, en temps de combat (même vidéo à chaque lecture).
+      v.skin.setPosition(v.sprite.x, v.sprite.y).setDepth(v.sprite.depth).setAngle(Math.sin(this.battle.time * 18 + u.index) * 8);
+      return;
+    }
+    if (!v.skin) return;
+    // Petit nuage au retour à la normale (flux tiré de l'unité et de l'instant : même vidéo à chaque lecture).
+    const rnd = streamFrom(randAt(u.index, Math.round(u.transformUntil * 30)));
+    for (let k = 0; k < 6; k++) this.particles.push({ x: v.sprite.x / SCALE, y: v.sprite.y / SCALE - 3, vx: (rnd() - 0.5) * 40, vy: (rnd() - 0.5) * 40 - 10, life: 0.5, maxLife: 0.5, color: 0xffffff, size: 2 });
+    v.skin.destroy();
+    v.skin = undefined;
+    v.sprite.setVisible(true);
   }
 
   /** Position d'un accessoire : ancres relatives à la silhouette visible, elles suivent l'échelle du héros (mini-boss compris). */
@@ -1681,9 +1761,19 @@ export class ArenaScene extends Phaser.Scene {
     const jitter = Math.sin(this.battle.time * 97) * 14 * this.balanceKick;
     const split = Math.round(Phaser.Math.Clamp(top + bh * (1 - this.balanceShown) + jitter, top, bottom));
     g.clear();
-    g.fillStyle(0x000000, 1).fillRect(x - 5, top - 5, bw + 10, bh + 10);
-    g.fillStyle(TEAM_COLORS.goblins.bar, 1).fillRect(x, top, bw, split - top);
-    g.fillStyle(TEAM_COLORS.gnomes.bar, 1).fillRect(x, split, bw, bottom - split);
+    const stripes = this.balanceStripes;
+    if (stripes) {
+      // Sucre d'orge : le cadre noir passe derrière les rayures (graphics au-dessus : on ne dessine que le contour).
+      g.fillStyle(0x000000, 1).fillRect(x - 5, top - 5, bw + 10, 5).fillRect(x - 5, bottom, bw + 10, 5).fillRect(x - 5, top, 5, bh).fillRect(x + bw, top, 5, bh);
+      stripes.goblins.setPosition(x, top).setSize(bw, Math.max(1, split - top)).setVisible(split > top);
+      stripes.gnomes.setPosition(x, split).setSize(bw, Math.max(1, bottom - split)).setVisible(bottom > split);
+      stripes.goblins.tilePositionY = this.balanceScroll;
+      stripes.gnomes.tilePositionY = this.balanceScroll + (split - top);
+    } else {
+      g.fillStyle(0x000000, 1).fillRect(x - 5, top - 5, bw + 10, bh + 10);
+      g.fillStyle(TEAM_COLORS.goblins.bar, 1).fillRect(x, top, bw, split - top);
+      g.fillStyle(TEAM_COLORS.gnomes.bar, 1).fillRect(x, split, bw, bottom - split);
+    }
     // Reflet sur le côté, jonction qui brille sur les gros coups (et flashe quand un héros tombe).
     g.fillStyle(0xffffff, 0.25).fillRect(x, top, 6, bh);
     const glow = 0.6 + 0.4 * this.balanceKick;
