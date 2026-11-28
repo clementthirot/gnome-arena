@@ -93,6 +93,28 @@ function previewNext(delay = 600): void {
 document.getElementById('fullscreen')!.onclick = () => {
   if (previewTarget && arc) window.open(previewUrl(previewTarget), '_blank');
 };
+// Téléphone : une vue à la fois (arène plein écran ou régie), basculée par le bouton flottant.
+// Les classes n'ont d'effet que dans la mise en page téléphone (regie.html) ; sur ordinateur, tout reste côte à côte.
+const viewToggle = document.getElementById('viewToggle')!;
+function setView(view: 'arena' | 'regie'): void {
+  document.body.classList.toggle('view-arena', view === 'arena');
+  document.body.classList.toggle('view-regie', view === 'regie');
+  viewToggle.textContent = view === 'arena' ? '⚙ Régie' : '▶ Arène';
+  try {
+    sessionStorage.setItem('regie.view', view);
+  } catch {
+    // stockage indisponible
+  }
+}
+let savedView: string | null = null;
+try {
+  savedView = sessionStorage.getItem('regie.view');
+} catch {
+  // stockage indisponible
+}
+setView(savedView === 'regie' ? 'regie' : 'arena');
+viewToggle.onclick = () => setView(document.body.classList.contains('view-arena') ? 'regie' : 'arena');
+document.getElementById('viewReplay')!.onclick = () => previewTarget && preview(previewTarget);
 document.getElementById('replay')!.onclick = () => previewTarget && preview(previewTarget);
 // Nouvelle seed au hasard pour le prochain épisode (la sélection du scout est abandonnée).
 document.getElementById('randomSeed')!.onclick = () => {
