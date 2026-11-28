@@ -93,7 +93,18 @@
         table { font-size: 13px; display: block; overflow-x: auto; }
         tbody tr.pick td { padding: 10px 6px; }
         .row { gap: 10px; }
+        /* Une vue à la fois : l'arène en plein écran, ou la régie ; le bouton flottant bascule en un geste. */
+        body.view-arena { overflow: hidden; }
+        body.view-arena #left { display: none; }
+        body.view-arena #right { position: fixed; inset: 0; height: 100vh; height: 100dvh; border: 0; }
+        body.view-regie #right { display: none; }
+        body.view-regie #left { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+        nav#viewBar { display: flex; }
       }
+      #viewBar { display: none; position: fixed; z-index: 20; right: calc(12px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom)); gap: 8px; }
+      #viewBar button { min-height: 52px; padding: 12px 16px; font-size: 12px; border-radius: 26px; border-width: 3px; box-shadow: 0 4px 14px #000a; }
+      #viewBar #viewToggle { background: var(--accent); color: #000; }
+      body.view-regie #viewReplay { display: none; }
     </style>
   </head>
   <body>
@@ -124,6 +135,10 @@
       <iframe id="preview" title="Aperçu de l'arène" tabindex="-1"></iframe>
     </div>
     </div>
+    <nav id="viewBar" aria-label="Vue">
+      <button id="viewReplay" aria-label="Rejouer">↻</button>
+      <button id="viewToggle">⚙ Régie</button>
+    </nav>
     <script type="module" src="/src/regie/regie.ts"></script>
   </body>
 </html>
