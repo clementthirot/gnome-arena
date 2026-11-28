@@ -63,14 +63,18 @@ export const theme: ThemeFile = themeId ? THEMES[themeId] : {};
 type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => !!v && typeof v === 'object' && !Array.isArray(v);
 
-/** Superpose over à base : objets fusionnés récursivement, le reste remplacé, null retire la clé. */
+/**
+ * Superpose over à base : objets fusionnés récursivement, le reste remplacé, null retire la clé.
+ * Exception : `animations` est remplacé en bloc, car ses numéros d'image ne valent que pour la sheet qui les accompagne
+ * (une animation du manifeste de base qui survivrait viserait des images absentes de la sheet du thème).
+ */
 export function overlay<T>(base: T, over: unknown): T {
   if (!isObject(base) || !isObject(over)) return (over === undefined ? base : over) as T;
   const out: Json = { ...base };
   for (const [k, v] of Object.entries(over)) {
     if (k === '$comment') continue;
     if (v === null) delete out[k];
-    else out[k] = overlay(out[k], v);
+    else out[k] = k === 'animations' ? v : overlay(out[k], v);
   }
   return out as T;
 }

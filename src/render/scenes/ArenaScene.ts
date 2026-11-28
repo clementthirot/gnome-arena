@@ -1072,7 +1072,7 @@ export class ArenaScene extends Phaser.Scene {
   /** En vol : pose figée du coup encaissé (sinon la pose fixe), dans la direction du regard. */
   private holdAirPose(view: UnitView): void {
     const hurt = this.anims.get(animKey(view, 'hurt')) ?? this.anims.get(animKey(view, 'idle'));
-    if (!hurt) return;
+    if (!hurt?.frames.length) return;
     const frame = hurt.frames[Math.min(2, hurt.frames.length - 1)].textureFrame;
     if (view.sprite.anims.isPlaying) view.sprite.anims.stop();
     if (view.sprite.frame.name !== String(frame)) view.sprite.setFrame(frame);

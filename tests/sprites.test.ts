@@ -5,6 +5,7 @@ import { encodePng, pngSize } from '../scripts/lib/png';
 import manifest from '../src/render/assets.manifest.json';
 import { placeholderPixels } from '../src/render/pixels';
 import { buildSheet, SHEET_FRAMES, SHEET_LAYOUT, sheetGrid } from '../src/render/spriteFrames';
+import { overlay, THEMES } from '../src/render/themes';
 
 const PUBLIC = join(import.meta.dirname, '../public');
 
@@ -26,7 +27,12 @@ describe('sprite sheets', () => {
     expect(pngSize(encodePng(grid))).toEqual({ width: grid[0].length, height: grid.length });
   });
 
-  it('chaque image référencée par le manifeste existe et a le bon découpage', () => {
+  // Le manifeste de base, puis chaque thème superposé : une animation qui vise une image absente plante le rendu.
+  const manifests: [string, typeof manifest][] = [
+    ['base', manifest],
+    ...Object.entries(THEMES).map(([id, t]): [string, typeof manifest] => [id, overlay(manifest, t.manifest)]),
+  ];
+  it.each(manifests)('%s : chaque image référencée existe et a le bon découpage', (_id, manifest) => {
     for (const [key, entry] of Object.entries<Record<string, any>>(manifest.assets)) {
       if (entry.type !== 'spritesheet') continue;
       const file = join(PUBLIC, entry.url);
