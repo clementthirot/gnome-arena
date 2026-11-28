@@ -10,7 +10,7 @@ import { FRAME_INSET, FRAME_SCALE, goldFrame, hasGoldFrame } from '../frame';
 import { manifest } from '../manifest';
 import { drawOpeningTitle, fill, lastOpeningTitle, OPENING_FRAME } from '../reveal';
 import { SAFE } from '../safeZone';
-import { accessoryReel, accessoryTexture, fitIcon, spinReel } from '../slotMachine';
+import { accessoryReel, accessoryTexture, fitIcon, revealOption } from '../slotMachine';
 import { TEAM_COLORS, textStyle } from '../text';
 import type { ArenaParams } from './ArenaScene';
 
@@ -102,7 +102,12 @@ export class ResultScene extends Phaser.Scene {
     const cfg = manifest.staging.reveal;
     const items: Phaser.GameObjects.GameObject[] = [];
     const ep = r.params.episode;
-    if (ep) items.push(this.add.text(CX, 300, fill(cfg.episode, { n: ep.number }), textStyle(44, '#d8d0e8')).setOrigin(0.5));
+    if (ep) {
+      const label = this.add.text(CX, 300, fill(cfg.episode, { n: ep.number }), textStyle(44, '#d8d0e8')).setOrigin(0.5);
+      // Règle de texte du thème : un aplat uni sous les lettres, jamais le motif.
+      if (cfg.textBacking) items.push(this.backing(label.x, label.y, label.width + 48, label.height + 24));
+      items.push(label);
+    }
     const draw = r.winner === 'draw';
     const title = draw ? cfg.draw : fill(cfg.victory, { team: TEAM_COLORS[r.winner as TeamId].label });
     const color = draw ? '#ffffff' : TEAM_COLORS[r.winner as TeamId].main;
@@ -131,6 +136,7 @@ export class ResultScene extends Phaser.Scene {
     if (!mvp) return items;
     const def = (r.params.heroes ?? r.params.data.heroes).find((e) => e.name === mvp.name);
     const group: Phaser.GameObjects.GameObject[] = [];
+    if (cfg.textBacking) group.push(goldFrame(this, CX, 935, SAFE.centered.w * 0.8, 500)?.setDepth(-1) ?? this.backing(CX, 935, SAFE.centered.w * 0.8, 500));
     group.push(this.add.text(CX, 730, cfg.mvp, textStyle(48, '#ffe14a')).setOrigin(0.5));
     const portrait = def && `unit_${def.visual}`;
     if (portrait && this.textures.exists(portrait)) {
@@ -138,7 +144,7 @@ export class ResultScene extends Phaser.Scene {
       fitIcon(img, 240);
       group.push(img);
     }
-    group.push(this.add.text(CX, 1040, mvp.name.toUpperCase(), textStyle(64, TEAM_COLORS[mvp.team].main)).setOrigin(0.5));
+    group.push(this.fitWidth(this.add.text(CX, 1040, mvp.name.toUpperCase(), textStyle(64, TEAM_COLORS[mvp.team].main)).setOrigin(0.5), SAFE.centered.w * 0.8 - 2 * FRAME_INSET.x - 20));
     group.push(this.add.text(CX, 1130, `${mvp.kills} K.O.`, textStyle(48, '#ffffff')).setOrigin(0.5));
     group.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0));
     this.tweens.add({ targets: group, alpha: 1, duration: 250, delay: this.tweens.stagger(120, { start: 700 }) });
@@ -152,21 +158,33 @@ export class ResultScene extends Phaser.Scene {
     const name = this.add.text(CX, 348, vote.recipient.toUpperCase(), textStyle(64, TEAM_COLORS[vote.team].main)).setOrigin(0.5);
     head.push(name);
     // Portrait du héros bénéficiaire, à gauche de son nom : le groupe portrait + nom est centré.
+    const inside = SAFE.centered.w - 2 * FRAME_INSET.x - 40;
     if (this.textures.exists(vote.portrait)) {
       const size = 110;
       const gap = 20;
-      const left = CX - (size + gap + name.width) / 2;
+      // Nom long (« MARCEL L'ENCLUME ») : réduit pour que portrait + nom tiennent dans le cadre.
+      this.fitWidth(name, inside - size - gap);
+      const left = CX - (size + gap + name.displayWidth) / 2;
       const portrait = this.add.image(left + size / 2, 342, vote.portrait, 0);
       fitIcon(portrait, size);
-      name.setX(left + size + gap + name.width / 2);
+      name.setX(left + size + gap + name.displayWidth / 2);
       head.push(portrait);
+    } else {
+      this.fitWidth(name, inside);
     }
     head.push(this.fitWidth(this.add.text(CX, 428, fill(cfg.voteFor, { hero: vote.recipient.toUpperCase() }), textStyle(24, '#ffffff')).setOrigin(0.5), SAFE.centered.w - 2 * FRAME_INSET.x - 40));
-    head.push(this.add.text(CX, 530, cfg.voteCall, textStyle(42, '#ffe14a', { wordWrap: { width: SAFE.centered.w - 2 * FRAME_INSET.x - 40 }, lineSpacing: 18, align: 'center' })).setOrigin(0.5));
+    const call = this.add.text(CX, 530, cfg.voteCall, textStyle(42, '#ffe14a', { wordWrap: { width: SAFE.centered.w - 2 * FRAME_INSET.x - 40 }, lineSpacing: 18, align: 'center' })).setOrigin(0.5);
+    // Cadeaux : l'appel au vote arrive une fois le dernier cadeau ouvert.
+    const gifts = cfg.style === 'gifts';
+    if (!gifts) head.push(call);
     // Cadre 250 → 630 : portrait et nom, invitation, appel au vote, même marge en haut et en bas.
     head.push(...this.plaque(440, 380));
     head.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0));
     this.tweens.add({ targets: head, alpha: 1, duration: 250, delay: this.tweens.stagger(120, { start: 100 }) });
+    if (gifts) {
+      call.setAlpha(0).setScale(0.4);
+      this.tweens.add({ targets: call, alpha: 1, scale: 1, duration: 300, ease: 'Back.easeOut', delay: 600 + (vote.options.length - 1) * 750 + 800 });
+    }
 
     // Trois cartes côte à côte sur la bande centrée, y 650 à 1170 : chiffre, rouleau, libellé,
     // répartis avec la même marge intérieure en haut et en bas.
@@ -194,11 +212,19 @@ export class ResultScene extends Phaser.Scene {
       if (!target) return;
       // Rouleau : les icônes défilent de plus en plus lentement, puis s'arrêtent sur l'option de la carte.
       // Courts et nets : le dernier s'arrête vers 1,4 s, chacun avec un petit coup de tampon.
-      const r = spinReel(this, { x, y, size: Math.min(176, inner - 10), depth: 1, pool: reel, target, delay: delay + 200, spins: 6 + i * 2, firstStep: 35, stepGrowth: 7, offset: i * 2 });
+      // Cadeaux (thème) : ils s'ouvrent l'un après l'autre, chacun sur l'option de sa carte.
+      const gifts = cfg.style === 'gifts';
+      const r = revealOption(this, { x, y, size: Math.min(176, inner - 10), depth: 1, pool: reel, target, delay: gifts ? 600 + i * 750 : delay + 200, spins: 6 + i * 2, firstStep: 35, stepGrowth: 7, offset: i * 2 });
       r.container.setScale(0);
       this.tweens.add({ targets: r.container, scale: 1, duration: 320, delay, ease: 'Back.easeOut' });
       this.time.delayedCall(r.stopsAt, () => this.tweens.add({ targets: card, scale: { from: 1.08, to: 1 }, duration: 180, ease: 'Back.easeOut' }));
     });
+  }
+
+  /** Aplat uni (manifeste staging.reveal.textBacking) centré en (x, y), bord noir : sous un texte posé sur le motif. */
+  private backing(x: number, y: number, w: number, h: number): Phaser.GameObjects.Rectangle {
+    const color = Number.parseInt((manifest.staging.reveal.textBacking ?? '#000000').slice(1), 16);
+    return this.add.rectangle(x, y, w, h, color).setStrokeStyle(6, 0x000000).setDepth(-1);
   }
 
   /** Réduit un texte trop large pour tenir dans width px. */

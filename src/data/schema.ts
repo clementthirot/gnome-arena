@@ -210,6 +210,31 @@ const SpawnEffect = z.object({
   jump: z.number().min(0).default(140),
   /** Effet visuel joué sur le lanceur (coup de sifflet…) ; aucun par défaut. */
   visual: visualKey.optional(),
+  /**
+   * D'où viennent les renforts : des gradins (supporters, défaut) ou de la position du lanceur
+   * (invocations d'un héros : soldats de bois, cadeaux sortis de la hotte), avec un petit saut.
+   */
+  from: z.enum(['stands', 'source']).default('stands'),
+});
+
+/**
+ * Transformation : quelques ennemis deviennent inoffensifs pendant un moment (bonshommes en pain
+ * d'épices, morceaux de charbon). Ils ne bougent plus ni n'attaquent, mais restent vulnérables.
+ * Le rendu change leur apparence (clé `skin`, section overlays du manifeste).
+ */
+const TransformEffect = z.object({
+  type: z.literal('transform'),
+  at,
+  radius: positive,
+  /** Nombre maximal d'unités transformées (les plus proches du centre d'abord). */
+  maxTargets: z.number().int().positive(),
+  duration: positive,
+  /** Apparence pendant la transformation (rendu). */
+  skin: visualKey,
+  /** Les héros sont épargnés : la transformation vise la troupe. */
+  heroes: z.boolean().default(false),
+  friendlyFire: z.boolean().default(false),
+  visual: visualKey.optional(),
 });
 
 export type EffectDef =
@@ -221,6 +246,7 @@ export type EffectDef =
   | z.infer<typeof BeamEffect>
   | z.infer<typeof SpawnEffect>
   | z.infer<typeof StunEffect>
+  | z.infer<typeof TransformEffect>
   | ProjectileEffectDef;
 
 export interface ProjectileEffectDef {
@@ -248,6 +274,7 @@ export const EffectSchema: z.ZodType<EffectDef, z.ZodTypeDef, unknown> = z.lazy(
     BeamEffect,
     SpawnEffect,
     StunEffect,
+    TransformEffect,
     z.object({
       type: z.literal('projectile'),
       speed: positive,
@@ -285,6 +312,16 @@ export const EquipmentSchema = z.object({
   visual: visualKey,
   /** Rôles (roles.json) auxquels l'upgrade peut être proposée au vote ; absent = tous. */
   roles: z.array(id).min(1).optional(),
+  /**
+   * Capacité propre d'un héros (donnée dans heroes[].upgrades) : jamais proposée au vote, ni affichée
+   * comme accessoire, ni comptée dans les upgrades du héros.
+   */
+  innate: z.boolean().default(false),
+  /**
+   * Pack de thème qui propose cette upgrade (ex. « noel ») ; absent = upgrade de base. Les arcs de base ne
+   * la proposent jamais : un arc la propose s'il la cite dans son pool (`upgrades` de l'arc).
+   */
+  pack: id.optional(),
   stats: z
     .object({
       hp: positive.default(1),
@@ -349,6 +386,8 @@ export const HeroSchema = z.object({
   rival: id.optional(),
   /** Équipements de départ ; un arc y ajoute les upgrades gagnées au fil des épisodes. */
   upgrades: z.array(id).default([]),
+  /** Garde le sort du rôle de base (lanceur de sorts) ; false pour un héros dont les capacités le remplacent. */
+  roleSpell: z.boolean().default(true),
   active: z.boolean().default(true),
 });
 export type HeroDef = z.infer<typeof HeroSchema>;

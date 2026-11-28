@@ -86,6 +86,20 @@ pour boucler. L'ancienne intro longue reste disponible avec `staging.intro: "cla
 Les arcs sont des fichiers JSON dans `src/data/arcs/` : l'état des héros à l'épisode N se reconstruit à
 partir des votes précédents, donc chaque épisode publié reste rejouable à l'identique.
 
+### Pack Noël « Calendrier de l'Avent »
+
+Lutins contre Vilains, mêmes règles : six héros propres au pack (Marcel l'Enclume, Mère Noël, Papy Boulon contre
+Gros Glaçon, Père Fouettard, Gobbo Claus), upgrades rhabillées et deux nouvelles (Boule à neige géante, Grelots du
+traîneau), arène enneigée, cadeaux qui s'ouvrent à la place des rouleaux. Gnomes contre Gobelins reste l'arc par défaut.
+
+```bash
+npm run episode -- close                                  # un seul arc ouvert à la fois
+npm run episode -- new-arc --id noel --theme noel         # roster, biome et pool d'upgrades du thème
+npm run bench -- --heroes marcel,mere_noel,papy_boulon,glacon,fouettard,gobbo   # équilibre du pack
+```
+
+Aperçu sans arc : `?theme=noel`. Détails des assets et prompts : `docs/sprites.md`.
+
 ### Mode accéléré en ligne de commande
 
 ```bash
@@ -118,10 +132,15 @@ commande donne le même combat dans Chrome, Firefox ou Safari.
 - **Un équipement** : `src/data/equipment.json` — stats, attaque spéciale composée d'effets, raté éventuel (`misfire` : allié, soi-même ou au hasard) — et son accessoire dans `manifest.accessories`.
 - **Un incident d'arène** : `src/data/events.json` — poids, moment d'apparition, cible (`densest`, `hero`, `random_unit`, `random_point`), télégraphe, effets.
 - **Un rendu d'effet** : `manifest.effects` (trait, boule, anneau, flaque, éclair, étincelles).
+- **Une capacité propre à un héros** : un équipement `"innate": true` listé dans `heroes[].upgrades` (jamais votable, pas d'accessoire).
+  `"roleSpell": false` sur le héros retire le sort de son rôle de base quand ses capacités le remplacent.
+- **Un pack de thème** : héros `"active": false`, upgrades `"pack": "<id>"` (hors du pool de base), puis
+  `src/render/themes/<id>.json` (roster, biome, pool, libellés, assets). Voir `docs/sprites.md`, section Thèmes.
 
 Effets disponibles : `damage` (ponctuel ou de zone, tir allié possible), `projectile` (contient d'autres effets à l'impact,
 peut tomber du ciel avec `fromSky`), `ricochet` (rebonds en chaîne), `beam` (rayon qui traverse l'arène et rebondit sur les murs),
-`launch` (projette dans les airs), `spawn` (renforts qui sautent dans l'arène), `knockback`, `slow`.
+`launch` (projette dans les airs), `spawn` (renforts qui sautent des gradins, ou invocations autour du lanceur avec `"from": "source"`),
+`transform` (change les unités les plus proches en objet inerte pendant `duration`, jamais les héros par défaut), `knockback`, `slow`.
 Les effets de zone peuvent se centrer sur le lanceur (`"at": "self"`, le tourbillon de l'épée) et un rayon peut se charger avant de frapper (`delay`). Une boule de feu = un `projectile` qui déclenche un `damage` de zone.
 
 ## Mécaniques

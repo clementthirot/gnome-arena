@@ -164,5 +164,35 @@
       "steady": 3,
       "coward": 2
     }
+  },
+  {
+    "id": "toy_soldier",
+    "team": "gnomes",
+    "label": "Soldat de bois",
+    "role": "melee",
+    "visual": "toy_soldier",
+    "hp": 22,
+    "damage": 4.5,
+    "speed": 30,
+    "radius": 4.5,
+    "mass": 0.8,
+    "personalities": {
+      "valiant": 1
+    }
+  },
+  {
+    "id": "mimic_gift",
+    "team": "goblins",
+    "label": "Croque-cadeau",
+    "role": "melee",
+    "visual": "mimic_gift",
+    "hp": 22,
+    "damage": 4.5,
+    "speed": 30,
+    "radius": 4.5,
+    "mass": 0.8,
+    "personalities": {
+      "valiant": 1
+    }
   }
 ]

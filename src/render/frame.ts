@@ -1,11 +1,13 @@
 // Cadre doré unique des écrans de fin (manifeste art.menu.card) : cartes de vote, plaques de titre,
 // fenêtres des rouleaux. Une seule image agrandie en 9-slice, pour que tous les cadres se ressemblent.
 import type Phaser from 'phaser';
+import { manifest } from './manifest';
 
 /** Agrandissement : les pixels de l'image source tombent sur 1,5 px écran, partout pareil. */
 export const FRAME_SCALE = 1.5;
-/** Bords non étirés, en px de l'image source (coins, liseré doré et bande violette). */
-const SLICE = { left: 20, right: 20, top: 22, bottom: 22 };
+/** Bords non étirés, en px de l'image source (coins, liseré doré et bande violette) ; un thème peut les changer. */
+const [left, right, top, bottom] = manifest.art.menu.slice;
+const SLICE = { left, right, top, bottom };
 /** Marge intérieure en px écran : du bord extérieur jusqu'au fond sombre du cadre. */
 export const FRAME_INSET = { x: Math.ceil(SLICE.left * FRAME_SCALE), y: Math.ceil(SLICE.top * FRAME_SCALE) };
 

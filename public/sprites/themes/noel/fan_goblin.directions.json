@@ -1,0 +1,61 @@
+{
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "bodyHeight": 26,
+  "scale": 1.25,
+  "animations": {
+    "walk": {
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "fps": 10
+    },
+    "kick": {
+      "frames": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "fps": 14,
+      "hit": 3
+    },
+    "attack": {
+      "frames": [
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "fps": 14,
+      "hit": 5
+    },
+    "hurt": {
+      "frames": [
+        20,
+        21,
+        22,
+        23,
+        24,
+        25
+      ],
+      "fps": 16
+    },
+    "idle": {
+      "frames": [
+        0
+      ],
+      "fps": 1
+    }
+  }
+}

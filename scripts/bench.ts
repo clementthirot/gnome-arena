@@ -1,4 +1,4 @@
-// Mode accéléré en ligne de commande : npm run bench -- --runs 200 --from 1 [--set chemin=valeur] [--up grok:laser_goggles+iron_pot]
+// Mode accéléré en ligne de commande : npm run bench -- --runs 200 --from 1 [--set chemin=valeur] [--up grok:laser_goggles+iron_pot] [--heroes marcel,mere_noel,…]
 import { parseGameData, rawGameData } from '../src/data';
 import { aggregate, formatReport, simulate, spectacleScore, WINNER_LABEL } from '../src/tools/metrics';
 
@@ -38,7 +38,16 @@ const upgrades = upIndex >= 0
 // --biome neige : mesure un autre biome.
 const biomeIndex = args.indexOf('--biome');
 const biome = biomeIndex >= 0 ? args[biomeIndex + 1] : undefined;
-const summaries = Array.from({ length: runs }, (_, i) => simulate(data, { seed: from + i, upgrades, biome }));
+// --heroes marcel,mere_noel,… : un autre roster (pack de thème) que les héros actifs.
+const heroesIndex = args.indexOf('--heroes');
+const heroes = heroesIndex >= 0
+  ? args[heroesIndex + 1].split(',').map((id) => {
+      const h = data.heroes.find((x) => x.id === id);
+      if (!h) throw new Error(`--heroes : héros inconnu ${id}`);
+      return h;
+    })
+  : undefined;
+const summaries = Array.from({ length: runs }, (_, i) => simulate(data, { seed: from + i, upgrades, biome, heroes }));
 const elapsed = (performance.now() - started) / 1000;
 
 console.log(formatReport(aggregate(summaries)));

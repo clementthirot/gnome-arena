@@ -72,6 +72,9 @@ export interface Unit {
   lastGap: number;
   /** Recharge de l'attaque spéciale de chaque équipement. */
   specialCooldowns: number[];
+  /** Transformation en cours (pain d'épices, charbon) : jusqu'à ce moment du combat, et apparence. */
+  transformUntil: number;
+  transformSkin: string;
   /** Ralentissement en cours (glu, boue). */
   slowUntil: number;
   slowFactor: number;
@@ -128,6 +131,7 @@ export type BattleEvent =
   | { type: 'spawn'; unit: number }
   | { type: 'gag'; unit: number; kind: 'dance' | 'danceInterrupted' | 'weaponLost' | 'weaponFound' | 'headClash' | 'bowled'; x: number; y: number }
   | { type: 'stun'; unit: number; duration: number }
+  | { type: 'transform'; unit: number; skin: string; duration: number }
   | { type: 'land'; unit: number; x: number; y: number; impact: number; dead: boolean }
   | { type: 'telegraph'; event: string; visual: string; x: number; y: number; radius: number; duration: number }
   /** Annonce d'un incident (au moment où son télégraphe apparaît). */

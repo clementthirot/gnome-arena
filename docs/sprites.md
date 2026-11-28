@@ -135,7 +135,14 @@ dans le thème, sans toucher au manifeste de base. Pour une image (sol, titre, c
 sous `manifest.art`, `manifest.staging`, etc. Le test `tests/themes.test.ts` vérifie que chaque thème donne un
 manifeste valide, ne vise que des clés connues et que ses images existent.
 
-Les textes des données (cris des héros, noms d'unités dans `src/data`) font partie des règles et restent communs.
+Les règles (`src/data`) restent communes. Un thème peut en plus porter :
+
+- `heroes`, `biome`, `upgrades` : roster, arène et pool d'upgrades votables proposés par défaut
+  (`npm run episode -- new-arc --theme noel`, sélecteur « Thème » de la régie) ; l'arc enregistre `theme` et `upgrades` ;
+- `labels` : noms affichés des équipements (`equipment.<id>.label/short`), des unités et des incidents. Seul le texte
+  à l'écran change, les identifiants et les stats restent ceux des données.
+
+Un arc qui a un `theme` recharge la page dans ce thème (jeu et régie), même sans `?theme=` dans l'URL.
 
 ## Vérifier
 
@@ -178,3 +185,55 @@ Schéma (src/render/manifest.ts) : `art` (facultatif, `title`, `grounds`, `stand
 grossit de 0,6 à 1,1 fois sa taille en s'effaçant (durée = `duration` de l'effet, 250 ms minimum), par-dessus le dessin par code.
 Les accessoires restent orientés vers la droite (retournés quand le héros regarde à gauche) et servent aussi d'icônes
 dans la machine à sous.
+
+## Pack Noël « Calendrier de l'Avent » (thème `noel`)
+
+Brief : doc Claude « Pack Noël — Calendrier de l'Avent ». Même moteur, même équilibrage de base ; tout passe par
+`src/render/themes/noel.json` et les ajouts de données (héros `active: false`, upgrades `pack: "noel"`, capacités `innate`).
+
+### Personnages (PixelLab API v2, `create-character-v3`)
+
+Paramètres communs : `view: "low top-down"`, 8 directions, template `mannequin`, `outline: single color black outline`.
+Animations par template (1 génération par direction) : `running-6-frames`, `cross-punch`, `falling-back-death`.
+Import : `npm run sprites -- pixellab <dossier dézippé> <clé> --theme=noel --scale=1.25 --hit=attack:5`.
+
+| Clé | Taille / seed | character_id | Prompt |
+| --- | --- | --- | --- |
+| hero_marcel | 64 / 4101 | e031cef2-cca1-4972-aedb-9fffa8814663 | Chubby Christmas elf blacksmith, green tunic with red trim, brown leather apron, pointy green elf hat, thick white beard, big rounded nose, holding a huge iron forge hammer |
+| hero_mere_noel | 64 / 4102 | 3e73b0ce-8672-4de6-8c32-7b7534b0912f | Mrs. Claus, plump kind grandmother, red velvet dress with white fur trim, white apron, white hair in a bun, small round glasses, holding a giant wooden rolling pin |
+| hero_papy_boulon | 64 / 4103 | 2e0f738a-303f-431c-9f51-995593a3e4e1 | Old elf inventor, green overalls with red patches, brass goggles on the forehead, very long white beard, pointy green elf hat, holding a big steel wrench |
+| hero_glacon | 64 / 4104 | fdf32248-aa70-4494-b40d-c033b631598c | Evil snowman, round body of dirty grey snow, angry coal eyes, crooked carrot nose, purple scarf, black top hat, twig arms |
+| hero_fouettard | 64 / 4105 | 6f624ee2-fb0b-4ed7-a83f-2a6377edb21b | Pere Fouettard, gaunt sinister old man in a charcoal black hooded robe with purple trim, long black beard, big brown sack over the shoulder, bundle of twigs in hand |
+| hero_gobbo | 64 / 4106 | 72a1e32a-be84-46f9-b3af-665cae04d4a5 | Green goblin disguised as Santa Claus, dark purple Santa suit with black fur trim, fake white cotton beard askew, big pointy ears, sneaky grin, black boots |
+| toy_soldier | 32 / 4107 | 5d6fe650-3ff3-478c-8602-f6ecc19a9c8b | Small wooden toy soldier, red jacket, blue trousers, tall black shako hat, painted rosy cheeks, wind-up key in the back |
+| mimic_gift | 32 / 4108 | cb5a79d6-34b3-4f6b-9d07-5973fb4c97e2 | Mimic gift box monster, dark purple wrapped present with black ribbon, open lid with sharp teeth and red tongue, small legs |
+
+Troupes : les sheets du lutin (gnomes) sont reprises telles quelles ; celles du voleur (gobelins) sont recolorées en
+violet et noir charbon (décalage de teinte des verts, script de post-traitement du lot), rangées sous
+`sprites/themes/noel/gnome_*`, `goblin_*`, `fan_*`.
+
+### Images (`create-image-pixen`, synchrone)
+
+Commun : `no_background: true`, `outline: single color black outline`, `detail: medium detail` sauf mention.
+
+| Fichier (sous `sprites/themes/noel/`) | Clé | Taille / seed | Prompt (résumé) |
+| --- | --- | --- | --- |
+| acc/star.png | `accessories.acc_goggles` (Étoile de sapin laser) | 32 / 5201 | golden Christmas tree topper star |
+| acc/candycane.png | `acc_sword` (Sucre d'orge géant) | 32 / 5202 | giant red and white striped candy cane |
+| acc/crackers.png | `acc_grenades` (Pétards de Noël) | 32 / 5203 | bundle of three Christmas crackers |
+| acc/marshmallow.png | `acc_glue` (Bombe à guimauve) | 32 / 5204 | glass jar of pink and white marshmallows |
+| acc/turkey.png | `acc_chicken` (Lance-dinde) | 32 / 5225 | cooked roast turkey, no face (essais précédents avec un visage écartés) |
+| acc/sweater.png | `acc_pot` (Pull de Noël moche) | 32 / 5206 | ugly Christmas sweater, green knit with red reindeer |
+| acc/snowball.png | `acc_snowball` (Boule à neige géante) | 32 / 5207 | big round snowball |
+| acc/bells.png | `acc_bells` (Grelots du traîneau) | 32 / 5208 | two golden jingle sleigh bells on a red strap |
+| ui/gift_box.png | `art.menu.gift` | 64 / 5209 | closed Christmas gift box, red paper, gold ribbon |
+| ui/card.png | `art.menu.card` (slice 18/19/20/17) | 128 / 5304 | gingerbread cookie frame, white icing, flat dark chocolate inside |
+| ui/pattern.png | `art.menu.pattern` | dessiné (PIL) | papier cadeau rayé rouge et blanc (la tuile PixelLab ne raccordait pas) |
+| arena/stands.png | `art.stands` | dessiné (PIL) | gradins en pain d'épice glacé (idem) |
+| fx/trap_bauble.png | `effects.meteor.sprite` (Boule piégée) | 32 / 5210 | dark purple bauble with a lit fuse |
+| fx/skin_gingerbread.png, fx/skin_coal.png | `overlays.skin_*` | 16 / 5211, 5212 | bonhomme de pain d'épice, morceau de charbon |
+| fx/poof.png | `effects.poof_*` | 48 / 5233, lineless | white and pale pink smoke puff |
+| fx/rolling_pin.png | `effects.rolling_pin`, `snowball_roll` | 32 / 5401 | giant wooden rolling pin |
+| fx/coal_sack.png | `effects.sack_spit` | 32 / 5402 | big brown burlap sack |
+
+Sol : `sprites/arena/ground_neige.png` du lot G. Chute de neige : ambiance du biome `noel`.

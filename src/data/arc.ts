@@ -65,6 +65,13 @@ export const ArcSchema = z.object({
   status: z.enum(['open', 'closed']).default('open'),
   /** Biome de l'arène pour tout l'arc (ancien emplacement ; settings.biome prime). */
   biome: id.optional(),
+  /** Thème visuel de l'arc (src/render/themes/<id>.json) : l'arène et la régie l'ouvrent dans ce thème. */
+  theme: id.optional(),
+  /**
+   * Upgrades que l'arc peut proposer au vote (pool). Absent : toutes les upgrades de base (sans pack).
+   * Un pack de thème cite ici ses reskins et ses upgrades propres.
+   */
+  upgrades: z.array(id).min(2).optional(),
   /** Réglages courants de la régie, appliqués au prochain épisode. */
   settings: ArcSettingsSchema.default({}),
   episodes: z.array(EpisodeSchema).default([]),
@@ -81,6 +88,11 @@ export function parseArc(raw: unknown, data: GameData): Arc {
   const equipment = new Set(data.equipment.map((e) => e.id));
   const problems: string[] = [];
   for (const h of arc.heroes) if (!heroIds.has(h)) problems.push(`héros inconnu : ${h}`);
+  for (const up of arc.upgrades ?? []) {
+    const eq = data.equipment.find((e) => e.id === up);
+    if (!eq) problems.push(`upgrade inconnue dans le pool : ${up}`);
+    else if (eq.innate) problems.push(`${up} est une capacité propre de héros, pas une upgrade votable`);
+  }
   const checkSettings = (s: ArcSettings | undefined, where: string) => {
     if (!s) return;
     if (s.biome && !data.biomes.some((b) => b.id === s.biome)) problems.push(`${where} : biome inconnu ${s.biome}`);
@@ -234,7 +246,13 @@ export const VOTE_OPTIONS = 3;
 export function freeUpgrades(arc: Arc, n: number, heroId: string, data: GameData): string[] {
   const owned = new Set(upgradesBefore(arc, n)[heroId] ?? []);
   const role = heroRole(data, heroId);
-  return data.equipment.filter((e) => !owned.has(e.id) && (!e.roles || (role !== undefined && e.roles.includes(role)))).map((e) => e.id);
+  return votablePool(arc, data).filter((e) => !owned.has(e.id) && (!e.roles || (role !== undefined && e.roles.includes(role)))).map((e) => e.id);
+}
+
+/** Upgrades votables de l'arc : son pool s'il en a un, sinon toutes les upgrades de base ; jamais une capacité propre. */
+export function votablePool(arc: Pick<Arc, 'upgrades'>, data: GameData) {
+  const pool = arc.upgrades;
+  return data.equipment.filter((e) => !e.innate && (pool ? pool.includes(e.id) : !e.pack));
 }
 
 /** Héros saturé : moins de 2 upgrades libres, donc plus de vrai vote possible pour lui. */

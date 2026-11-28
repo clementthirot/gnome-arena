@@ -164,3 +164,86 @@ export function spinReel(scene: Phaser.Scene, o: ReelOptions): Reel {
 function hex(color: string): number {
   return Number.parseInt(color.replace('#', ''), 16);
 }
+
+/** Cadeau dessiné (rouge, ruban doré) quand art.menu.gift manque : 16 × 16, couvercle sur les 5 premières lignes. */
+function drawGift(): HTMLCanvasElement {
+  const rows = [
+    '....yy..yy......',
+    '.....yyyy.......',
+    'oooooooyyooooooo',
+    'orrrrrryyrrrrrro',
+    'orrrrrryyrrrrrro',
+    'oooooooyyooooooo',
+    '.orrrrryyrrrrro.',
+    '.orrrrryyrrrrro.',
+    '.oyyyyyyyyyyyyo.',
+    '.orrrrryyrrrrro.',
+    '.orrrrryyrrrrro.',
+    '.orrrrryyrrrrro.',
+    '.orrrrryyrrrrro.',
+    '.orrrrryyrrrrro.',
+    '.oooooooooooooo.',
+    '................',
+  ];
+  const canvas = document.createElement('canvas');
+  canvas.width = 16;
+  canvas.height = 16;
+  const ctx = canvas.getContext('2d')!;
+  const pal: Record<string, string> = { o: '#1a0e14', r: '#d83b3b', y: '#ffd23a' };
+  rows.forEach((row, y) => [...row].forEach((ch, x) => pal[ch] && ((ctx.fillStyle = pal[ch]), ctx.fillRect(x, y, 1, 1))));
+  return canvas;
+}
+
+/** Texture du cadeau : l'image du thème si elle a chargé, sinon le cadeau dessiné. */
+export function giftTexture(scene: Phaser.Scene): string {
+  if (scene.textures.exists('ui_gift')) return 'ui_gift';
+  if (!scene.textures.exists('ui_gift_drawn')) scene.textures.addCanvas('ui_gift_drawn', drawGift());
+  return 'ui_gift_drawn';
+}
+
+/**
+ * Cadeau qui s'ouvre sur une option imposée : il tremble, le couvercle saute, l'icône sort de la boîte.
+ * Même contrat que spinReel (rien au hasard, instant d'arrêt connu d'avance).
+ */
+export function openGift(scene: Phaser.Scene, o: ReelOptions): Reel {
+  const { size } = o;
+  const delay = o.delay ?? 0;
+  const container = scene.add.container(o.x, o.y).setDepth(o.depth);
+  const key = giftTexture(scene);
+  const src = scene.textures.get(key).getSourceImage() as HTMLImageElement;
+  const w = src.width || 16;
+  const h = src.height || 16;
+  const scale = size / Math.max(w, h);
+  // Le couvercle : le tiers du haut de l'image ; la boîte : le reste (deux copies rognées de la même image).
+  const lidH = Math.round(h * 0.34);
+  const body = scene.add.image(0, 0, key).setScale(scale).setCrop(0, lidH, w, h - lidH);
+  const lid = scene.add.image(0, 0, key).setScale(scale).setCrop(0, 0, w, lidH);
+  const icon = scene.add.image(0, size * 0.1, o.target).setAlpha(0);
+  fitIcon(icon, size * 0.72);
+  const iconScale = icon.scale;
+  icon.setScale(iconScale * 0.3);
+  container.add([icon, body, lid]);
+  // Secousses de plus en plus fortes (anticipation), puis ouverture.
+  const shakeMs = 520 + (o.spins ?? 0) * 25;
+  scene.time.delayedCall(delay, () => {
+    if (o.sound !== false) sound.play('tick');
+    scene.tweens.add({ targets: container, angle: { from: -6, to: 6 }, duration: 70, yoyo: true, repeat: Math.max(1, Math.floor(shakeMs / 140) - 1), ease: 'Sine.easeInOut', onComplete: () => container.setAngle(0) });
+  });
+  const stopsAt = delay + shakeMs;
+  scene.time.delayedCall(stopsAt, () => {
+    if (!icon.active) return;
+    scene.tweens.add({ targets: lid, y: -size * 0.9, angle: -35, alpha: 0, duration: 380, ease: 'Cubic.easeOut' });
+    // L'icône jaillit de la boîte puis se pose au-dessus.
+    icon.setAlpha(1);
+    container.bringToTop(icon);
+    scene.tweens.add({ targets: icon, y: -size * 0.5, scale: iconScale, duration: 320, ease: 'Back.easeOut' });
+    if (o.sound !== false) sound.play('ding');
+    o.onStop?.();
+  });
+  return { container, icon, stopsAt };
+}
+
+/** Dévoilement d'une option selon le style du thème : rouleau de machine à sous ou cadeau qui s'ouvre. */
+export function revealOption(scene: Phaser.Scene, o: ReelOptions): Reel {
+  return manifest.staging.reveal.style === 'gifts' ? openGift(scene, o) : spinReel(scene, o);
+}

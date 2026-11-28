@@ -293,3 +293,29 @@ Questions ouvertes pour Clément :
      compte pro, TikTok Content Posting API après validation de l'app) avec la légende et le vote 1/2/3 ;
   3. 24 h après, n8n récupère les commentaires (API YouTube et Instagram ; TikTok plus limité) et les passe à
      `npm run episode -- vote --comments`, puis prépare l'épisode suivant pour validation.
+
+## 9. Pack Noël « Calendrier de l'Avent » (28 novembre 2026, session autonome)
+
+Brief : doc Claude « Pack Noël — Calendrier de l'Avent ». Thème `noel`, Lutins contre Vilains, mêmes règles.
+
+Fait :
+- **Moteur** (générique, sans effet sur le combat de base, bench 100 seeds identique) : effet `transform` (pain d'épice /
+  charbon, les unités transformées ne bougent plus et ne frappent plus), invocations autour du lanceur (`spawn` avec
+  `from: "source"`), capacités `innate` propres à un héros, `roleSpell: false`, upgrades d'un pack hors du pool de base,
+  arcs avec `theme` et pool `upgrades`.
+- **Héros** : Marcel l'Enclume (onde de choc), Mère Noël (nuage pain d'épice + rouleau géant), Papy Boulon (soldats de bois)
+  contre Gros Glaçon (charge roulée, rapetisse avec ses PV), Père Fouettard (nuage de charbon + sac qui avale et recrache),
+  Gobbo Claus (cadeaux mimiques). Transformations et invocations strictement symétriques (test).
+- **Upgrades** : les 6 reskins du brief (libellés du thème, mêmes stats) et 2 nouvelles, Boule à neige géante et Grelots du traîneau.
+- **Événement** : boule de Noël piégée (le météore rhabillé : ombre annoncée, explosion de zone).
+- **Arène et interface** : sol enneigé, gradins en pain d'épice, neige qui tombe, jauge en sucre d'orge, cadres en pain
+  d'épice, papier cadeau qui défile, 3 cadeaux qui s'ouvrent tour à tour puis « VOTEZ EN COMMENTAIRE ! », accroche
+  « JOUR N — LE PÈRE NOËL EST TOUJOURS INTROUVABLE ». Aplat uni sous tous les textes du thème.
+- **Équilibre** : 51 % / 49 % sur 1000 seeds, combat d'environ 42 s. Les héros Vilains frappent 1,29x plus que leurs
+  modèles (Bob, Kevin, Gertrude) pour compenser des troupes différentes d'un camp à l'autre.
+
+Questions ouvertes pour Clément :
+- Héros qui reçoit l'upgrade, poule géante, héros qui a toutes les upgrades : mêmes questions que la section 8, non tranchées.
+- Le brief cite 4 types de troupes par camp (fantassin, archer, chargeur, tirailleur) ; le jeu en aligne 3 par camp
+  (archers côté Lutins, tirailleurs côté Vilains), comme Gnomes contre Gobelins. Ajouter le 4e type changerait l'équilibrage.
+- Nombre et fréquence des invocations (2 toutes les 10 s), noms définitifs, mise en scène du 25 décembre.

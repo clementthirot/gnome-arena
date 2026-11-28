@@ -31,7 +31,11 @@
     "label": "Épée magique",
     "short": "épée",
     "visual": "acc_sword",
-    "roles": ["melee", "charger", "skirmisher"],
+    "roles": [
+      "melee",
+      "charger",
+      "skirmisher"
+    ],
     "stats": {
       "damage": 1.05
     },
@@ -258,6 +262,269 @@
           "count": 2,
           "team": "self",
           "visual": "whistle_blow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "forge_slam",
+    "label": "Coup d'enclume",
+    "short": "enclume",
+    "visual": "acc_none",
+    "innate": true,
+    "special": {
+      "maxRange": 8,
+      "cooldown": 7,
+      "effects": [
+        {
+          "type": "damage",
+          "at": "self",
+          "power": 0.8,
+          "radius": 20,
+          "knockback": 140,
+          "visual": "anvil_shock"
+        },
+        {
+          "type": "launch",
+          "at": "self",
+          "force": 110,
+          "lift": 70,
+          "radius": 20,
+          "edge": 0.5
+        }
+      ]
+    }
+  },
+  {
+    "id": "snow_roll",
+    "label": "Boule de neige vivante",
+    "short": "roulade",
+    "visual": "acc_none",
+    "innate": true,
+    "special": {
+      "maxRange": 8,
+      "cooldown": 7,
+      "effects": [
+        {
+          "type": "damage",
+          "at": "self",
+          "power": 0.8,
+          "radius": 20,
+          "knockback": 140,
+          "visual": "snow_burst"
+        },
+        {
+          "type": "launch",
+          "at": "self",
+          "force": 110,
+          "lift": 70,
+          "radius": 20,
+          "edge": 0.5
+        }
+      ]
+    }
+  },
+  {
+    "id": "gingerbread_cloud",
+    "label": "Nuage pain d'épices",
+    "short": "pouf",
+    "visual": "acc_none",
+    "innate": true,
+    "special": {
+      "minRange": 10,
+      "maxRange": 90,
+      "cooldown": 12,
+      "effects": [
+        {
+          "type": "transform",
+          "radius": 18,
+          "maxTargets": 4,
+          "duration": 3.5,
+          "skin": "skin_gingerbread",
+          "visual": "poof_gingerbread"
+        }
+      ]
+    }
+  },
+  {
+    "id": "coal_cloud",
+    "label": "Nuage de charbon",
+    "short": "pouf",
+    "visual": "acc_none",
+    "innate": true,
+    "special": {
+      "minRange": 10,
+      "maxRange": 90,
+      "cooldown": 12,
+      "effects": [
+        {
+          "type": "transform",
+          "radius": 18,
+          "maxTargets": 4,
+          "duration": 3.5,
+          "skin": "skin_coal",
+          "visual": "poof_coal"
+        }
+      ]
+    }
+  },
+  {
+    "id": "rolling_pin",
+    "label": "Rouleau à pâtisserie géant",
+    "short": "rouleau",
+    "visual": "acc_none",
+    "innate": true,
+    "special": {
+      "minRange": 10,
+      "maxRange": 120,
+      "cooldown": 9,
+      "effects": [
+        {
+          "type": "beam",
+          "width": 10,
+          "power": 0.5,
+          "knockback": 170,
+          "bounces": 0,
+          "delay": 0.6,
+          "visual": "rolling_pin"
+        }
+      ]
+    }
+  },
+  {
+    "id": "big_sack",
+    "label": "Grand sac",
+    "short": "sac",
+    "visual": "acc_none",
+    "innate": true,
+    "special": {
+      "minRange": 10,
+      "maxRange": 90,
+      "cooldown": 9,
+      "effects": [
+        {
+          "type": "projectile",
+          "speed": 120,
+          "arc": 12,
+          "visual": "sack_swoosh",
+          "effects": [
+            {
+              "type": "damage",
+              "power": 0.5,
+              "radius": 14,
+              "visual": "sack_spit"
+            },
+            {
+              "type": "launch",
+              "force": 230,
+              "lift": 150,
+              "radius": 14,
+              "edge": 0.6
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "toy_soldiers",
+    "label": "Soldats de bois",
+    "short": "soldats",
+    "visual": "acc_none",
+    "innate": true,
+    "special": {
+      "maxRange": 40,
+      "cooldown": 10,
+      "effects": [
+        {
+          "type": "spawn",
+          "units": {
+            "gnomes": "toy_soldier",
+            "goblins": "mimic_gift"
+          },
+          "count": 2,
+          "team": "self",
+          "from": "source",
+          "jump": 90
+        }
+      ]
+    }
+  },
+  {
+    "id": "mimic_gifts",
+    "label": "Cadeaux mimiques",
+    "short": "cadeaux",
+    "visual": "acc_none",
+    "innate": true,
+    "special": {
+      "maxRange": 40,
+      "cooldown": 10,
+      "effects": [
+        {
+          "type": "spawn",
+          "units": {
+            "gnomes": "toy_soldier",
+            "goblins": "mimic_gift"
+          },
+          "count": 2,
+          "team": "self",
+          "from": "source",
+          "jump": 90
+        }
+      ]
+    }
+  },
+  {
+    "id": "giant_snowball",
+    "label": "Boule à neige géante",
+    "short": "boule",
+    "visual": "acc_snowball",
+    "pack": "noel",
+    "special": {
+      "minRange": 10,
+      "maxRange": 140,
+      "cooldown": 8,
+      "effects": [
+        {
+          "type": "beam",
+          "width": 11,
+          "power": 0.7,
+          "knockback": 150,
+          "bounces": 0,
+          "delay": 0.6,
+          "visual": "snowball_roll"
+        }
+      ]
+    }
+  },
+  {
+    "id": "sleigh_bells",
+    "label": "Grelots du traîneau",
+    "short": "grelots",
+    "visual": "acc_bells",
+    "pack": "noel",
+    "roles": [
+      "melee",
+      "charger",
+      "skirmisher"
+    ],
+    "special": {
+      "maxRange": 4,
+      "cooldown": 3.5,
+      "effects": [
+        {
+          "type": "stun",
+          "at": "self",
+          "duration": 0.8,
+          "radius": 14,
+          "friendlyFire": false,
+          "visual": "bells_ring"
+        },
+        {
+          "type": "damage",
+          "at": "self",
+          "power": 0.3,
+          "radius": 14
         }
       ]
     }
