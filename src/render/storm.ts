@@ -1,7 +1,8 @@
 // Blizzard : la zone qui se resserre devient une tempête de neige et de grêle qui cingle tout ce qui est
 // dehors, gradins compris. Même rôle que le gaz (gas.ts), autre habillage, choisi par staging.gas.style = "blizzard".
 // La tempête monte peu à peu jusqu'à devenir intense, puis s'estompe quand le combat est fini.
-// Le ciel bouché et la congère sont peints sous les unités (calque `ground`), la neige et la grêle par-dessus.
+// Le ciel bouché et la congère sont peints sous les corps et les unités (calque `ground`, qui assombrit aussi le
+// public, les flaques et les débris), la neige et la grêle par-dessus.
 // Purement visuel : les dégâts hors zone restent ceux du moteur.
 import type Phaser from 'phaser';
 import type { FieldRect } from '../sim/types';
@@ -201,7 +202,7 @@ export class BlizzardLayer {
     // Ciel bouché hors zone, gradins compris : le sol s'assombrit (la neige blanche ressort même sur un sol
     // enneigé), plus fort pendant les rafales et à mesure que la tempête dure. Peint sous les unités : les
     // combattants et le public restent nets par-dessus.
-    const veil = Math.min(0.6, (0.28 + this.frost * 0.14 + (w.gust - 0.75) * 0.3) * Math.min(1, this.strength * 1.6));
+    const veil = Math.min(0.72, (0.4 + this.frost * 0.16 + (w.gust - 0.75) * 0.3) * Math.min(1, this.strength * 1.6));
     if (veil > 0 && zone.width < this.field.width) {
       const gr = this.ground;
       gr.fillStyle(hex(this.config.shade), veil);

@@ -225,6 +225,8 @@ export class ArenaScene extends Phaser.Scene {
   /** Blizzard : secondes passées par chaque mort dans la tempête, puis son bloc de glace (null sans image). */
   private frostTime = new Map<number, number>();
   private iceBlocks = new Map<number, Phaser.GameObjects.Image | null>();
+  /** Blizzard : unités tombées dans la tempête (seules elles peuvent geler ; un corps rattrapé par la zone, non). */
+  private diedInStorm = new Set<number>();
   /** Tête de lecture : moment visé (s de combat) pendant le rattrapage, vitesse et son à rendre ensuite. */
   private seekTo?: number;
   private seekRestore = { speed: 1, muted: false };
@@ -268,6 +270,7 @@ export class ArenaScene extends Phaser.Scene {
     this.mvpLabel = undefined;
     this.frostTime = new Map();
     this.iceBlocks = new Map();
+    this.diedInStorm = new Set();
     this.seekTo = undefined;
     this.seekRestore = { speed: params.speed, muted: sound.muted };
   }
@@ -314,7 +317,8 @@ export class ArenaScene extends Phaser.Scene {
     this.add.image(0, 0, bgKey).setOrigin(0).setScale(SCALE).setDepth(-1000);
     this.createCrowd();
 
-    this.zoneGfx = this.add.graphics().setDepth(-500);
+    // Limite de la zone : au-dessus du ciel bouché du blizzard (-405), sous les corps (-400) et les unités.
+    this.zoneGfx = this.add.graphics().setDepth(-404);
     const groundFx = this.add.graphics().setDepth(-450);
     this.airGfx = this.add.graphics().setDepth(-440);
     this.juice = new Juice(this, this.particles, SCALE, manifest.staging.juice, manifest.staging.gore);
@@ -344,8 +348,9 @@ export class ArenaScene extends Phaser.Scene {
     }
     this.gas =
       manifest.staging.gas.style === 'blizzard'
-        ? // Ciel bouché et congère sous le public et les unités (-950), neige et grêle par-dessus (8500).
-          new BlizzardLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-950), field, { x: 0, y: 0, width, height }, manifest.staging.gas, SCALE)
+        ? // Ciel bouché sur le sol, le public, les flaques et les débris (-405), sous les corps et les unités
+          // (estompés à part, voir dimStorm) ; neige et grêle par-dessus (8500).
+          new BlizzardLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-405), field, { x: 0, y: 0, width, height }, manifest.staging.gas, SCALE)
         : new GasLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-430), field, manifest.staging.gas, SCALE);
     for (const u of this.battle.units) this.createUnitView(u);
     this.prev = this.battle.units.map((u) => ({ x: u.x, y: u.y, z: u.z }));
@@ -797,6 +802,7 @@ export class ArenaScene extends Phaser.Scene {
     const alpha = Math.min(1, this.accumulator / dtMs);
     this.drawUnits(alpha, this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale : 0);
     this.drawZone();
+    this.dimStorm();
     this.placeIce();
     this.gas.update(this.running && !this.paused ? (Math.min(delta, 100) / 1000) * this.timeScale * this.slowmo : 0, this.battle.zone);
     this.drawEffects(delta / 1000);
@@ -1019,6 +1025,7 @@ export class ArenaScene extends Phaser.Scene {
         case 'death': {
           const u = units[e.unit];
           const view = this.views[e.unit];
+          if (this.gas instanceof BlizzardLayer && this.gas.intensity >= 0.3 && this.stormFade(u.x, u.y) > 0) this.diedInStorm.add(u.index);
           view.sprite.setDepth(-400 + u.y * 0.01);
           view.sprite.anims.stop();
           this.playOnce(view, 'death');
@@ -1537,7 +1544,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   /**
-   * Blizzard : un mort qui reste dans la tempête bleuit peu à peu, puis gèle dans un bloc de glace.
+   * Blizzard : une unité tombée dans la tempête, si son corps y reste, bleuit peu à peu, puis gèle dans un bloc de glace.
    * Compté en temps de combat, dans le tick : le moment du gel ne dépend ni du framerate ni de ?speed.
    * Rendu seulement : la simulation ne sait rien du gel.
    */
@@ -1545,7 +1552,8 @@ export class ArenaScene extends Phaser.Scene {
     const cfg = manifest.staging.gas.freeze;
     if (!cfg.enabled || this.battle.result || storm.intensity < 0.3) return;
     const z = this.battle.zone;
-    for (const u of this.battle.units) {
+    for (const i of this.diedInStorm) {
+      const u = this.battle.units[i];
       if (u.state !== 'dead' || u.z > 0 || this.iceBlocks.has(u.index)) continue;
       if (u.x > z.x && u.x < z.x + z.width && u.y > z.y && u.y < z.y + z.height) continue;
       const t = (this.frostTime.get(u.index) ?? 0) + dt;
@@ -1553,30 +1561,30 @@ export class ArenaScene extends Phaser.Scene {
       const sprite = this.views[u.index].sprite;
       if (t < cfg.after) {
         // Le givre gagne : du blanc au bleu glacier.
-        const k = Math.min(1, t / cfg.after) * 0.6;
+        const k = Math.min(1, t / cfg.after);
         const ch = (from: number, to: number) => Math.round(from + (to - from) * k);
-        sprite.setTint((ch(255, 0x9c) << 16) | (ch(255, 0xcf) << 8) | 255);
+        sprite.setTint((ch(255, 0xb8) << 16) | (ch(255, 0xdc) << 8) | 255);
       } else this.freezeCorpse(u);
     }
   }
 
   private freezeCorpse(u: Unit): void {
     const sprite = this.views[u.index].sprite;
-    sprite.setTint(0x8cc4ff);
-    // Craquement de glace : éclats blancs et bleus.
-    for (let k = 0; k < (u.hero ? 10 : 6); k++) {
+    sprite.setTint(0xb8dcff);
+    // Petit craquement de glace (discret : on est dans la tempête, l'action est dans la zone).
+    for (let k = 0; k < (u.hero ? 5 : 2); k++) {
       const a = rand() * Math.PI * 2;
       const v = 20 + rand() * 30;
       this.particles.push({ x: u.x, y: u.y - 3, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6 - 25, life: 0.45, maxLife: 0.45, color: rand() < 0.5 ? 0xffffff : 0xa8dcff, size: rand() < 0.4 ? 2 : 1 });
     }
-    sound.play('hail');
+    if (u.hero) sound.play('hail');
     if (!this.textures.exists('ice_block')) {
       this.iceBlocks.set(u.index, null);
       return;
     }
-    // Bloc à la taille du corps couché : un héros se retrouve dans un gros glaçon.
-    const size = Math.max(sprite.displayWidth * 0.42, u.radius * 2.6 * SCALE);
-    const ice = this.add.image(sprite.x, sprite.y, 'ice_block').setOrigin(0.5, 0.8).setDepth(sprite.depth + 0.002).setAlpha(0.8);
+    // Bloc à la taille du corps couché, discret comme un cadavre ; estompé avec lui par dimStorm.
+    const size = Math.max(sprite.displayWidth * 0.3, u.radius * 2 * SCALE);
+    const ice = this.add.image(sprite.x, sprite.y, 'ice_block').setOrigin(0.5, 0.8).setDepth(sprite.depth + 0.002);
     const scale = size / ice.width;
     ice.setScale(scale * 0.3, scale * 0.1);
     this.tweens.add({ targets: ice, scaleX: scale, scaleY: scale, duration: 280, ease: 'Back.easeOut' });
@@ -1595,7 +1603,40 @@ export class ArenaScene extends Phaser.Scene {
         this.frostTime.delete(i);
         continue;
       }
-      ice.setPosition(sprite.x, sprite.y).setDepth(sprite.depth + 0.002);
+      ice.setPosition(sprite.x, sprite.y).setDepth(sprite.depth + 0.002).setAlpha(0.6 * sprite.alpha);
+    }
+  }
+
+  /** Part de tempête au point (x, y) : 0 dans la zone, 1 à 6 px dehors, multipliée par la force du blizzard. */
+  private stormFade(x: number, y: number): number {
+    if (!(this.gas instanceof BlizzardLayer) || this.battle.zoneScale >= 1) return 0;
+    const z = this.battle.zone;
+    const d = Math.max(z.x - x, x - z.x - z.width, z.y - y, y - z.y - z.height);
+    return Phaser.Math.Clamp(d / 6, 0, 1) * Math.min(1, this.gas.intensity * 1.5);
+  }
+
+  /**
+   * Tout ce qui est dans le blizzard s'estompe (unités, corps, accessoires, couronnes, HUD des héros) :
+   * l'œil reste dans la zone. Le sol, les flaques et le public le sont déjà par le ciel bouché.
+   */
+  private dimStorm(): void {
+    if (!(this.gas instanceof BlizzardLayer)) return;
+    const units = this.battle.units;
+    for (let i = 0; i < units.length; i++) {
+      const v = this.views[i];
+      const a = 1 - 0.55 * this.stormFade(units[i].x, units[i].y);
+      if (v.sprite.alpha === a) continue;
+      v.sprite.setAlpha(a);
+      v.skin?.setAlpha(a);
+      for (const acc of this.accessories.get(i) ?? []) acc.img.setAlpha(a);
+      const fx = this.bossFx.get(i);
+      fx?.crown?.setAlpha(a);
+      fx?.aura?.setAlpha(0.85 * a);
+      const hud = this.heroHud.get(i);
+      if (hud) {
+        hud.bar.setAlpha(a);
+        hud.name.setAlpha((units[i].state === 'dead' ? 0.6 : 1) * a);
+      }
     }
   }
 
