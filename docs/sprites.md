@@ -93,7 +93,8 @@ de chaque animation) et `<clé>.directions.json`, puis lance `import`. L'entrée
 le rendu choisit la ligne selon le déplacement, sinon selon la cible, au lieu du miroir gauche/droite.
 Noms reconnus : *punch, attack, slash…* → attack ; *kick* → kick (coup de pied, attaque secondaire) ;
 *taking punch, hurt…* → hurt (coup encaissé) ; *getting up* → getup (relevé après une projection) ;
-*walk, run* → walk ; *death, die* → death.
+*run* → walk (course) ; *walk* → stroll (marche, au contact) ; *fight stance* → guard (garde à l'arrêt) ;
+*death, die* → death.
 Une animation absente retombe sur la rotation fixe (walk), sur le coup de poing (kick), ou sur les briques
 (death : chute). Pour une direction en double (« west-8062cc6e »), la première variante est prise.
 
@@ -239,3 +240,30 @@ Commun : `no_background: true`, `outline: single color black outline`, `detail: 
 | fx/coal_sack.png | `effects.sack_spit` | 32 / 5402 | big brown burlap sack |
 
 Sol : `sprites/arena/ground_neige.png` du lot G. Chute de neige : ambiance du biome `noel`.
+Tempête : `staging.gas.style: "blizzard"` (dans `noel.json`) remplace le gaz par `src/render/storm.ts` : neige
+cinglante poussée par un vent à rafales, grêlons qui tombent en biais et éclatent au sol, nuages de rafale, ciel
+assombri hors zone (`staging.gas.shade`) et congère le long de la limite. Rendu seulement, les dégâts restent ceux du moteur.
+
+## Allures : marche et garde de combat (PixelLab, 28/11/2026)
+
+Le rendu choisit l'allure de chaque unité au sol (`playGait` dans ArenaScene.ts) :
+`walk` (course) quand elle fonce, `stroll` (marche) quand elle avance lentement ou se replace au contact,
+`guard` (garde en boucle) à l'arrêt face à un adversaire, `idle` (pose fixe) sinon. La cadence suit la vitesse
+réelle. Sans `stroll`, la course est jouée ralentie ; sans `guard`, la pose fixe. Seules `idle`, `guard`, `stroll`
+et `walk` bouclent : coups, coup de pied, blessure, relevé et mort ne jouent qu'une fois, et un coup cède à la
+course dès l'image d'impact passée si l'unité repart.
+
+Générées par l'API v2 (`POST /characters/animations`, mode template, 1 génération par direction) sur les
+personnages existants, puis ajoutées en colonnes à droite des sheets (centrées dans l'image, sans
+ré-assembler le reste) :
+
+| Personnage (character_id) | Sheets | Templates |
+| --- | --- | --- |
+| gnome de base 78b1b8f0-4f53-432b-9e8a-0615c13c0226 | gnome_*, fan_gnome | `walking-6-frames` → stroll, `fight-stance-idle-8-frames` → guard |
+| gobelin de base 7c57e856-1348-4d26-82ea-2bd621a89ae7 | goblin_*, fan_goblin, hero_grok/snik/morva | idem |
+| lutin ea8c68d0-591e-433b-9c47-82ddaf2a34d4 | themes/noel/gnome_*, fan_gnome | idem |
+| voleur 407a3794-6160-4067-91c2-7bdc9d0b9cfe | themes/noel/goblin_*, fan_goblin (recolorés : rouge → violet, jaune → orange) | idem |
+| héros Noël, soldat, cadeau mimic (ids ci-dessus) | themes/noel/hero_*, toy_soldier, mimic_gift | idem |
+
+Les héros de base Bob, Kevin et Gertrude n'ont pas de personnage PixelLab sur le compte : ils gardent la course,
+jouée ralentie au contact.

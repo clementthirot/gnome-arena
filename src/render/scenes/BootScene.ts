@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import { asPlaceholder, manifest } from '../manifest';
 import { drawPlaceholder } from '../placeholders';
 import type { ArenaParams } from './ArenaScene';
+import { LOOPING_ANIMS } from '../animations';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -75,7 +76,9 @@ export class BootScene extends Phaser.Scene {
             key: d === undefined ? `${texture}_${name}` : `${texture}_${name}_${d}`,
             frames: this.anims.generateFrameNumbers(texture, { frames: anim.frames.map((f) => f + (d ?? 0) * columns) }),
             frameRate: anim.fps,
-            repeat: name === 'death' || name === 'attack' ? 0 : -1,
+            // Coup de pied, blessure, relevé : une seule fois. En boucle, ils bloquaient l'unité dans le geste
+            // (coups de pied en se déplaçant au lieu de courir), car le rendu attend la fin d'un coup avant de relancer la marche.
+            repeat: LOOPING_ANIMS.includes(name) ? -1 : 0,
           });
         }
       }

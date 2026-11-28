@@ -30,7 +30,18 @@ export interface UnitView {
   shrinkMin?: number;
   /** Roule sur lui-même pendant ses charges (bonhomme de neige). */
   rollOnCharge?: boolean;
+  /** Allure affichée (arrêt, garde, marche, course) et depuis quand (ms) : évite de changer d'animation à chaque image. */
+  gait?: Gait;
+  gaitSince?: number;
+  /** Coup en cours : rang de l'image d'impact. Passé cet instant, l'unité qui repart reprend sa course. */
+  strikeHit?: number;
 }
+
+/** Allures en boucle : pose fixe, garde de combat, marche (au contact, lent), course. */
+export type Gait = 'idle' | 'guard' | 'stroll' | 'walk';
+
+/** Animations jouées en boucle ; toutes les autres (coups, réactions, mort) ne jouent qu'une fois. */
+export const LOOPING_ANIMS: readonly string[] = ['idle', 'guard', 'stroll', 'walk'];
 
 /** Direction (indice dans DIRECTIONS) la plus proche d'un vecteur écran (y vers le bas). */
 export function directionOf(dx: number, dy: number): number {

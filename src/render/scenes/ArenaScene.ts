@@ -6,11 +6,12 @@ import type { GameData, HeroDef, TeamId } from '../../data/schema';
 import { Battle, opposingTeam, TEAMS } from '../../sim/battle';
 import { hashSeed } from '../../sim/rng';
 import type { BattleEvent, Unit } from '../../sim/types';
-import { animKey, Bricks, directionOf, type BrickContext, type Particle, type UnitView } from '../animations';
+import { animKey, Bricks, directionOf, type BrickContext, type Gait, type Particle, type UnitView } from '../animations';
 import { drawArenaBackground } from '../arenaArt';
 import { Director } from '../director';
 import { FxLayer } from '../fx';
 import { GasLayer } from '../gas';
+import { BlizzardLayer } from '../storm';
 import { Juice } from '../juice';
 import { sound } from '../audio';
 import { runningGagCanvas, Show } from '../show';
@@ -158,7 +159,7 @@ export class ArenaScene extends Phaser.Scene {
   private prev: { x: number; y: number; z: number }[] = [];
   /** Ombres des unités en l'air. */
   private airGfx!: Phaser.GameObjects.Graphics;
-  private gas!: GasLayer;
+  private gas!: GasLayer | BlizzardLayer;
   private juice!: Juice;
   private show!: Show;
   /** Dernière unité tombée : la caméra la suit au ralenti à la fin. */
@@ -324,7 +325,10 @@ export class ArenaScene extends Phaser.Scene {
         this.gagHat = { img, dy: 7 * SCALE };
       }
     }
-    this.gas = new GasLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-430), field, manifest.staging.gas, SCALE);
+    this.gas =
+      manifest.staging.gas.style === 'blizzard'
+        ? new BlizzardLayer(this.add.graphics().setDepth(8500), field, manifest.staging.gas, SCALE)
+        : new GasLayer(this.add.graphics().setDepth(8500), this.add.graphics().setDepth(-430), field, manifest.staging.gas, SCALE);
     for (const u of this.battle.units) this.createUnitView(u);
     this.prev = this.battle.units.map((u) => ({ x: u.x, y: u.y, z: u.z }));
     this.fx = this.add.graphics().setDepth(9000);
@@ -1035,7 +1039,48 @@ export class ArenaScene extends Phaser.Scene {
   /** Joue une animation ponctuelle de la sprite sheet si le manifeste la fournit. */
   private playOnce(view: UnitView, name: 'attack' | 'death'): void {
     const key = animKey(view, name);
-    if (this.anims.exists(key)) view.sprite.play(key);
+    if (!this.anims.exists(key)) return;
+    view.sprite.anims.timeScale = 1;
+    view.gait = undefined;
+    view.strikeHit = undefined;
+    view.sprite.play(key);
+  }
+
+  /**
+   * Allure en boucle d'une unité au sol qui ne frappe pas : course quand elle fonce, marche quand elle avance
+   * lentement ou piétine au contact, garde de combat à l'arrêt face à un adversaire, pose fixe sinon.
+   * Un léger délai et des seuils décalés évitent de basculer d'une allure à l'autre à chaque image.
+   */
+  private playGait(u: Unit, v: UnitView, units: readonly Unit[], stunned: boolean): void {
+    const has = (name: string) => this.anims.exists(animKey(v, name));
+    const speed = stunned ? 0 : Math.hypot(u.vx, u.vy);
+    const ratio = speed / Math.max(1, u.speed);
+    const t = u.target >= 0 ? units[u.target] : undefined;
+    const foe = t && t.state !== 'dead' ? t : undefined;
+    const gap = foe ? Math.hypot(foe.x - u.x, foe.y - u.y) - u.radius - foe.radius : Infinity;
+    const contact = gap < 6;
+    const prev = v.gait;
+    let gait: Gait;
+    if (speed <= (prev === 'walk' || prev === 'stroll' ? 3 : 5)) gait = foe && gap < 40 && !this.ending ? 'guard' : 'idle';
+    // Au contact, on ne court pas : on se replace en marchant. Ailleurs, la course dès que l'unité prend de la vitesse.
+    else if (contact || ratio < (prev === 'walk' ? 0.4 : 0.55)) gait = 'stroll';
+    else gait = 'walk';
+    if (prev && gait !== prev && this.time.now - (v.gaitSince ?? 0) < 140) gait = prev;
+    // Animation absente de la sheet : la marche retombe sur la course (ralentie), la garde sur la pose fixe.
+    let name: string = gait;
+    if (name === 'stroll' && !has('stroll')) name = 'walk';
+    if (name === 'walk' && !has('walk')) name = has('stroll') ? 'stroll' : 'idle';
+    if (name === 'guard' && !has('guard')) name = 'idle';
+    const key = animKey(v, name);
+    if (!this.anims.exists(key)) return;
+    if (gait !== prev) {
+      v.gait = gait;
+      v.gaitSince = this.time.now;
+    }
+    // La cadence suit la vitesse réelle (les pieds ne glissent plus) et l'accéléré/ralenti du combat.
+    const pace = name === 'walk' ? Phaser.Math.Clamp(ratio / 0.85, 0.7, 1.4) : name === 'stroll' ? (gait === 'stroll' ? Phaser.Math.Clamp(ratio / 0.4, 0.6, 1.3) : 0.55) : 1;
+    v.sprite.anims.timeScale = pace * this.simRate();
+    if (v.sprite.anims.currentAnim?.key !== key || !v.sprite.anims.isPlaying) v.sprite.play(key, true);
   }
 
   /** Vitesse de la simulation par rapport au temps réel (accéléré, ralenti). */
@@ -1057,6 +1102,9 @@ export class ArenaScene extends Phaser.Scene {
     const hit = anim.hit ?? Math.floor(anim.frames.length / 2);
     // hit images avant l'impact : la cadence qui les fait tenir dans le temps d'armé.
     const fps = windup > 0 && hit > 0 ? Phaser.Math.Clamp((hit / windup) * this.simRate(), 4, 40) : anim.fps;
+    view.sprite.anims.timeScale = 1;
+    view.gait = undefined;
+    view.strikeHit = hit;
     view.sprite.play({ key, frameRate: fps });
   }
 
@@ -1066,7 +1114,10 @@ export class ArenaScene extends Phaser.Scene {
     const current = view.sprite.anims.currentAnim?.key ?? '';
     if (view.sprite.anims.isPlaying && /_(attack|kick)/.test(current)) return;
     const anim = this.anims.get(key);
-    if (anim) view.sprite.play({ key, frameRate: anim.frameRate * this.simRate() });
+    if (!anim) return;
+    view.sprite.anims.timeScale = 1;
+    view.gait = undefined;
+    view.sprite.play({ key, frameRate: anim.frameRate * this.simRate() });
   }
 
   /** En vol : pose figée du coup encaissé (sinon la pose fixe), dans la direction du regard. */
@@ -1345,7 +1396,7 @@ export class ArenaScene extends Phaser.Scene {
   /** Confettis de la victoire, fond d'ambiance, barre de force : avancés au rythme de la simulation. */
   private tickVisuals(dt: number): void {
     this.ambience(dt);
-    this.gas.emit(dt, this.battle.zoneScale);
+    this.gas.emit(dt, this.battle.zoneScale, this.battle.zone);
     if (this.battle.time < this.confettiUntil) {
       const f = this.battle.field;
       this.confettiDebt += dt * 75;
@@ -1554,9 +1605,12 @@ export class ArenaScene extends Phaser.Scene {
       // Petit sautillement de marche, plus nerveux en fuite.
       const stunned = u.stunTimer > 0;
       const moving = !stunned && Math.hypot(u.vx, u.vy) > 4;
-      // Un coup qui part va jusqu'au bout ; une réaction (coup encaissé, relevé) cède dès que l'unité repart.
+      // Un coup va jusqu'à l'impact, puis cède si l'unité repart (pas de coup de pied qui glisse sur le sol) ;
+      // une réaction (coup encaissé, relevé) cède dès que l'unité repart.
       const current = v.sprite.anims.currentAnim?.key ?? '';
-      const busy = v.sprite.anims.isPlaying && (/_(attack|kick)/.test(current) || (/_(hurt|getup)/.test(current) && !moving));
+      const rank = (v.sprite.anims.currentFrame?.index ?? 1) - 1;
+      const striking = /_(attack|kick)/.test(current) && !(moving && rank > (v.strikeHit ?? Infinity));
+      const busy = v.sprite.anims.isPlaying && (striking || (/_(hurt|getup)/.test(current) && !moving));
       if (v.dir === undefined) v.sprite.setFlipX(u.facing < 0);
       else if (!busy) {
         // 8 directions : on regarde où l'on va, sinon sa cible, sinon son camp d'en face.
@@ -1566,10 +1620,8 @@ export class ArenaScene extends Phaser.Scene {
         else if (t && t.state !== 'dead') v.dir = directionOf(t.x - u.x, t.y - u.y);
         else v.dir = directionOf(u.facing, 0);
       }
-      const walk = animKey(v, 'walk');
       // Sonné au sol : pas de marche sur place (le relevé, s'il joue, va jusqu'au bout).
-      const anim = moving && this.anims.exists(walk) ? walk : animKey(v, 'idle');
-      if (!busy && v.sprite.anims.currentAnim?.key !== anim && this.anims.exists(anim)) v.sprite.play(anim);
+      if (!busy) this.playGait(u, v, units, stunned);
       const celebrating = this.ending && this.battle.result?.winner === u.team;
       if (v.dir !== undefined) {
         // 8 directions : l'animation fait la marche ; les vainqueurs sautent sur place, sans se déformer.
@@ -1686,8 +1738,8 @@ export class ArenaScene extends Phaser.Scene {
     if (this.battle.zoneScale >= 1) return;
     const f = this.battle.field;
     const z = this.battle.zone;
-    // Hors zone : voile vert du gaz, sous les bouffées.
-    g.fillStyle(parseInt(manifest.staging.gas.color.slice(1), 16), 0.2);
+    // Hors zone : voile vert du gaz, sous les bouffées (le blizzard dessine son propre voile, par-dessus les unités).
+    g.fillStyle(parseInt(manifest.staging.gas.color.slice(1), 16), manifest.staging.gas.style === 'blizzard' ? 0.12 : 0.2);
     g.fillRect(f.x * SCALE, f.y * SCALE, f.width * SCALE, (z.y - f.y) * SCALE);
     g.fillRect(f.x * SCALE, (z.y + z.height) * SCALE, f.width * SCALE, (f.y + f.height - z.y - z.height) * SCALE);
     g.fillRect(f.x * SCALE, z.y * SCALE, (z.x - f.x) * SCALE, z.height * SCALE);
